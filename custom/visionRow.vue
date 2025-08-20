@@ -37,14 +37,21 @@
                 v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
             ></Select>
             </div>
+            <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string'">
+              <Textarea
+                class="w-full h-full"
+                type="text"
+                v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+              >
+              </Textarea>
+            </div>
             <div v-else>
               <Input
-                :type="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string' ? 'text' : 'number'"
+                type="number"
                 v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
-                class="w-full"
+                class="w-full "
                 :fullWidth="true"
-              >    
-              </Input>
+              />
             </div>
         </template>
       </Table>
@@ -54,7 +61,7 @@
 <script lang="ts" setup>
 import { ref, onMounted, nextTick, toRaw, Ref, h, computed, watch, reactive } from 'vue'
 import mediumZoom from 'medium-zoom'
-import { Select, Input, Table } from '@/afcl'
+import { Select, Input, Textarea, Table } from '@/afcl'
 
 const props = defineProps<{
     checkbox: any,
@@ -70,23 +77,6 @@ const props = defineProps<{
 }>();
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
-
-onMounted(() => {
-    // for (const [index, record] of props.records) {
-    //   props.meta.outputFields.forEach((fieldObj, i) => {
-    //       for (const key in fieldObj) {
-    //         if(isInColumnEnum(key)){
-    //           const colEnum = props.meta.columnEnums.find(c => c.name === key);
-    //           const object = colEnum.enum.find(item => item.value === props.records[index][key]);
-    //           selected.value[index][key] = object ? props.records[index][key] : null;
-    //         }else {
-    //           selected.value[index][key] = props.records[index][key];
-    //         }
-    //       }
-    //   })
-    // };
-    // console.log('🤮🤮🤮🤮🤮Selected:', selected.value);
-})
 
 function zoomImage(img) {
   zoomedImage.value = img
@@ -108,34 +98,20 @@ watch(zoomedImage, async (val) => {
 })
 
 function isInColumnEnum(key: string): boolean {
-  //console.log('Checking column enum for key:', key);
-  //console.log('Available column enums:',JSON.stringify(props.meta.columnEnums));
   const colEnum = props.meta.columnEnums?.find(c => c.name === key);
   if (!colEnum) {
-    //console.log(`Column enum not found for key: ${key}`);
     return false;
   }
-  //console.log(`Column enum found for key: ${key}`, colEnum);
   return true;
 }
 
 function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
   const col = columnEnumArray.find(c => c.name === key);
   if (!col) return [];
-  //console.log(`Converting column enum for key: ${JSON.stringify(key)}`, JSON.stringify(col));
   return col.enum.map(item => ({
     label: item.label,
     value: item.value
   }));
-}
-
-function showData(str1, str2, str3, str4) {
-  console.log('Str1:', str1);
-  console.log('Str2:', str2);
-  console.log('Str3:', str3);
-  console.log('Str4:', str4);
-  console.log('You clicked on record with index:', props.tableColumnsIndexes.findIndex(el => el.label === str1.label));
-  // console.log('Selected:', JSON.stringify(props.selected));
 }
 
 </script>

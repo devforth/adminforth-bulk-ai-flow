@@ -13,14 +13,6 @@
                 @click.stop
             >
                 <div class="flex flex-col gap-4 w-full h-full p-6 overflow-y-auto">
-                    <!-- <div v-for="(fieldObj, i) in props.meta.outputFields" :key="i" class="flex justify-start gap-4 text-lg">
-                        <p class="font-bold w-64 w-full text-center">Field ID:</p>
-                            <p class="font-bold w-64 w-full text-center">Source Images</p>
-                        <div v-for="(val, key) in fieldObj" :key="key" class="max-w-64 w-full text-center">
-                            <p>{{ formatLabel(key) }}</p>
-                        </div>
-                    </div> -->
-
                         <VisionTable
                             v-if="records && props.checkboxes.length"
                             :checkbox="props.checkboxes"
@@ -64,16 +56,9 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
-// const images = props.meta.imageFields(1);
-
-onMounted( async () => {
-    // const images = props.meta.imageFields(1);
-  //console.log(JSON.stringify(props.meta));
-});
 
 const openDialog = async () => {
   confirmDialog.value.open();
-//   showBaseConfig();
   await getRecords();
   await getImages();
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
@@ -118,7 +103,6 @@ function generateTableHeaders(outputFields) {
       });
     }
   }
-  //console.log('Generated table headers:', headers);
   return headers;
 }
 
@@ -147,11 +131,9 @@ function generateTableColumns() {
 }
 
 function setSelected() {
-    // Initialize selected array with correct length
     selected.value = records.value.map(() => ({}));
     
     records.value.forEach((record, index) => {
-        console.log('Record:', record);
         props.meta.outputFields.forEach((fieldObj, i) => {
             for (const key in fieldObj) {
                 if(isInColumnEnum(key)){
@@ -164,18 +146,13 @@ function setSelected() {
             }
         });
     });
-    console.log('🤮🤮🤮🤮🤮Selected:', selected.value);
 }
 
 function isInColumnEnum(key: string): boolean {
-  //console.log('Checking column enum for key:', key);
-  //console.log('Available column enums:',JSON.stringify(props.meta.columnEnums));
   const colEnum = props.meta.columnEnums?.find(c => c.name === key);
   if (!colEnum) {
-    //console.log(`Column enum not found for key: ${key}`);
     return false;
   }
-  //console.log(`Column enum found for key: ${key}`, colEnum);
   return true;
 }
 
@@ -187,11 +164,7 @@ async function getRecords() {
         record: props.checkboxes,
       },
   });
-
-//   console.log('Records:', res.records);
-//   console.log('Enum fields:', JSON.stringify(props.meta.columnEnums));
   records.value = res.records;
-  console.log('Records after assignment:', records.value);
 }
 
 async function getImages() {
@@ -204,7 +177,6 @@ async function getImages() {
   });
 
   images.value = res.images;
-//   console.log('Images after assignment:', images.value);
 }
 
 </script>
