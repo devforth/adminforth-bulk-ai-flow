@@ -1,46 +1,4 @@
 <template>
-    <!-- <div v-for="(fieldObj, i) in props.meta.outputFields" :key="i" class="flex justify-center gap-6 text-lg items-center py-2">
-        <p class="font-bold w-64 w-full text-center">{{ record.title }}</p>
-        <div class="flex justify-evenly flex-shrink-0 w-full gap-1 max-w-64">
-          <div v-for="image in images" :key="image">
-              <div class="mt-2 flex flex-wrap items-center justify-center gap-2">
-                  <img 
-                      :src="image"  
-                      class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
-                      @click="zoomImage(image)"
-                  />
-              </div>
-              <div
-                  v-if="zoomedImage"
-                  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                  @click.self="closeZoom"
-              >
-                  <img
-                  :src="zoomedImage"
-                  ref="zoomedImg"
-                  class="max-w-full max-h-full rounded-lg object-contain cursor-grab z-75"
-              />
-              </div>
-          </div>
-        </div>
-        <div v-for="(val, key) in fieldObj" :key="key" class="w-full max-w-64">
-            <div v-if="isInColumnEnum(key)">
-                <Select
-                    :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, key)"
-                    v-model="selected[key]"
-                ></Select>
-            </div>
-            <div v-else>
-              <Input
-              :type="typeof selected[key] === 'number' ? 'number' : 'text'"
-              v-model="selected[key]"
-              class="w-full"
-              :fullWidth="true"
-              >    
-              </Input>
-            </div>
-        </div>
-    </div> -->
     <div>
       <Table
         :columns="tableHeaders"
@@ -48,7 +6,7 @@
         :pageSize="8"
         >
         <template #cell:images="{item}">
-            <div class="flex gap-2">
+            <div class="flex flex-shrink-0 gap-2">
                 <div v-for="image in item.images" :key="image">
                     <!-- RENDERING IMAGES -->
                     <div class="mt-2 flex items-center justify-center gap-2">
@@ -74,17 +32,17 @@
         </template>
         <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
             <div v-if="isInColumnEnum(n)">
-                <Select
-                    :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
-                    v-model="selected[n]"
-                ></Select>
+            <Select
+                :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
+                v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+            ></Select>
             </div>
             <div v-else>
               <Input
-              :type="typeof selected[n] === 'number' ? 'number' : 'text'"
-              v-model="selected[n]"
-              class="w-full"
-              :fullWidth="true"
+                :type="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string' ? 'text' : 'number'"
+                v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+                class="w-full"
+                :fullWidth="true"
               >    
               </Input>
             </div>
@@ -107,25 +65,27 @@ const props = defineProps<{
     tableHeaders: any,
     tableColumns: any,
     customFieldNames: any,
+    tableColumnsIndexes: any,
+    selected: any,
 }>();
-
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
-const selected = ref({});
 
 onMounted(() => {
-  // props.meta.outputFields.forEach((fieldObj, i) => {
-  //   for (const key in fieldObj) {
-  //     if(isInColumnEnum(key)){
-  //       const colEnum = props.meta.columnEnums.find(c => c.name === key);
-  //       const object = colEnum.enum.find(item => item.value === props.record[key]);
-  //       selected.value[key] = object ? props.record[key] : null;
-  //     }else {
-  //       selected.value[key] = props.record[key];
-  //     }
-  //   }
-  // })
-  // console.log('Mounted VisionRow selected:', selected.value);
+    // for (const [index, record] of props.records) {
+    //   props.meta.outputFields.forEach((fieldObj, i) => {
+    //       for (const key in fieldObj) {
+    //         if(isInColumnEnum(key)){
+    //           const colEnum = props.meta.columnEnums.find(c => c.name === key);
+    //           const object = colEnum.enum.find(item => item.value === props.records[index][key]);
+    //           selected.value[index][key] = object ? props.records[index][key] : null;
+    //         }else {
+    //           selected.value[index][key] = props.records[index][key];
+    //         }
+    //       }
+    //   })
+    // };
+    // console.log('🤮🤮🤮🤮🤮Selected:', selected.value);
 })
 
 function zoomImage(img) {
@@ -167,6 +127,15 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
     label: item.label,
     value: item.value
   }));
+}
+
+function showData(str1, str2, str3, str4) {
+  console.log('Str1:', str1);
+  console.log('Str2:', str2);
+  console.log('Str3:', str3);
+  console.log('Str4:', str4);
+  console.log('You clicked on record with index:', props.tableColumnsIndexes.findIndex(el => el.label === str1.label));
+  // console.log('Selected:', JSON.stringify(props.selected));
 }
 
 </script>

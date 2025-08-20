@@ -31,6 +31,8 @@
                             :tableHeaders="tableHeaders"
                             :tableColumns="tableColumns"
                             :customFieldNames="customFieldNames"
+                            :tableColumnsIndexes="tableColumnsIndexes"
+                            :selected="selected"
                         />
                 </div>
             </div>
@@ -59,7 +61,9 @@ const records = ref<any[]>([]);
 const images = ref<any[]>([]);
 const tableHeaders = ref([]);
 const tableColumns = ref([]);
+const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
+const selected = ref<any[]>([]);
 // const images = props.meta.imageFields(1);
 
 onMounted( async () => {
@@ -73,9 +77,16 @@ const openDialog = async () => {
   await getRecords();
   await getImages();
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
-  tableColumns.value = generateTableColumns();
+  const result = generateTableColumns();
+  tableColumns.value = result[0];
+  tableColumnsIndexes.value = result[1];
   customFieldNames.value = tableHeaders.value.slice(2).map(h => h.fieldName);
+  setSelected();
 }
+
+watch(selected, (val) => {
+  console.log('Selected changed:', val);
+}, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
@@ -107,36 +118,66 @@ function generateTableHeaders(outputFields) {
       });
     }
   }
-  console.log('Generated table headers:', headers);
+  //console.log('Generated table headers:', headers);
   return headers;
 }
 
 function generateTableColumns() {
     const fields = [];
     const tableData = [];
+    const indexes = [];
     for (const field of tableHeaders.value) {
-        fields.push( field.fieldName );
+      fields.push( field.fieldName );
     }
-    console.log('Generated table columns:', fields);
-    console.log("Checkboxes:", props.checkboxes);
     for (const [index, checkbox] of props.checkboxes) {
-        const record = records.value[index];
-        console.log('Record:', record);
-        let reqFields = {};
-        for (const field of fields) {
-            reqFields[field] = record[field] || '';
-        }
-        reqFields['label'] = record.title;  //need to find a way to get the label
-        reqFields['images'] = images.value[index];
-        console.log('Request fields:', reqFields);
-        tableData.push(reqFields);
-        //tableData.push(rowData);
+      const record = records.value[index];
+      let reqFields = {};
+      for (const field of fields) {
+          reqFields[field] = record[field] || '';
+      }
+      reqFields['label'] = record.title;
+      reqFields['images'] = images.value[index];
+      indexes.push({
+        id: record.id,
+        label: record.title,
+      });
+      tableData.push(reqFields);
     }
-    console.log('Generated table data:', tableData);
-    return tableData;
+    return [tableData, indexes];
 }
 
+function setSelected() {
+    // Initialize selected array with correct length
+    selected.value = records.value.map(() => ({}));
+    
+    records.value.forEach((record, index) => {
+        console.log('Record:', record);
+        props.meta.outputFields.forEach((fieldObj, i) => {
+            for (const key in fieldObj) {
+                if(isInColumnEnum(key)){
+                    const colEnum = props.meta.columnEnums.find(c => c.name === key);
+                    const object = colEnum.enum.find(item => item.value === record[key]);
+                    selected.value[index][key] = object ? record[key] : null;
+                } else {
+                    selected.value[index][key] = record[key];
+                }
+            }
+        });
+    });
+    console.log('🤮🤮🤮🤮🤮Selected:', selected.value);
+}
 
+function isInColumnEnum(key: string): boolean {
+  //console.log('Checking column enum for key:', key);
+  //console.log('Available column enums:',JSON.stringify(props.meta.columnEnums));
+  const colEnum = props.meta.columnEnums?.find(c => c.name === key);
+  if (!colEnum) {
+    //console.log(`Column enum not found for key: ${key}`);
+    return false;
+  }
+  //console.log(`Column enum found for key: ${key}`, colEnum);
+  return true;
+}
 
 async function getRecords() {
   const res = await callAdminForthApi({
@@ -150,7 +191,7 @@ async function getRecords() {
 //   console.log('Records:', res.records);
 //   console.log('Enum fields:', JSON.stringify(props.meta.columnEnums));
   records.value = res.records;
-//   console.log('Records after assignment:', records.value);
+  console.log('Records after assignment:', records.value);
 }
 
 async function getImages() {
