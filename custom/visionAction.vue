@@ -81,7 +81,7 @@ const openDialog = async () => {
   setSelected();
   analyzeFields();
 }
-
+ 
 // watch(selected, (val) => {
 //   console.log('Selected changed:', val);
 // }, { deep: true });
