@@ -2,6 +2,7 @@ import { AdminForthPlugin, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourcePages, AdminForthResourceColumn, AdminForthDataTypes, AdminForthResource } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { json } from "stream/consumers";
+import Handlebars from 'handlebars';
 
 
 export default class  BulkVisionPlugin extends AdminForthPlugin {
@@ -10,6 +11,22 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
     this.options = options;
+  }
+
+  // Compile Handlebars templates in outputFields using record fields as context
+  private compileOutputFieldsTemplates(record: any): Record<string, string>[] {
+    return this.options.outputFields.map((fieldObj) => {
+      const compiled: Record<string, string> = {};
+      for (const [key, templateStr] of Object.entries(fieldObj)) {
+        try {
+          const tpl = Handlebars.compile(String(templateStr));
+          compiled[key] = tpl(record);
+        } catch {
+          compiled[key] = String(templateStr);
+        }
+      }
+      return compiled;
+    });
   }
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
@@ -47,21 +64,28 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
             const attachmentFiles = await this.options.attachFiles({ record: record });
             console.log("Attachment files to analyze:", attachmentFiles);
             //create prompt for OpenAI
+            const compiledOutputFields = this.compileOutputFieldsTemplates(record);
             const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
               Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-              Each object must contain the following fields: ${JSON.stringify(this.options.outputFields)} Use the exact field names.
+              Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names.
               Image URLs:`;
 
             //send prompt to OpenAI and get response
             const chatResponse = await this.options.adapter.generate({ prompt, inputFileUrls: attachmentFiles });
 
-            //if error in response, throw error
-            if (chatResponse.response.error) {
-              throw new Error(`ERROR: ${JSON.stringify(chatResponse.response.error)}`);
+            const resp: any = (chatResponse as any).response;
+            const topLevelError = (chatResponse as any).error;
+            if (topLevelError || resp?.error) {
+              throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
+            }
+
+            const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+            if (!textOutput || typeof textOutput !== 'string') {
+              throw new Error('Unexpected AI response format');
             }
 
             //parse response and update record
-            const resData = JSON.parse(chatResponse.response.output[0].content[0].text);
+            const resData = JSON.parse(textOutput);
             console.log("Parsed response data:", resData);
 
             const updates = Object.entries(resData).map(([key, value]) =>
@@ -125,21 +149,28 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
         const attachmentFiles = await this.options.attachFiles({ record: record });
         console.log("Attachment files to analyze:", attachmentFiles);
         //create prompt for OpenAI
+        const compiledOutputFields = this.compileOutputFieldsTemplates(record);
         const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
           Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-          Each object must contain the following fields: ${JSON.stringify(this.options.outputFields)} Use the exact field names.
+          Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names.
           Image URLs:`;
-
+          
         //send prompt to OpenAI and get response
         const chatResponse = await this.options.adapter.generate({ prompt, inputFileUrls: attachmentFiles });
 
-        //if error in response, throw error
-        if (chatResponse.response.error) {
-          throw new Error(`ERROR: ${JSON.stringify(chatResponse.response.error)}`);
+        const resp: any = (chatResponse as any).response;
+        const topLevelError = (chatResponse as any).error;
+        if (topLevelError || resp?.error) {
+          throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
+        }
+
+        const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+        if (!textOutput || typeof textOutput !== 'string') {
+          throw new Error('Unexpected AI response format');
         }
 
         //parse response and update record
-        const resData = JSON.parse(chatResponse.response.output[0].content[0].text);
+        const resData = JSON.parse(textOutput);
         console.log("Parsed response data:", resData);
 
         // const updates = Object.entries(resData).map(([key, value]) =>
@@ -190,13 +221,17 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
         const fieldsToUpdate = body.body.fields || {};
         console.log("Selected IDs for update:", selectedIds);
         console.log("Fields to update:", fieldsToUpdate);
-        selectedIds.map(async (ID) => {})
+        const updates = selectedIds.map((ID, idx) =>
+          this.adminforth
+            .resource(this.resourceConfig.resourceId)
+            .update(ID, fieldsToUpdate[idx])
+        );
 
+        await Promise.all(updates);
 
-
-        return { ok: true };
-      }
-    });
+      return { ok: true };
+    }
+  });
   }
 }
 
