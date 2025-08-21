@@ -28,7 +28,7 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       return compiled;
     });
   }
-
+ 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
 
