@@ -1,67 +1,61 @@
 <template>
-    <div @click="openDialog">
-        <p class="">{{ props.meta.actionName }}</p>
-    </div>
-
-    <Dialog ref="confirmDialog">
-        <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            @click="closeDialog"
-        >
-            <div
-                class="relative max-w-[95vw] h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
-                @click.stop
-            >
-                <div class="flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
-                  <VisionTable
-                      v-if="records && props.checkboxes.length"
-                      :checkbox="props.checkboxes"
-                      :records="records"
-                      :index="0"
-                      :meta="props.meta"
-                      :images="images"
-                      :tableHeaders="tableHeaders"
-                      :tableColumns="tableColumns"
-                      :customFieldNames="customFieldNames"
-                      :tableColumnsIndexes="tableColumnsIndexes"
-                      :selected="selected"
-                      :isAiResponseReceived="isAiResponseReceived"
-                  />
-                  <Button 
-                    class="w-64"
-                    @click="saveData"
-                  >
-                    Save
-                  </Button>
-                </div>
-            </div>
+  <div @click="openDialog">
+      <p class="">{{ props.meta.actionName }}</p>
+  </div>
+  <Dialog ref="confirmDialog">
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      @click="closeDialog"
+    >
+      <div
+        class="relative max-w-[95vw] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
+        @click.stop
+      >
+        <div class="flex flex-col items-end justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+          <VisionTable
+            v-if="records && props.checkboxes.length"
+            :checkbox="props.checkboxes"
+            :records="records"
+            :index="0"
+            :meta="props.meta"
+            :images="images"
+            :tableHeaders="tableHeaders"
+            :tableColumns="tableColumns"
+            :customFieldNames="customFieldNames"
+            :tableColumnsIndexes="tableColumnsIndexes"
+            :selected="selected"
+            :isAiResponseReceived="isAiResponseReceived"
+          />
+          <Button 
+            class="w-64"
+            @click="saveData"
+          >
+          {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
+          </Button>
         </div>
-    </Dialog>
-
-
-
+      </div>
+    </div>
+  </Dialog>
 </template>
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { ref, onMounted, nextTick, Ref, h, computed, watch, reactive } from 'vue'
+import { ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
-import VisionTable from './visionRow.vue'
-import { json } from 'stream/consumers';
-import { emit } from 'process';
+import VisionTable from './visionTable.vue'
 
 const props = defineProps<{
-    checkboxes: any,
-    meta: any,
-    resource: any,
-    adminUser: any,
-    updateList: {
-      type: Function,
-      required: true
-    },
-    clearCheckboxes: {
-      type: Function
-    }
+  checkboxes: any,
+  meta: any,
+  resource: any,
+  adminUser: any,
+  updateList: {
+    type: Function,
+    required: true
+  },
+  clearCheckboxes: {
+    type: Function
+  }
 }>();
 
 const confirmDialog = ref(null);
@@ -72,7 +66,6 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
-
 const isAiResponseReceived = ref([]);
 
 const openDialog = async () => {
@@ -95,10 +88,6 @@ watch(selected, (val) => {
 const closeDialog = () => {
   confirmDialog.value.close();
   isAiResponseReceived.value = [];
-}
-async function showBaseConfig() {
-  console.log('Base config:', JSON.stringify(props.meta));
-  console.log('Checked config:', JSON.stringify(props.checkboxes));
 }
 
 function formatLabel(str) {
@@ -134,20 +123,17 @@ function generateTableColumns() {
     for (const field of tableHeaders.value) {
       fields.push( field.fieldName );
     }
-    console.log('Checkboxes:', props.checkboxes);
     for (const [index, checkbox] of props.checkboxes.entries()) {
-      console.log('Index:', index);
       const record = records.value[index];
-      console.log('Record:', record);
       let reqFields = {};
       for (const field of fields) {
           reqFields[field] = record[field] || '';
       }
-      reqFields['label'] = record.title;
+      reqFields['label'] = record._label;
       reqFields['images'] = images.value[index];
       indexes.push({
         id: record.id,
-        label: record.title,
+        label: record._label,
       });
       tableData.push(reqFields);
     }
@@ -155,25 +141,24 @@ function generateTableColumns() {
 }
 
 function setSelected() {
-    selected.value = records.value.map(() => ({}));
-    
-    records.value.forEach((record, index) => {
-        props.meta.outputFields.forEach((fieldObj, i) => {
-            for (const key in fieldObj) {
-                if(isInColumnEnum(key)){
-                    const colEnum = props.meta.columnEnums.find(c => c.name === key);
-                    const object = colEnum.enum.find(item => item.value === record[key]);
-                    selected.value[index][key] = object ? record[key] : null;
-                } else {
-                    selected.value[index][key] = record[key];
-                }
-            }
-            selected.value[index].isChecked = true;
-            selected.value[index].id = record.id;
-            isAiResponseReceived.value[index] = true;
-        });
+  selected.value = records.value.map(() => ({}));
+  
+  records.value.forEach((record, index) => {
+    props.meta.outputFields.forEach((fieldObj, i) => {
+      for (const key in fieldObj) {
+        if(isInColumnEnum(key)){
+          const colEnum = props.meta.columnEnums.find(c => c.name === key);
+          const object = colEnum.enum.find(item => item.value === record[key]);
+          selected.value[index][key] = object ? record[key] : null;
+        } else {
+          selected.value[index][key] = record[key];
+        }
+      }
+      selected.value[index].isChecked = true;
+      selected.value[index].id = record.id;
+      isAiResponseReceived.value[index] = true;
     });
-    console.log("isAiResponseReceived:", isAiResponseReceived.value);
+  });
 }
 
 function isInColumnEnum(key: string): boolean {
@@ -186,23 +171,22 @@ function isInColumnEnum(key: string): boolean {
 
 async function getRecords() {
   const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
-      method: 'POST',
-      body: {
-        record: props.checkboxes,
-      },
+    path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
+    method: 'POST',
+    body: {
+      record: props.checkboxes,
+    },
   });
-  console.log('Records fetched:', res.records);
   records.value = res.records;
 }
 
 async function getImages() {
   const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
-      method: 'POST',
-      body: {
-        record: records.value,
-      },
+    path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
+    method: 'POST',
+    body: {
+      record: records.value,
+    },
   });
 
   images.value = res.images;
@@ -218,27 +202,21 @@ function prepareDataForSave() {
   const checkedItemsIDs = selected.value
     .filter(item => item.isChecked === true)
     .map(item => item.id);
-
-  console.log('Checked items IDs:', checkedItemsIDs);
-  console.log('Checked items to save:', checkedItems);
   return [checkedItemsIDs, checkedItems];
 }
 
 async function analyzeFields() {
   isAiResponseReceived.value = props.checkboxes.map(() => false);
 
- const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
-      method: 'POST',
-      body: {
-        selectedIds: props.checkboxes,
-      },
+  const res = await callAdminForthApi({
+    path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
+    method: 'POST',
+    body: {
+      selectedIds: props.checkboxes,
+    },
   });
 
   isAiResponseReceived.value = props.checkboxes.map(() => true);
-  console.log('Analysis result:', res);
-  console.log('Selected', selected.value);
-
     selected.value.splice(
     0,
     selected.value.length,
@@ -247,21 +225,18 @@ async function analyzeFields() {
       isChecked: true
     }))
   )
-
-  console.log('Selected after splice:', selected.value);
-
 }
 
 async function saveData() {
   const [checkedItemsIDs, reqData] = prepareDataForSave();
 
   const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
-      method: 'POST',
-      body: {
-        selectedIds: checkedItemsIDs,
-        fields: reqData,
-      },
+    path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
+    method: 'POST',
+    body: {
+      selectedIds: checkedItemsIDs,
+      fields: reqData,
+    },
   });
 
   if(res.ok) {

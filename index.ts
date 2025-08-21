@@ -52,56 +52,12 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       }
     }
 
-    const field = {
-        label: this.options.actionName,
-        confirm: this.options.confirmMessage,
-        action: async ({ selectedIds, adminUser }: any) => {
-          const tasks = selectedIds.map(async (ID) => {
-            // Fetch the record using the provided ID
-            const record = await adminforth.resource(resourceConfig.resourceId).get( [Filters.EQ('id', ID)] );
+    //const targetResource = this.adminforth.config.resources.find((res) => res.resourceId == col.foreignResource.resourceId);
+    //const targetResource = this.adminforth.config.resources;
+    //console.log('targetResource', targetResource);
+    // console.log('recorcdLabel', resourceConfig.recordLabel);
 
-            //recieve image URLs to analyze
-            const attachmentFiles = await this.options.attachFiles({ record: record });
-            console.log("Attachment files to analyze:", attachmentFiles);
-            //create prompt for OpenAI
-            const compiledOutputFields = this.compileOutputFieldsTemplates(record);
-            const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
-              Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-              Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names.
-              Image URLs:`;
-
-            //send prompt to OpenAI and get response
-            const chatResponse = await this.options.adapter.generate({ prompt, inputFileUrls: attachmentFiles });
-
-            const resp: any = (chatResponse as any).response;
-            const topLevelError = (chatResponse as any).error;
-            if (topLevelError || resp?.error) {
-              throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
-            }
-
-            const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
-            if (!textOutput || typeof textOutput !== 'string') {
-              throw new Error('Unexpected AI response format');
-            }
-
-            //parse response and update record
-            const resData = JSON.parse(textOutput);
-            console.log("Parsed response data:", resData);
-
-            const updates = Object.entries(resData).map(([key, value]) =>
-              adminforth.resource(this.resourceConfig.resourceId).update(ID, { [key]: value })
-            );
-
-            return Promise.all(updates);
-          });
-
-          await Promise.all(tasks);
-          return { ok: true, successMessage: "Updated successfully" };
-        },
-
-        showInThreeDotsDropdown: true,
-      };
-
+    ///////////////////////////////////////
     const pageInjection = {
       file: this.componentPath('visionAction.vue'),
       meta: {
@@ -120,7 +76,6 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       this.resourceConfig.options.pageInjections.list = {};
     }
 
-    this.resourceConfig.options.bulkActions.push(field);
     this.resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [pageInjection];
   }
   
@@ -135,19 +90,17 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
   }
 
   setupEndpoints(server: IHttpServer) {
-     server.endpoint({
+    server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/analyze`,
       handler: async ({ body, adminUser, headers }) => {
       const selectedIds = body.selectedIds || [];
-      console.log("Selected IDs for analysis:", selectedIds);
       const tasks = selectedIds.map(async (ID) => {
         // Fetch the record using the provided ID
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ('id', ID)] );
 
         //recieve image URLs to analyze
         const attachmentFiles = await this.options.attachFiles({ record: record });
-        console.log("Attachment files to analyze:", attachmentFiles);
         //create prompt for OpenAI
         const compiledOutputFields = this.compileOutputFieldsTemplates(record);
         const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
@@ -171,11 +124,6 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
 
         //parse response and update record
         const resData = JSON.parse(textOutput);
-        console.log("Parsed response data:", resData);
-
-        // const updates = Object.entries(resData).map(([key, value]) =>
-        //   adminforth.resource(this.resourceConfig.resourceId).update(ID, { [key]: value })
-        // );
 
         return resData;
       });
@@ -183,8 +131,8 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       const result = await Promise.all(tasks);
 
       return { result };
-    }
-  });
+      }
+    });
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
@@ -192,6 +140,7 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
         let records = [];
         for( const record of body.body.record ) {
           records.push(await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ('id', record)] ));
+          records[records.length - 1]._label = this.resourceConfig.recordLabel(records[records.length - 1]);
         }
         return {
           records,
@@ -219,8 +168,6 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       handler: async ( body ) => {
         const selectedIds = body.body.selectedIds || [];
         const fieldsToUpdate = body.body.fields || {};
-        console.log("Selected IDs for update:", selectedIds);
-        console.log("Fields to update:", fieldsToUpdate);
         const updates = selectedIds.map((ID, idx) =>
           this.adminforth
             .resource(this.resourceConfig.resourceId)
@@ -230,8 +177,8 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
         await Promise.all(updates);
 
       return { ok: true };
-    }
-  });
+      }
+    });
   }
 }
 
