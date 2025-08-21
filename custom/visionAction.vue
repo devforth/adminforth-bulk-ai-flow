@@ -74,16 +74,17 @@ const openDialog = async () => {
   await getImages();
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
   const result = generateTableColumns();
-  tableColumns.value = result[0];
-  tableColumnsIndexes.value = result[1];
+  tableColumns.value = result.tableData;
+  tableColumnsIndexes.value = result.indexes;
+  
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
-  //analyzeFields();
+  analyzeFields();
 }
 
-watch(selected, (val) => {
-  console.log('Selected changed:', val);
-}, { deep: true });
+// watch(selected, (val) => {
+//   console.log('Selected changed:', val);
+// }, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
@@ -117,27 +118,28 @@ function generateTableHeaders(outputFields) {
 }
 
 function generateTableColumns() {
-    const fields = [];
-    const tableData = [];
-    const indexes = [];
-    for (const field of tableHeaders.value) {
-      fields.push( field.fieldName );
+  const fields = [];
+  const tableData = [];
+  const indexes = [];
+  for (const field of tableHeaders.value) {
+    fields.push( field.fieldName );
+  }
+  for (const [index, checkbox] of props.checkboxes.entries()) {
+    const record = records.value[index];
+    let reqFields: any = {};
+    for (const field of fields) {
+      reqFields[field] = record[field] || '';
     }
-    for (const [index, checkbox] of props.checkboxes.entries()) {
-      const record = records.value[index];
-      let reqFields = {};
-      for (const field of fields) {
-          reqFields[field] = record[field] || '';
-      }
-      reqFields['label'] = record._label;
-      reqFields['images'] = images.value[index];
-      indexes.push({
-        id: record.id,
-        label: record._label,
-      });
-      tableData.push(reqFields);
-    }
-    return [tableData, indexes];
+    reqFields.label = record._label;
+    reqFields.images = images.value[index];
+    reqFields.id = record.id;
+    indexes.push({
+      id: record.id,
+      label: record._label,
+    });
+    tableData.push(reqFields);
+  }
+  return { tableData, indexes };
 }
 
 function setSelected() {
@@ -217,12 +219,14 @@ async function analyzeFields() {
   });
 
   isAiResponseReceived.value = props.checkboxes.map(() => true);
-    selected.value.splice(
+
+  selected.value.splice(
     0,
     selected.value.length,
-    ...res.result.map(item => ({
+    ...res.result.map((item, idx) => ({
       ...item,
-      isChecked: true
+      isChecked: true,
+      id: selected.value[idx]?.id,
     }))
   )
 }
@@ -242,7 +246,6 @@ async function saveData() {
   if(res.ok) {
     confirmDialog.value.close();
     props.updateList();
-    console.log(props.checkboxes);
     props.clearCheckboxes();
   } else {
     console.error('Error saving data:', res);

@@ -11,9 +11,11 @@
       </template>
       <!-- CHECKBOX CELL TEMPLATE -->
       <template #cell:checkboxes="{ item }">
-        <Checkbox
-          v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)].isChecked"
-        />
+        <div class="flex items-center justify-center">
+          <Checkbox
+            v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)].isChecked"
+          />
+        </div>
       </template>
       <!-- IMAGE CELL TEMPLATE -->
       <template #cell:images="{item}">
@@ -42,26 +44,32 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el.label === item.label)]">
+        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el.id === item.id)]">
           <div v-if="isInColumnEnum(n)">
             <Select
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
             >
             </Select>
           </div>
-          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'object'">
+          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n] === 'object'">
             <Textarea
               class="w-full h-full"
               type="text"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
             >
             </Textarea>
+          </div>
+          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n] === 'boolean'">
+            <Toggle
+              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
+            >
+            </Toggle>
           </div>
           <div v-else>
             <Input
               type="number"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
               class="w-full "
               :fullWidth="true"
             />
@@ -78,7 +86,7 @@
 <script lang="ts" setup>
 import { ref, nextTick, watch } from 'vue'
 import mediumZoom from 'medium-zoom'
-import { Select, Input, Textarea, Table, Checkbox, Skeleton } from '@/afcl'
+import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle } from '@/afcl'
 
 const props = defineProps<{
   meta: any,

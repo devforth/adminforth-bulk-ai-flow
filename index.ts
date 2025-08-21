@@ -52,12 +52,6 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       }
     }
 
-    //const targetResource = this.adminforth.config.resources.find((res) => res.resourceId == col.foreignResource.resourceId);
-    //const targetResource = this.adminforth.config.resources;
-    //console.log('targetResource', targetResource);
-    // console.log('recorcdLabel', resourceConfig.recordLabel);
-
-    ///////////////////////////////////////
     const pageInjection = {
       file: this.componentPath('visionAction.vue'),
       meta: {
@@ -105,7 +99,7 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
         const compiledOutputFields = this.compileOutputFieldsTemplates(record);
         const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
           Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-          Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names.
+          Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
           Image URLs:`;
           
         //send prompt to OpenAI and get response
