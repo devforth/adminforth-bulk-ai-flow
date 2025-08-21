@@ -5,6 +5,17 @@
         :data="tableColumns"
         :pageSize="8"
         >
+        <template #header:checkboxes="{ item }">
+            <Checkbox
+              v-model="isAllChecked"
+              @click="clickMainCheckbox"
+            />
+        </template>
+        <template #cell:checkboxes="{ item }">
+            <Checkbox
+              v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)].isChecked"
+            />
+        </template>
         <template #cell:images="{item}">
             <div class="flex flex-shrink-0 gap-2">
                 <div v-for="image in item.images" :key="image">
@@ -42,6 +53,7 @@
                 class="w-full h-full"
                 type="text"
                 v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+                @click="showData(index)"
               >
               </Textarea>
             </div>
@@ -61,7 +73,7 @@
 <script lang="ts" setup>
 import { ref, onMounted, nextTick, toRaw, Ref, h, computed, watch, reactive } from 'vue'
 import mediumZoom from 'medium-zoom'
-import { Select, Input, Textarea, Table } from '@/afcl'
+import { Select, Input, Textarea, Table, Checkbox } from '@/afcl'
 
 const props = defineProps<{
     checkbox: any,
@@ -77,6 +89,11 @@ const props = defineProps<{
 }>();
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
+
+const isAllChecked = computed(() => {
+  console.log('Checking if all are checked:', props.selected.every(item => item.isChecked));
+  return props.selected.every(item => item.isChecked);
+});
 
 function zoomImage(img) {
   zoomedImage.value = img
@@ -112,6 +129,19 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
     label: item.label,
     value: item.value
   }));
+}
+
+
+function showData(record: any) {
+  console.log('Showing data for record:', record);
+}
+
+function clickMainCheckbox() {
+  if( isAllChecked.value ) {
+    props.selected.forEach(item => item.isChecked = false);
+  } else {
+    props.selected.forEach(item => item.isChecked = true);
+  }
 }
 
 </script>

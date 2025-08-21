@@ -12,20 +12,23 @@
                 class="relative max-w-[95vw] h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
                 @click.stop
             >
-                <div class="flex flex-col gap-4 w-full h-full p-6 overflow-y-auto">
-                        <VisionTable
-                            v-if="records && props.checkboxes.length"
-                            :checkbox="props.checkboxes"
-                            :records="records"
-                            :index="0"
-                            :meta="props.meta"
-                            :images="images"
-                            :tableHeaders="tableHeaders"
-                            :tableColumns="tableColumns"
-                            :customFieldNames="customFieldNames"
-                            :tableColumnsIndexes="tableColumnsIndexes"
-                            :selected="selected"
-                        />
+                <div class="flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+                  <VisionTable
+                      v-if="records && props.checkboxes.length"
+                      :checkbox="props.checkboxes"
+                      :records="records"
+                      :index="0"
+                      :meta="props.meta"
+                      :images="images"
+                      :tableHeaders="tableHeaders"
+                      :tableColumns="tableColumns"
+                      :customFieldNames="customFieldNames"
+                      :tableColumnsIndexes="tableColumnsIndexes"
+                      :selected="selected"
+                  />
+                  <Button class="w-64">
+                    Save
+                  </Button>
                 </div>
             </div>
         </div>
@@ -38,8 +41,9 @@
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
 import { ref, onMounted, nextTick, Ref, h, computed, watch, reactive } from 'vue'
-import { Dialog, Table } from '@/afcl';
+import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionRow.vue'
+import { json } from 'stream/consumers';
 
 const props = defineProps<{
     checkboxes: any,
@@ -65,7 +69,7 @@ const openDialog = async () => {
   const result = generateTableColumns();
   tableColumns.value = result[0];
   tableColumnsIndexes.value = result[1];
-  customFieldNames.value = tableHeaders.value.slice(2).map(h => h.fieldName);
+  customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
 }
 
@@ -91,6 +95,7 @@ function formatLabel(str) {
 function generateTableHeaders(outputFields) {
   const headers = [];
 
+  headers.push({ label: 'Checkboxes', fieldName: 'checkboxes' });
   headers.push({ label: 'Field name', fieldName: 'label' });
   headers.push({ label: 'Source Images', fieldName: 'images' });
 
@@ -113,8 +118,11 @@ function generateTableColumns() {
     for (const field of tableHeaders.value) {
       fields.push( field.fieldName );
     }
-    for (const [index, checkbox] of props.checkboxes) {
+    console.log('Checkboxes:', props.checkboxes);
+    for (const [index, checkbox] of props.checkboxes.entries()) {
+      console.log('Index:', index);
       const record = records.value[index];
+      console.log('Record:', record);
       let reqFields = {};
       for (const field of fields) {
           reqFields[field] = record[field] || '';
@@ -144,6 +152,7 @@ function setSelected() {
                     selected.value[index][key] = record[key];
                 }
             }
+            selected.value[index].isChecked = true;
         });
     });
 }
@@ -164,6 +173,7 @@ async function getRecords() {
         record: props.checkboxes,
       },
   });
+  console.log('Records fetched:', res.records);
   records.value = res.records;
 }
 
