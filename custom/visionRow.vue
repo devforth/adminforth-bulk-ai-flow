@@ -47,7 +47,7 @@
               >
               </Select>
             </div>
-            <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string'">
+            <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'object'">
               <Textarea
                 class="w-full h-full"
                 type="text"

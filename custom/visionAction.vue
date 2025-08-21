@@ -48,12 +48,20 @@ import { ref, onMounted, nextTick, Ref, h, computed, watch, reactive } from 'vue
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionRow.vue'
 import { json } from 'stream/consumers';
+import { emit } from 'process';
 
 const props = defineProps<{
     checkboxes: any,
     meta: any,
     resource: any,
     adminUser: any,
+    updateList: {
+      type: Function,
+      required: true
+    },
+    clearCheckboxes: {
+      type: Function
+    }
 }>();
 
 const confirmDialog = ref(null);
@@ -77,7 +85,7 @@ const openDialog = async () => {
   tableColumnsIndexes.value = result[1];
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
-  analyzeFields();
+  //analyzeFields();
 }
 
 watch(selected, (val) => {
@@ -247,7 +255,7 @@ async function analyzeFields() {
 async function saveData() {
   const [checkedItemsIDs, reqData] = prepareDataForSave();
 
-   const res = await callAdminForthApi({
+  const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
       method: 'POST',
       body: {
@@ -255,5 +263,14 @@ async function saveData() {
         fields: reqData,
       },
   });
+
+  if(res.ok) {
+    confirmDialog.value.close();
+    props.updateList();
+    console.log(props.checkboxes);
+    props.clearCheckboxes();
+  } else {
+    console.error('Error saving data:', res);
+  }
 }
 </script>
