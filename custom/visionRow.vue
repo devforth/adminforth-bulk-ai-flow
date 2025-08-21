@@ -6,10 +6,7 @@
         :pageSize="8"
         >
         <template #header:checkboxes="{ item }">
-            <Checkbox
-              v-model="isAllChecked"
-              @click="clickMainCheckbox"
-            />
+            MARK FOR SAVE
         </template>
         <template #cell:checkboxes="{ item }">
             <Checkbox
@@ -42,11 +39,13 @@
             </div>
         </template>
         <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
+          <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el.label === item.label)]">
             <div v-if="isInColumnEnum(n)">
-            <Select
-                :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
-                v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
-            ></Select>
+              <Select
+                  :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
+                  v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n]"
+              >
+              </Select>
             </div>
             <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.label === item.label)][n] === 'string'">
               <Textarea
@@ -65,6 +64,10 @@
                 :fullWidth="true"
               />
             </div>
+          </div>
+          <div v-else>
+            <Skeleton class="w-full h-6" />
+          </div>
         </template>
       </Table>
     </div>
@@ -73,7 +76,7 @@
 <script lang="ts" setup>
 import { ref, onMounted, nextTick, toRaw, Ref, h, computed, watch, reactive } from 'vue'
 import mediumZoom from 'medium-zoom'
-import { Select, Input, Textarea, Table, Checkbox } from '@/afcl'
+import { Select, Input, Textarea, Table, Checkbox, Skeleton } from '@/afcl'
 
 const props = defineProps<{
     checkbox: any,
@@ -86,6 +89,7 @@ const props = defineProps<{
     customFieldNames: any,
     tableColumnsIndexes: any,
     selected: any,
+    isAiResponseReceived: boolean[]
 }>();
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)

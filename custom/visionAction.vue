@@ -25,8 +25,12 @@
                       :customFieldNames="customFieldNames"
                       :tableColumnsIndexes="tableColumnsIndexes"
                       :selected="selected"
+                      :isAiResponseReceived="isAiResponseReceived"
                   />
-                  <Button class="w-64">
+                  <Button 
+                    class="w-64"
+                    @click="saveData"
+                  >
                     Save
                   </Button>
                 </div>
@@ -61,6 +65,8 @@ const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
 
+const isAiResponseReceived = ref([]);
+
 const openDialog = async () => {
   confirmDialog.value.open();
   await getRecords();
@@ -71,6 +77,7 @@ const openDialog = async () => {
   tableColumnsIndexes.value = result[1];
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
+  analyzeFields();
 }
 
 watch(selected, (val) => {
@@ -79,6 +86,7 @@ watch(selected, (val) => {
 
 const closeDialog = () => {
   confirmDialog.value.close();
+  isAiResponseReceived.value = [];
 }
 async function showBaseConfig() {
   console.log('Base config:', JSON.stringify(props.meta));
@@ -153,8 +161,11 @@ function setSelected() {
                 }
             }
             selected.value[index].isChecked = true;
+            selected.value[index].id = record.id;
+            isAiResponseReceived.value[index] = true;
         });
     });
+    console.log("isAiResponseReceived:", isAiResponseReceived.value);
 }
 
 function isInColumnEnum(key: string): boolean {
@@ -189,4 +200,60 @@ async function getImages() {
   images.value = res.images;
 }
 
+function prepareDataForSave() {
+  const checkedItems = selected.value
+    .filter(item => item.isChecked === true)
+    .map(item => {
+      const { isChecked, id, ...itemWithoutIsCheckedAndId } = item;
+      return itemWithoutIsCheckedAndId;
+    });
+  const checkedItemsIDs = selected.value
+    .filter(item => item.isChecked === true)
+    .map(item => item.id);
+
+  console.log('Checked items IDs:', checkedItemsIDs);
+  console.log('Checked items to save:', checkedItems);
+  return [checkedItemsIDs, checkedItems];
+}
+
+async function analyzeFields() {
+  isAiResponseReceived.value = props.checkboxes.map(() => false);
+
+ const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+  });
+
+  isAiResponseReceived.value = props.checkboxes.map(() => true);
+  console.log('Analysis result:', res);
+  console.log('Selected', selected.value);
+
+    selected.value.splice(
+    0,
+    selected.value.length,
+    ...res.result.map(item => ({
+      ...item,
+      isChecked: true
+    }))
+  )
+
+  console.log('Selected after splice:', selected.value);
+
+}
+
+async function saveData() {
+  const [checkedItemsIDs, reqData] = prepareDataForSave();
+
+   const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
+      method: 'POST',
+      body: {
+        selectedIds: checkedItemsIDs,
+        fields: reqData,
+      },
+  });
+}
 </script>

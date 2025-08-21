@@ -112,46 +112,48 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
 
   setupEndpoints(server: IHttpServer) {
      server.endpoint({
-      method: 'GET',
-      path: `/plugin/${this.pluginInstanceId}/analize`,
-      handler: async ({ body, adminUser, headers, selectedIds }) => {
-       const tasks = selectedIds.map(async (ID) => {
-            // Fetch the record using the provided ID
-            const record = await adminUser.resource(resourceConfig.resourceId).get( [Filters.EQ('id', ID)] );
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/analyze`,
+      handler: async ({ body, adminUser, headers }) => {
+      const selectedIds = body.selectedIds || [];
+      console.log("Selected IDs for analysis:", selectedIds);
+      const tasks = selectedIds.map(async (ID) => {
+        // Fetch the record using the provided ID
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ('id', ID)] );
 
-            //recieve image URLs to analyze
-            const attachmentFiles = await this.options.attachFiles({ record: record });
-            console.log("Attachment files to analyze:", attachmentFiles);
-            //create prompt for OpenAI
-            const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
-              Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-              Each object must contain the following fields: ${JSON.stringify(this.options.outputFields)} Use the exact field names.
-              Image URLs:`;
+        //recieve image URLs to analyze
+        const attachmentFiles = await this.options.attachFiles({ record: record });
+        console.log("Attachment files to analyze:", attachmentFiles);
+        //create prompt for OpenAI
+        const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
+          Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
+          Each object must contain the following fields: ${JSON.stringify(this.options.outputFields)} Use the exact field names.
+          Image URLs:`;
 
-            //send prompt to OpenAI and get response
-            const chatResponse = await this.options.adapter.generate({ prompt, inputFileUrls: attachmentFiles });
+        //send prompt to OpenAI and get response
+        const chatResponse = await this.options.adapter.generate({ prompt, inputFileUrls: attachmentFiles });
 
-            //if error in response, throw error
-            if (chatResponse.response.error) {
-              throw new Error(`ERROR: ${JSON.stringify(chatResponse.response.error)}`);
-            }
+        //if error in response, throw error
+        if (chatResponse.response.error) {
+          throw new Error(`ERROR: ${JSON.stringify(chatResponse.response.error)}`);
+        }
 
-            //parse response and update record
-            const resData = JSON.parse(chatResponse.response.output[0].content[0].text);
-            console.log("Parsed response data:", resData);
+        //parse response and update record
+        const resData = JSON.parse(chatResponse.response.output[0].content[0].text);
+        console.log("Parsed response data:", resData);
 
-            // const updates = Object.entries(resData).map(([key, value]) =>
-            //   adminforth.resource(this.resourceConfig.resourceId).update(ID, { [key]: value })
-            // );
+        // const updates = Object.entries(resData).map(([key, value]) =>
+        //   adminforth.resource(this.resourceConfig.resourceId).update(ID, { [key]: value })
+        // );
 
-            return resData;
-          });
+        return resData;
+      });
 
-          const result = await Promise.all(tasks);
+      const result = await Promise.all(tasks);
 
-          return { result };
-      }
-    });
+      return { result };
+    }
+  });
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
@@ -170,12 +172,29 @@ export default class  BulkVisionPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/get_images`,
       handler: async ( body ) => {
         let images = [];
-        for( const record of body.body.record ) {
-          images.push(await this.options.attachFiles({ record: record }));
+        if(body.body.record){
+          for( const record of body.body.record ) {
+            images.push(await this.options.attachFiles({ record: record }));
+          }
         }
         return {
           images,
         };
+      }
+    });
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/update_fields`,
+      handler: async ( body ) => {
+        const selectedIds = body.body.selectedIds || [];
+        const fieldsToUpdate = body.body.fields || {};
+        console.log("Selected IDs for update:", selectedIds);
+        console.log("Fields to update:", fieldsToUpdate);
+        selectedIds.map(async (ID) => {})
+
+
+
+        return { ok: true };
       }
     });
   }
