@@ -102,7 +102,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           Image URLs:`;
           
         //send prompt to OpenAI and get response
-        const chatResponse = await this.options.adapter.generate({ prompt, inputFileUrls: attachmentFiles });
+        const chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
 
         const resp: any = (chatResponse as any).response;
         const topLevelError = (chatResponse as any).error;
