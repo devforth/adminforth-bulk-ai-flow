@@ -14,19 +14,17 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   // Compile Handlebars templates in outputFields using record fields as context
-  private compileOutputFieldsTemplates(record: any): Record<string, string>[] {
-    return this.options.outputFields.map((fieldObj) => {
-      const compiled: Record<string, string> = {};
-      for (const [key, templateStr] of Object.entries(fieldObj)) {
-        try {
-          const tpl = Handlebars.compile(String(templateStr));
-          compiled[key] = tpl(record);
-        } catch {
-          compiled[key] = String(templateStr);
-        }
+  private compileOutputFieldsTemplates(record: any): Record<string, string> {
+    const compiled: Record<string, string> = {};
+    for (const [key, templateStr] of Object.entries(this.options.fillFieldsFromImages)) {
+      try {
+        const tpl = Handlebars.compile(String(templateStr));
+        compiled[key] = tpl(record);
+      } catch {
+        compiled[key] = String(templateStr);
       }
-      return compiled;
-    });
+    }
+    return compiled;
   }
  
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
@@ -35,30 +33,32 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     //check if options names are provided
     const columns = this.resourceConfig.columns;
     let columnEnums = [];
-    for (const field of this.options.outputFields) {
-      for (const [key, value] of Object.entries(field)) {
-        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
-        if (column) {
-          if(column.enum){
-            (field as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
-            columnEnums.push({
-              name: key,
-              enum: column.enum,
-            });
-          }
-        } else {
-          throw new Error(`⚠️ No column found for key "${key}"`);
+    for (const [key, value] of Object.entries(this.options.fillFieldsFromImages)) {
+      const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+      if (column) {
+        if(column.enum){
+          (this.options.fillFieldsFromImages as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
+          columnEnums.push({
+            name: key,
+            enum: column.enum,
+          });
         }
+      } else {
+        throw new Error(`⚠️ No column found for key "${key}"`);
       }
     }
+
+    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+    console.log('Primary Key Column:', primaryKeyColumn);
 
     const pageInjection = {
       file: this.componentPath('visionAction.vue'),
       meta: {
         pluginInstanceId: this.pluginInstanceId,
-        outputFields: this.options.outputFields,
+        outputFields: this.options.fillFieldsFromImages,
         actionName: this.options.actionName,
         columnEnums: columnEnums,
+        primaryKey: primaryKeyColumn.name,
       }
     }
 

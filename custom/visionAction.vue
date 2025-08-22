@@ -25,6 +25,7 @@
             :tableColumnsIndexes="tableColumnsIndexes"
             :selected="selected"
             :isAiResponseReceived="isAiResponseReceived"
+            :primaryKey="primaryKey"
           />
           <Button 
             class="w-64"
@@ -67,6 +68,7 @@ const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
 const isAiResponseReceived = ref([]);
+const primaryKey = props.meta.primaryKey;
 
 const openDialog = async () => {
   confirmDialog.value.open();
@@ -82,9 +84,9 @@ const openDialog = async () => {
   analyzeFields();
 }
  
-// watch(selected, (val) => {
-//   console.log('Selected changed:', val);
-// }, { deep: true });
+watch(selected, (val) => {
+  console.log('Selected changed:', val);
+}, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
@@ -105,14 +107,11 @@ function generateTableHeaders(outputFields) {
   headers.push({ label: 'Field name', fieldName: 'label' });
   headers.push({ label: 'Source Images', fieldName: 'images' });
 
-  if (outputFields.length > 0) {
-    const sampleField = outputFields[0];
-    for (const key in sampleField) {
-      headers.push({
-        label: formatLabel(key),
-        fieldName: key,
-      });
-    }
+  for (const key in outputFields) {
+    headers.push({
+      label: formatLabel(key),
+      fieldName: key,
+    });
   }
   return headers;
 }
@@ -144,22 +143,19 @@ function generateTableColumns() {
 
 function setSelected() {
   selected.value = records.value.map(() => ({}));
-  
   records.value.forEach((record, index) => {
-    props.meta.outputFields.forEach((fieldObj, i) => {
-      for (const key in fieldObj) {
-        if(isInColumnEnum(key)){
-          const colEnum = props.meta.columnEnums.find(c => c.name === key);
-          const object = colEnum.enum.find(item => item.value === record[key]);
-          selected.value[index][key] = object ? record[key] : null;
-        } else {
-          selected.value[index][key] = record[key];
-        }
+    for (const key in props.meta.outputFields) {
+      if(isInColumnEnum(key)){
+        const colEnum = props.meta.columnEnums.find(c => c.name === key);
+        const object = colEnum.enum.find(item => item.value === record[key]);
+        selected.value[index][key] = object ? record[key] : null;
+      } else {
+        selected.value[index][key] = record[key];
       }
-      selected.value[index].isChecked = true;
-      selected.value[index].id = record.id;
-      isAiResponseReceived.value[index] = true;
-    });
+    }
+    selected.value[index].isChecked = true;
+    selected.value[index][primaryKey] = record[primaryKey];
+    isAiResponseReceived.value[index] = true;
   });
 }
 

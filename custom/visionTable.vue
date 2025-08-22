@@ -44,32 +44,32 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el.id === item.id)]">
+        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
           <div v-if="isInColumnEnum(n)">
             <Select
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
             >
             </Select>
           </div>
-          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n] === 'object'">
+          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'object'">
             <Textarea
               class="w-full h-full"
               type="text"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
             >
             </Textarea>
           </div>
-          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n] === 'boolean'">
+          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'boolean'">
             <Toggle
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
             >
             </Toggle>
           </div>
           <div v-else>
             <Input
               type="number"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el.id === item.id)][n]"
+              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
               class="w-full "
               :fullWidth="true"
             />
@@ -95,7 +95,8 @@ const props = defineProps<{
   customFieldNames: any,
   tableColumnsIndexes: any,
   selected: any,
-  isAiResponseReceived: boolean[]
+  isAiResponseReceived: boolean[],
+  primaryKey: any
 }>();
 
 const zoomedImage = ref(null)
