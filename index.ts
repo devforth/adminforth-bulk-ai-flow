@@ -7,6 +7,7 @@ import Handlebars from 'handlebars';
 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
+  uploadPlugin: AdminForthPlugin;
 
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
@@ -48,8 +49,37 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
 
+
+    // if (this.options.generateImages) {
+    //   const resource = adminforth.config.resources.find(r => r.resourceId === this.options.generateImages!.attachmentResource);
+    //   if (!resource) {
+    //     throw new Error(`Resource '${this.options.generateImages!.attachmentResource}' not found`);
+    //   }
+    //   this.attachmentResource = resource;
+    //   const field = resource.columns.find(c => c.name === this.options.generateImages!.attachmentFieldName);
+    //   if (!field) {
+    //     throw new Error(`Field '${this.options.generateImages!.attachmentFieldName}' not found in resource '${this.options.generateImages!.attachmentResource}'`);
+    //   }
+    //   const plugin = adminforth.activatedPlugins.find(p => 
+    //     p.resourceConfig!.resourceId === this.options.attachments!.attachmentResource && 
+    //     p.pluginOptions.pathColumnName === this.options.attachments!.attachmentFieldName
+    //   );
+    //   if (!plugin) {
+    //     throw new Error(`Plugin for attachment field '${this.options.attachments!.attachmentFieldName}' not found in resource '${this.options.attachments!.attachmentResource}', please check if Upload Plugin is installed on the field ${this.options.attachments!.attachmentFieldName}`);
+    //   }
+
+    //   if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
+    //     throw new Error(`Upload Plugin for attachment field '${this.options.attachments!.attachmentFieldName}' in resource '${this.options.attachments!.attachmentResource}' 
+    //       uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
+    //       Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
+    //     `);
+    //   }
+    //   this.uploadPlugin = plugin;
+    // }
+
+
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    console.log('Primary Key Column:', primaryKeyColumn);
+    //console.log('Primary Key Column:', primaryKeyColumn);
 
     const pageInjection = {
       file: this.componentPath('visionAction.vue'),
@@ -90,7 +120,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const selectedIds = body.selectedIds || [];
       const tasks = selectedIds.map(async (ID) => {
         // Fetch the record using the provided ID
-        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ('id', ID)] );
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
 
         //recieve image URLs to analyze
         const attachmentFiles = await this.options.attachFiles({ record: record });
@@ -131,8 +162,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/get_records`,
       handler: async ( body ) => {
         let records = [];
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
         for( const record of body.body.record ) {
-          records.push(await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ('id', record)] ));
+          records.push(await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, record)] ));
           records[records.length - 1]._label = this.resourceConfig.recordLabel(records[records.length - 1]);
         }
         return {
