@@ -131,9 +131,9 @@ function generateTableColumns() {
     }
     reqFields.label = record._label;
     reqFields.images = images.value[index];
-    reqFields.id = record.id;
+    reqFields[primaryKey] = record[primaryKey];
     indexes.push({
-      id: record.id,
+      [primaryKey]: record[primaryKey],
       label: record._label,
     });
     tableData.push(reqFields);
