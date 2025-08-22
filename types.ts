@@ -3,7 +3,6 @@ import { ImageVisionAdapter, AdminUser, IAdminForth, StorageAdapter } from "admi
 
 export interface PluginOptions {
     actionName: string,
-    confirmMessage: string,
     adapter: ImageVisionAdapter,
     outputFields: Record<string, string>[],
     attachFiles?: ({ record }: {
