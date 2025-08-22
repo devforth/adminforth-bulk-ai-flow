@@ -58,7 +58,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         pluginInstanceId: this.pluginInstanceId,
         outputFields: this.options.outputFields,
         actionName: this.options.actionName,
-        confirmMessage: this.options.confirmMessage,
         columnEnums: columnEnums,
       }
     }
