@@ -5,7 +5,7 @@ import { json } from "stream/consumers";
 import Handlebars from 'handlebars';
 
 
-export default class  BulkAiFlow extends AdminForthPlugin {
+export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
 
   constructor(options: PluginOptions) {
