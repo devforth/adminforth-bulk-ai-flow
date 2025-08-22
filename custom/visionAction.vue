@@ -84,9 +84,9 @@ const openDialog = async () => {
   analyzeFields();
 }
  
-watch(selected, (val) => {
-  console.log('Selected changed:', val);
-}, { deep: true });
+// watch(selected, (val) => {
+//   console.log('Selected changed:', val);
+// }, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
@@ -194,12 +194,12 @@ function prepareDataForSave() {
   const checkedItems = selected.value
     .filter(item => item.isChecked === true)
     .map(item => {
-      const { isChecked, id, ...itemWithoutIsCheckedAndId } = item;
+      const { isChecked, primaryKey, ...itemWithoutIsCheckedAndId } = item;
       return itemWithoutIsCheckedAndId;
     });
   const checkedItemsIDs = selected.value
     .filter(item => item.isChecked === true)
-    .map(item => item.id);
+    .map(item => item[primaryKey]);
   return [checkedItemsIDs, checkedItems];
 }
 
@@ -222,7 +222,7 @@ async function analyzeFields() {
     ...res.result.map((item, idx) => ({
       ...item,
       isChecked: true,
-      id: selected.value[idx]?.id,
+      [primaryKey]: selected.value[idx]?.[primaryKey],
     }))
   )
 }

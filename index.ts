@@ -50,32 +50,22 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
 
 
-    // if (this.options.generateImages) {
-    //   const resource = adminforth.config.resources.find(r => r.resourceId === this.options.generateImages!.attachmentResource);
-    //   if (!resource) {
-    //     throw new Error(`Resource '${this.options.generateImages!.attachmentResource}' not found`);
-    //   }
-    //   this.attachmentResource = resource;
-    //   const field = resource.columns.find(c => c.name === this.options.generateImages!.attachmentFieldName);
-    //   if (!field) {
-    //     throw new Error(`Field '${this.options.generateImages!.attachmentFieldName}' not found in resource '${this.options.generateImages!.attachmentResource}'`);
-    //   }
-    //   const plugin = adminforth.activatedPlugins.find(p => 
-    //     p.resourceConfig!.resourceId === this.options.attachments!.attachmentResource && 
-    //     p.pluginOptions.pathColumnName === this.options.attachments!.attachmentFieldName
-    //   );
-    //   if (!plugin) {
-    //     throw new Error(`Plugin for attachment field '${this.options.attachments!.attachmentFieldName}' not found in resource '${this.options.attachments!.attachmentResource}', please check if Upload Plugin is installed on the field ${this.options.attachments!.attachmentFieldName}`);
-    //   }
-
-    //   if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
-    //     throw new Error(`Upload Plugin for attachment field '${this.options.attachments!.attachmentFieldName}' in resource '${this.options.attachments!.attachmentResource}' 
-    //       uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
-    //       Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
-    //     `);
-    //   }
-    //   this.uploadPlugin = plugin;
-    // }
+    if (this.options.generateImages) {
+      console.log('Generate Images options:', this.options.generateImages);
+      for (const [key, value] of Object.entries(this.options.generateImages)) {
+        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+        if (!column) {
+          throw new Error(`⚠️ No column found for key "${key}"`);
+        }
+        const plugin = adminforth.activatedPlugins.find(p => 
+          p.resourceConfig!.resourceId === key &&
+          p.pluginOptions.pathColumnName === this.resourceConfig.resourceId
+        );
+        // if (!plugin) {
+        //   throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.options.attachments!.attachmentResource}', please check if Upload Plugin is installed on the field ${this.options.attachments!.attachmentFieldName}`);
+        // }
+      }
+    }
 
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
