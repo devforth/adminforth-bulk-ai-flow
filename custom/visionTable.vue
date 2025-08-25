@@ -13,7 +13,7 @@
       <template #cell:checkboxes="{ item }">
         <div class="flex items-center justify-center">
           <Checkbox
-            v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)].isChecked"
+            v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])].isChecked"
           />
         </div>
       </template>

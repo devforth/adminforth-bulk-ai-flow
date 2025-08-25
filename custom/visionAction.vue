@@ -84,7 +84,7 @@ const openDialog = async () => {
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
   await Promise.all([
-    analyzeFields(),
+    //analyzeFields(),
     generateImages()
   ]);
 }

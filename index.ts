@@ -66,14 +66,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     let outputImageFields = [];
     if (this.options.generateImages) {
-      for (const [key, value] of Object.entries(this.options.generateImages.fields)) {
+      for (const [key, value] of Object.entries(this.options.generateImages)) {
         outputImageFields.push(key);
       }
     }
 
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
-      for (const [key, value] of Object.entries(this.options.generateImages.fields)) {
+      for (const [key, value] of Object.entries(this.options.generateImages)) {
         const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
         if (!column) {
           throw new Error(`⚠️ No column found for key "${key}"`);
@@ -93,13 +93,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
         this.uploadPlugin = plugin;
       }
-
-
     }
 
     const outputFields = {
       ...this.options.fillFieldsFromImages,
-      ...(this.options.generateImages?.fields || {})
+      ...(this.options.generateImages || {})
     };
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
@@ -234,63 +232,51 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/generate_images`,
       handler: async ({ body, headers }) => {
         const selectedIds = body.selectedIds || [];
+        const STUB_MODE = true;
         const tasks = selectedIds.map(async (ID) => {
-          if (this.options.generateImages.rateLimit?.limit) {
-            // rate limit
-            const { error } = RateLimiter.checkRateLimit(
-              this.pluginInstanceId, 
-              this.options.generateImages.rateLimit?.limit,
-              this.adminforth.auth.getClientIp(headers),
+          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
+          const attachmentFiles = await this.options.attachFiles({ record });
+
+          const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
+            console.log('Generating image for field:', key, 'record ID:', ID);
+
+            const prompt = this.options.generateImages[key].prompt;
+
+            const images = await Promise.all(
+              (new Array(this.options.generateImages[key].countToGenerate)).fill(0).map(async () => {
+                if (STUB_MODE) {
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+                }
+                const start = +new Date();
+                const resp = await this.options.generateImages[key].adapter.generate(
+                  {
+                    prompt,
+                    inputFiles: attachmentFiles,
+                    n: 1,
+                    size: this.options.generateImages[key].outputSize,
+                  }
+                )
+
+                if (resp.error) {
+                  console.error('Error generating image', resp.error);
+                  return;
+                }
+                return resp.imageURLs[0]
+              })
             );
-            if (error) {
-              return { error: this.options.generateImages.rateLimit.errorMessage };
-            }
-          }
-          
-          let error: string | undefined = undefined;
 
-          const STUB_MODE = false;
+            return { key, images };
+          });
 
-          const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
-          const compiledOutputFields = this.compileImageGenerationFieldsTemplates(record);
-          const attachmentFiles = await this.options.attachFiles({ record: record });
-          
-          for (const [key, value] of Object.entries(compiledOutputFields)) {
-            const prompt = `${value}`;
-            const imageFieldName = key;
-            let images;
-            if (STUB_MODE) {
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
-            } else {
-            const start = +new Date();
-            const resp = await this.options.generateImages.adapter.generate(
-              {
-                prompt,
-                inputFiles: attachmentFiles,
-                n: 1,
-                size: this.options.generateImages.outputSize,
-              }
-            )
+          const fieldResults = await Promise.all(fieldTasks);
+          const recordResult: Record<string, string[]> = {};
+          fieldResults.forEach(({ key, images }) => {
+            recordResult[key] = images;
+          });
 
-            if (resp.error) {
-              console.error('Error generating image', resp.error);
-              error = resp.error;
-              return;
-            }
-
-            // this.totalCalls++;
-            // this.totalDuration += (+new Date() - start) / 1000;
-
-            images = resp.imageURLs[0];
-          }
-
-            return { [imageFieldName]: images };
-          }
+          return recordResult;
         });
-
-
 
         const result = await Promise.all(tasks);
         return { result };

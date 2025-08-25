@@ -9,8 +9,10 @@ export interface PluginOptions {
       record: any,
     }) => string[] | Promise<string[]>,
 
-    generateImages?: {  // can generate from images or just from another fields, e.g. "remove text from images", "improve image quality", "turn image into ghibli style"
-      fields: Record<string, string> 
+    generateImages?: Record<
+      string, {
+        // can generate from images or just from another fields, e.g. "remove text from images", "improve image quality", "turn image into ghibli style"
+      prompt: string,
 
       adapter: ImageGenerationAdapter,
 
@@ -27,20 +29,15 @@ export interface PluginOptions {
       
       /**
        * Since AI generation can be expensive, we can limit the number of requests per IP.
+       * E.g. 5/1d - 5 requests per day
+       * 3/1h - 3 requests per hour
        */
-      rateLimit?: {
+      rateLimit?: string,
 
-        /**
-         * E.g. 5/1d - 5 requests per day
-         * 3/1h - 3 requests per hour
-         */ 
-        limit: string,
-
-        /**
-         * !Not used now
-         * Message shown to user when rate limit is reached
-         */
-        errorMessage: string,
-      },
-    }
+      /**
+       * The number of images to generate
+       * in one request
+       */
+      countToGenerate: number,
+    }>,
 }
