@@ -64,6 +64,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
 
+    let outputImageFields = [];
+    if (this.options.generateImages) {
+      for (const [key, value] of Object.entries(this.options.generateImages.fields)) {
+        // console.log('Checking image generation field', key, value);
+        outputImageFields.push(key);
+      }
+    }
+
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
       for (const [key, value] of Object.entries(this.options.generateImages.fields)) {
@@ -90,6 +98,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     }
 
+    //const outputFields = this.options.fillFieldsFromImages + (this.options.generateImages?.fields || {});
+    //console.log('outputFields', outputFields);
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
@@ -100,6 +110,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         outputFields: this.options.fillFieldsFromImages,
         actionName: this.options.actionName,
         columnEnums: columnEnums,
+        outputImageFields: outputImageFields,
         primaryKey: primaryKeyColumn.name,
       }
     }

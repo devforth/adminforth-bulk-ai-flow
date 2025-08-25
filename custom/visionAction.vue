@@ -146,7 +146,7 @@ function setSelected() {
   selected.value = records.value.map(() => ({}));
   records.value.forEach((record, index) => {
     for (const key in props.meta.outputFields) {
-      if(isInColumnEnum(key)){
+      if (isInColumnEnum(key)) {
         const colEnum = props.meta.columnEnums.find(c => c.name === key);
         const object = colEnum.enum.find(item => item.value === record[key]);
         selected.value[index][key] = object ? record[key] : null;
@@ -250,6 +250,7 @@ async function saveData() {
 }
 
 async function generateImages() {
+  isAiResponseReceived.value = props.checkboxes.map(() => false);
   const res = await callAdminForthApi({
     path: `/plugin/${props.meta.pluginInstanceId}/generate_images`,
     method: 'POST',
@@ -257,5 +258,7 @@ async function generateImages() {
       selectedIds: props.checkboxes,
     },
   });
+  isAiResponseReceived.value = props.checkboxes.map(() => true);
+
 }
 </script>
