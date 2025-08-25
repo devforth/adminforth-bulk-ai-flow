@@ -50,6 +50,7 @@
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
               v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
               :teleportToTop="true"
+              :teleportToBody="false"
             >
             </Select>
           </div>

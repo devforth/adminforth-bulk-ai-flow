@@ -49,27 +49,34 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
 
-
+    //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
-      console.log('Generate Images options:', this.options.generateImages);
       for (const [key, value] of Object.entries(this.options.generateImages)) {
         const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
         if (!column) {
           throw new Error(`⚠️ No column found for key "${key}"`);
         }
         const plugin = adminforth.activatedPlugins.find(p => 
-          p.resourceConfig!.resourceId === key &&
-          p.pluginOptions.pathColumnName === this.resourceConfig.resourceId
+          p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+          p.pluginOptions.pathColumnName === key
         );
-        // if (!plugin) {
-        //   throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.options.attachments!.attachmentResource}', please check if Upload Plugin is installed on the field ${this.options.attachments!.attachmentFieldName}`);
-        // }
+        if (!plugin) {
+          throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
+        }
+        if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
+          throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' 
+            uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
+            Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
+          `);
+        }
+        this.uploadPlugin = plugin;
       }
+
+
     }
 
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    //console.log('Primary Key Column:', primaryKeyColumn);
 
     const pageInjection = {
       file: this.componentPath('visionAction.vue'),
