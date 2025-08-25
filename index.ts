@@ -3,6 +3,7 @@ import type { IAdminForth, IHttpServer, AdminForthResourcePages, AdminForthResou
 import type { PluginOptions } from './types.js';
 import { json } from "stream/consumers";
 import Handlebars from 'handlebars';
+import { RateLimiter } from "adminforth";
 
 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
@@ -18,6 +19,20 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private compileOutputFieldsTemplates(record: any): Record<string, string> {
     const compiled: Record<string, string> = {};
     for (const [key, templateStr] of Object.entries(this.options.fillFieldsFromImages)) {
+      try {
+        const tpl = Handlebars.compile(String(templateStr));
+        compiled[key] = tpl(record);
+      } catch {
+        compiled[key] = String(templateStr);
+      }
+    }
+    return compiled;
+  }
+
+  // Compile Handlebars templates in generateImage using record fields as context
+  private compileImageGenerationFieldsTemplates(record: any): Record<string, string> {
+    const compiled: Record<string, string> = {};
+    for (const [key, templateStr] of Object.entries(this.options.generateImages.fields)) {
       try {
         const tpl = Handlebars.compile(String(templateStr));
         compiled[key] = tpl(record);
@@ -51,7 +66,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
-      for (const [key, value] of Object.entries(this.options.generateImages)) {
+      for (const [key, value] of Object.entries(this.options.generateImages.fields)) {
         const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
         if (!column) {
           throw new Error(`⚠️ No column found for key "${key}"`);
@@ -199,6 +214,76 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         await Promise.all(updates);
 
       return { ok: true };
+      }
+    });
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/generate_images`,
+      handler: async ({ body, headers }) => {
+        const selectedIds = body.selectedIds || [];
+        const tasks = selectedIds.map(async (ID) => {
+          if (this.options.generateImages.rateLimit?.limit) {
+            // rate limit
+            const { error } = RateLimiter.checkRateLimit(
+              this.pluginInstanceId, 
+              this.options.generateImages.rateLimit?.limit,
+              this.adminforth.auth.getClientIp(headers),
+            );
+            if (error) {
+              return { error: this.options.generateImages.rateLimit.errorMessage };
+            }
+          }
+          
+          let error: string | undefined = undefined;
+
+          const STUB_MODE = true;
+
+          const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
+          const compiledOutputFields = this.compileImageGenerationFieldsTemplates(record);
+          const attachmentFiles = await this.options.attachFiles({ record: record });
+          
+          for (const [key, value] of Object.entries(compiledOutputFields)) {
+            const prompt = `${value}`;
+            const images = await Promise.all(
+              (new Array(this.options.generateImages.countToGenerate)).fill(0).map(async () => {
+                if (STUB_MODE) {
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+                }
+                const start = +new Date();
+                const resp = await this.options.generateImages.adapter.generate(
+                  {
+                    prompt,
+                    inputFiles: attachmentFiles,
+                    n: 1,
+                    size: this.options.generateImages.outputSize,
+                  }
+                )
+
+                if (resp.error) {
+                  console.error('Error generating image', resp.error);
+                  error = resp.error;
+                  return;
+                }
+
+                // this.totalCalls++;
+                // this.totalDuration += (+new Date() - start) / 1000;
+
+                return resp.imageURLs[0];
+
+              })
+            );
+            console.log('Generated images', images);
+            return { error, images };
+          }
+        });
+
+
+
+        const result = await Promise.all(tasks);
+        return { result };
       }
     });
   }

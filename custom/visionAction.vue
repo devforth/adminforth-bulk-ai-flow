@@ -81,7 +81,8 @@ const openDialog = async () => {
   
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
-  analyzeFields();
+  //analyzeFields();
+  generateImages();
 }
  
 // watch(selected, (val) => {
@@ -246,5 +247,15 @@ async function saveData() {
   } else {
     console.error('Error saving data:', res);
   }
+}
+
+async function generateImages() {
+  const res = await callAdminForthApi({
+    path: `/plugin/${props.meta.pluginInstanceId}/generate_images`,
+    method: 'POST',
+    body: {
+      selectedIds: props.checkboxes,
+    },
+  });
 }
 </script>
