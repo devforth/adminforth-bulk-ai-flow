@@ -8,10 +8,10 @@
       @click="closeDialog"
     >
       <div
-        class="relative max-w-[95vw] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
+        class="bulk-vision-dialog relative max-w-[95vw] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
         @click.stop
       >
-        <div class="flex flex-col items-end justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+        <div class="bulk-vision-table flex flex-col items-end justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
           <VisionTable
             v-if="records && props.checkboxes.length"
             :checkbox="props.checkboxes"
@@ -28,7 +28,7 @@
             :primaryKey="primaryKey"
           />
           <Button 
-            class="w-64"
+            class="bulk-vision-button w-64"
             @click="saveData"
           >
           {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
