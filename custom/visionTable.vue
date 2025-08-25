@@ -44,7 +44,7 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
+        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
           <div v-if="isInColumnEnum(n)">
             <Select
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
@@ -77,6 +77,34 @@
             />
           </div>
         </div>
+
+        <div v-else-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
+          <div v-if="isInColumnImage(n)">
+            <div class="mt-2 flex items-center justify-center gap-2">
+              <img 
+                  :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"  
+                  class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
+                  @click="zoomImage(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])"
+              />
+            </div>
+            <div
+              v-if="zoomedImage"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+              @click.self="closeZoom"
+            >
+              <img
+                :src="zoomedImage"
+                ref="zoomedImg"
+                class="max-w-full max-h-full rounded-lg object-contain cursor-grab z-75"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="isInColumnImage(n)">
+            <Skeleton type="image" class="w-20 h-20" />
+        </div>
+
         <div v-else>
           <Skeleton class="w-full h-6" />
         </div>
@@ -98,6 +126,7 @@ const props = defineProps<{
   tableColumnsIndexes: any,
   selected: any,
   isAiResponseReceived: boolean[],
+  isAiResponseReceivedImage: boolean[],
   primaryKey: any
 }>();
 
@@ -129,6 +158,10 @@ function isInColumnEnum(key: string): boolean {
     return false;
   }
   return true;
+}
+
+function isInColumnImage(key: string): boolean {
+  return props.meta.outputImageFields?.includes(key) || false;
 }
 
 function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {

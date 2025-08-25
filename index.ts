@@ -67,7 +67,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     let outputImageFields = [];
     if (this.options.generateImages) {
       for (const [key, value] of Object.entries(this.options.generateImages.fields)) {
-        // console.log('Checking image generation field', key, value);
         outputImageFields.push(key);
       }
     }
@@ -98,8 +97,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     }
 
-    //const outputFields = this.options.fillFieldsFromImages + (this.options.generateImages?.fields || {});
-    //console.log('outputFields', outputFields);
+    const outputFields = {
+      ...this.options.fillFieldsFromImages,
+      ...(this.options.generateImages?.fields || {})
+    };
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
@@ -107,7 +108,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       file: this.componentPath('visionAction.vue'),
       meta: {
         pluginInstanceId: this.pluginInstanceId,
-        outputFields: this.options.fillFieldsFromImages,
+        outputFields: outputFields,
         actionName: this.options.actionName,
         columnEnums: columnEnums,
         outputImageFields: outputImageFields,
@@ -248,7 +249,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           
           let error: string | undefined = undefined;
 
-          const STUB_MODE = true;
+          const STUB_MODE = false;
 
           const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
           const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
@@ -257,37 +258,35 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           
           for (const [key, value] of Object.entries(compiledOutputFields)) {
             const prompt = `${value}`;
-            const images = await Promise.all(
-              (new Array(this.options.generateImages.countToGenerate)).fill(0).map(async () => {
-                if (STUB_MODE) {
-                  await new Promise((resolve) => setTimeout(resolve, 2000));
-                  return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
-                }
-                const start = +new Date();
-                const resp = await this.options.generateImages.adapter.generate(
-                  {
-                    prompt,
-                    inputFiles: attachmentFiles,
-                    n: 1,
-                    size: this.options.generateImages.outputSize,
-                  }
-                )
+            const imageFieldName = key;
+            let images;
+            if (STUB_MODE) {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+            } else {
+            const start = +new Date();
+            const resp = await this.options.generateImages.adapter.generate(
+              {
+                prompt,
+                inputFiles: attachmentFiles,
+                n: 1,
+                size: this.options.generateImages.outputSize,
+              }
+            )
 
-                if (resp.error) {
-                  console.error('Error generating image', resp.error);
-                  error = resp.error;
-                  return;
-                }
+            if (resp.error) {
+              console.error('Error generating image', resp.error);
+              error = resp.error;
+              return;
+            }
 
-                // this.totalCalls++;
-                // this.totalDuration += (+new Date() - start) / 1000;
+            // this.totalCalls++;
+            // this.totalDuration += (+new Date() - start) / 1000;
 
-                return resp.imageURLs[0];
+            images = resp.imageURLs[0];
+          }
 
-              })
-            );
-            console.log('Generated images', images);
-            return { error, images };
+            return { [imageFieldName]: images };
           }
         });
 
@@ -299,5 +298,3 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     });
   }
 }
-
-

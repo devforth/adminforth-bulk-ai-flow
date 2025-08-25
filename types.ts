@@ -24,12 +24,6 @@ export interface PluginOptions {
        * If specified, the plugin will use fields from the record to provide additional context to the AI model.
        */
       fieldsForContext?: string[],
-
-      /**
-       * The number of images to generate
-       * in one request
-       */
-      countToGenerate: number,
       
       /**
        * Since AI generation can be expensive, we can limit the number of requests per IP.

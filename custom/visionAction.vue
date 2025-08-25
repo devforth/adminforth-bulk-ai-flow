@@ -25,6 +25,7 @@
             :tableColumnsIndexes="tableColumnsIndexes"
             :selected="selected"
             :isAiResponseReceived="isAiResponseReceived"
+            :isAiResponseReceivedImage="isAiResponseReceivedImage"
             :primaryKey="primaryKey"
           />
           <Button 
@@ -68,6 +69,7 @@ const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
 const isAiResponseReceived = ref([]);
+const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 
 const openDialog = async () => {
@@ -81,17 +83,20 @@ const openDialog = async () => {
   
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
-  //analyzeFields();
-  generateImages();
+  await Promise.all([
+    analyzeFields(),
+    generateImages()
+  ]);
 }
  
-// watch(selected, (val) => {
-//   console.log('Selected changed:', val);
-// }, { deep: true });
+watch(selected, (val) => {
+  console.log('Selected changed:', val);
+}, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
   isAiResponseReceived.value = [];
+  isAiResponseReceivedImage.value = [];
 }
 
 function formatLabel(str) {
@@ -217,15 +222,19 @@ async function analyzeFields() {
 
   isAiResponseReceived.value = props.checkboxes.map(() => true);
 
-  selected.value.splice(
-    0,
-    selected.value.length,
-    ...res.result.map((item, idx) => ({
-      ...item,
-      isChecked: true,
-      [primaryKey]: selected.value[idx]?.[primaryKey],
-    }))
-  )
+  res.result.forEach((item, idx) => {
+    const pk = selected.value[idx]?.[primaryKey]
+
+    if (pk) {
+      selected.value[idx] = {
+        ...selected.value[idx],
+        ...item,
+        isChecked: true,
+        [primaryKey]: pk
+      }
+    }
+  })
+
 }
 
 async function saveData() {
@@ -250,7 +259,7 @@ async function saveData() {
 }
 
 async function generateImages() {
-  isAiResponseReceived.value = props.checkboxes.map(() => false);
+  isAiResponseReceivedImage.value = props.checkboxes.map(() => false);
   const res = await callAdminForthApi({
     path: `/plugin/${props.meta.pluginInstanceId}/generate_images`,
     method: 'POST',
@@ -258,7 +267,19 @@ async function generateImages() {
       selectedIds: props.checkboxes,
     },
   });
-  isAiResponseReceived.value = props.checkboxes.map(() => true);
+  isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
+
+  res.result.forEach((item, idx) => {
+    const pk = selected.value[idx]?.[primaryKey]
+
+    if (pk) {
+      selected.value[idx] = {
+        ...selected.value[idx],
+        ...item,
+        [primaryKey]: pk
+      }
+    }
+  })
 
 }
 </script>
