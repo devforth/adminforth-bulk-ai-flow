@@ -84,18 +84,14 @@
               <img 
                   :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"  
                   class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
-                  @click="zoomImage(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])"
+                  @click="() => {openGenerationCarousel = !openGenerationCarousel; console.log('Image clicked:', item); }"
               />
             </div>
-            <div
-              v-if="zoomedImage"
-              class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-              @click.self="closeZoom"
-            >
-              <img
-                :src="zoomedImage"
-                ref="zoomedImg"
-                class="max-w-full max-h-full rounded-lg object-contain cursor-grab z-75"
+            <div>
+              <GenerationCarousel
+                v-if="openGenerationCarousel"
+                :images="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                @close="openGenerationCarousel = false"
               />
             </div>
           </div>
@@ -117,6 +113,7 @@
 import { ref, nextTick, watch } from 'vue'
 import mediumZoom from 'medium-zoom'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle } from '@/afcl'
+import GenerationCarousel from './imageGenerationCarousel.vue'
 
 const props = defineProps<{
   meta: any,
@@ -132,6 +129,7 @@ const props = defineProps<{
 
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
+const openGenerationCarousel = ref();
 
 function zoomImage(img) {
   zoomedImage.value = img

@@ -238,15 +238,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           const attachmentFiles = await this.options.attachFiles({ record });
 
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-            console.log('Generating image for field:', key, 'record ID:', ID);
 
             const prompt = this.options.generateImages[key].prompt;
 
             const images = await Promise.all(
               (new Array(this.options.generateImages[key].countToGenerate)).fill(0).map(async () => {
                 if (STUB_MODE) {
-                  await new Promise((resolve) => setTimeout(resolve, 2000));
-                  return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+                  await new Promise((resolve) => setTimeout(resolve, 200));
+                 // return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+                 return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
                 }
                 const start = +new Date();
                 const resp = await this.options.generateImages[key].adapter.generate(
