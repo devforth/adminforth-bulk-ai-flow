@@ -245,8 +245,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               (new Array(this.options.generateImages[key].countToGenerate)).fill(0).map(async () => {
                 if (STUB_MODE) {
                   await new Promise((resolve) => setTimeout(resolve, 200));
-                 // return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
-                 return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
+                  return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+                 // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
                 }
                 const start = +new Date();
                 const resp = await this.options.generateImages[key].adapter.generate(
@@ -266,6 +266,58 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               })
             );
 
+            return { key, images };
+          });
+
+          const fieldResults = await Promise.all(fieldTasks);
+          const recordResult: Record<string, string[]> = {};
+          fieldResults.forEach(({ key, images }) => {
+            recordResult[key] = images;
+          });
+
+          return recordResult;
+        });
+
+        const result = await Promise.all(tasks);
+        return { result };
+      }
+    });
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/initial_image_generate`,
+      handler: async ({ body, headers }) => {
+        const selectedIds = body.selectedIds || [];
+        const STUB_MODE = true;
+        const tasks = selectedIds.map(async (ID) => {
+          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
+          const attachmentFiles = await this.options.attachFiles({ record });
+
+          const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
+
+            const prompt = this.options.generateImages[key].prompt;
+
+            let images;
+              if (STUB_MODE) {
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+                // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
+              } else {
+              const start = +new Date();
+              const resp = await this.options.generateImages[key].adapter.generate(
+                {
+                  prompt,
+                  inputFiles: attachmentFiles,
+                  n: 1,
+                  size: this.options.generateImages[key].outputSize,
+                }
+              )
+
+              // if (resp.error) {
+              //   console.error('Error generating image', resp.error);
+              //   return;
+              // }
+                images = resp.imageURLs[0];
+              }
             return { key, images };
           });
 

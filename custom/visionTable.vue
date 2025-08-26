@@ -84,14 +84,14 @@
               <img 
                   :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"  
                   class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
-                  @click="() => {openGenerationCarousel = !openGenerationCarousel; console.log('Image clicked:', item); }"
+                  @click="() => {openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"
               />
             </div>
             <div>
               <GenerationCarousel
-                v-if="openGenerationCarousel"
+                v-if="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :images="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-                @close="openGenerationCarousel = false"
+                @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
               />
             </div>
           </div>
@@ -124,12 +124,13 @@ const props = defineProps<{
   selected: any,
   isAiResponseReceived: boolean[],
   isAiResponseReceivedImage: boolean[],
-  primaryKey: any
+  primaryKey: any,
+  openGenerationCarousel: any
 }>();
 
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
-const openGenerationCarousel = ref();
+
 
 function zoomImage(img) {
   zoomedImage.value = img

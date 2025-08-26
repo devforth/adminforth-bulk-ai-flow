@@ -99,7 +99,15 @@
                   <!-- Carousel wrapper -->
                   <div class="relative h-56 overflow-hidden rounded-lg md:h-[calc(100vh-400px)]">
                       <!-- Item 1 -->
-                      <div v-for="(img, index) in images" :key="index" class=" duration-700 ease-in-out" data-carousel-item>
+                      <div
+                        v-for="(img, index) in images"
+                        :key="index"
+                        :class="[
+                          index === 0 ? 'block' : 'hidden',
+                          'duration-700 ease-in-out'
+                        ]"
+                        data-carousel-item
+                      >
                           <img :src="img" class="absolute block max-w-full max-h-full -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 object-cover" 
                             :alt="`Generated image ${index + 1}`"
                           />
@@ -201,10 +209,13 @@ function minifyField(field: string): string {
 const caurosel = ref(null);
 onMounted(async () => {
   // Initialize carousel
-  images.value =  ["https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg"];
+  images.value.push((props.images || []));
   console.log('Initial images:', images.value);
 
+  await nextTick();
 
+  const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
+  console.log("Setting up carousel with currentIndex:", currentIndex);
   caurosel.value = new Carousel(
     document.getElementById('gallery'), 
     images.value.map((img, index) => {
@@ -216,16 +227,14 @@ onMounted(async () => {
     }),
     {
       internal: 0,
-      defaultPosition: 0,
+      defaultPosition: currentIndex,
     },
     {
       override: true,
     }
   );
+  console.log('Carousel initialized:', caurosel.value);
 
-
-
-  
   const context = {
     field: props.meta.pathColumnLabel,
     resource: props.meta.resourceLabel,
@@ -285,7 +294,9 @@ async function slide(direction: number) {
   const curPos = caurosel.value.getActiveItem().position;
   if (curPos === 0 && direction === -1) return;
   if (curPos === images.value.length - 1 && direction === 1) {
-    await generateImages();
+    //await generateImages();
+    console.log('At the end of carousel, cannot slide further');
+    return;
   }
   if (direction === 1) {
     caurosel.value.next();
@@ -401,10 +412,6 @@ async function generateImages() {
     ...resp.images,
   ];
 
-  // images.value = [
-  //   'https://via.placeholder.com/600x400?text=Image+1',
-  //   'https://via.placeholder.com/600x400?text=Image+2',
-  // ];
   await nextTick();
 
 

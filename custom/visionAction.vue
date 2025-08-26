@@ -27,6 +27,7 @@
             :isAiResponseReceived="isAiResponseReceived"
             :isAiResponseReceivedImage="isAiResponseReceivedImage"
             :primaryKey="primaryKey"
+            :openGenerationCarousel="openGenerationCarousel"
           />
           <Button 
             class="w-64"
@@ -71,6 +72,7 @@ const selected = ref<any[]>([]);
 const isAiResponseReceived = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
+const openGenerationCarousel = ref([]);
 
 const openDialog = async () => {
   confirmDialog.value.open();
@@ -80,9 +82,15 @@ const openDialog = async () => {
   const result = generateTableColumns();
   tableColumns.value = result.tableData;
   tableColumnsIndexes.value = result.indexes;
-  
   customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
   setSelected();
+  for (let i = 0; i < selected.value?.length; i++) {
+  openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
+
+    acc[key] = false;
+    return acc;
+  },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
+  }
   await Promise.all([
     //analyzeFields(),
     generateImages()
@@ -261,7 +269,7 @@ async function saveData() {
 async function generateImages() {
   isAiResponseReceivedImage.value = props.checkboxes.map(() => false);
   const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/generate_images`,
+    path: `/plugin/${props.meta.pluginInstanceId}/initial_image_generate`,
     method: 'POST',
     body: {
       selectedIds: props.checkboxes,
