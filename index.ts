@@ -2,7 +2,7 @@ import { AdminForthPlugin, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourcePages, AdminForthResourceColumn, AdminForthDataTypes, AdminForthResource } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { json } from "stream/consumers";
-import Handlebars from 'handlebars';
+import Handlebars, { compile } from 'handlebars';
 import { RateLimiter } from "adminforth";
 
 
@@ -29,7 +29,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
-  // Compile Handlebars templates in generateImage using record fields as context
+  private compileGenerationFieldTemplates(record: any) {
+    const compiled: Record<string, any> = {};
+    for (const key in this.options.generateImages) {
+      try {
+        const tpl = Handlebars.compile(String(this.options.generateImages[key].prompt));
+        compiled[key] = tpl(record);
+      } catch {
+        compiled[key] = String(this.options.generateImages[key].prompt);
+      }
+    }
+    return compiled;
+  }
+
   private checkRateLimit(fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
     if (fieldNameRateLimit) {
       // rate limit
@@ -102,6 +114,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       ...(this.options.generateImages || {})
     };
 
+    // const compiledGenerationOptions = this.compileGenerationFieldTemplates(record);
+    // console.log('Compiled generation options prompt:', compiledGenerationOptions);
+
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
     const pageInjection = {
@@ -113,7 +128,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         columnEnums: columnEnums,
         outputImageFields: outputImageFields,
         primaryKey: primaryKeyColumn.name,
-        generationOptions: this.options.generateImages,
       }
     }
 
@@ -138,6 +152,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   setupEndpoints(server: IHttpServer) {
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/analyze`,
@@ -285,13 +301,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         if (this.checkRateLimit(this.options.bulkGenerationRateLimit, headers)) {
           return { error: "Rate limit exceeded" };
         }
-        
+
         const tasks = selectedIds.map(async (ID) => {
           const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
           const attachmentFiles = await this.options.attachFiles({ record });
 
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-            const prompt = this.options.generateImages[key].prompt;
+            const prompt = this.compileGenerationFieldTemplates(record)[key];
             let images;
               if (STUB_MODE) {
                 await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -323,6 +339,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { result };
       }
     });
+
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/get_generation_prompts`,
+      handler: async ({ body, headers }) => {
+        const Id = body.recordId || [];
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
+        const compiledGenerationOptions = this.compileGenerationFieldTemplates(record);
+        return { generationOptions: compiledGenerationOptions };
+      }
+    });
+
 
 
   }

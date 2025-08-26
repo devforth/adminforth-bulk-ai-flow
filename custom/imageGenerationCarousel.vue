@@ -210,6 +210,8 @@ const caurosel = ref(null);
 onMounted(async () => {
   // Initialize carousel
   images.value.push((props.images || []));
+  const temp = await getGenerationPrompt() || '';
+  prompt.value = temp[props.fieldName];
   console.log('Initial images:', images.value, "with id:", props.recordId, "and prompt:", prompt.value);
   await nextTick();
 
@@ -239,8 +241,8 @@ onMounted(async () => {
     resource: props.meta.resourceLabel,
   }; 
   let template = '';
-  if (props.prompt) {
-    template = props.prompt;
+  if (prompt.value) {
+    template = prompt.value;
   } else {
     template = 'Generate image for field {{field}} in {{resource}}. No text should be on image.';
   }
@@ -336,6 +338,18 @@ async function getHistoricalAverage() {
     method: 'GET',
   });
   historicalAverage.value = resp?.averageDuration || null;
+}
+
+async function getGenerationPrompt() {
+  const resp = await callAdminForthApi({
+    path: `/plugin/${props.meta.pluginInstanceId}/get_generation_prompts`,
+    method: 'POST',
+    body: {
+      recordId: props.recordId,
+    },
+  });
+  console.log('Received generation prompts from server:', resp);
+  return resp?.generationOptions || null;
 }
 
 async function generateImages() {
