@@ -111,6 +111,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         columnEnums: columnEnums,
         outputImageFields: outputImageFields,
         primaryKey: primaryKeyColumn.name,
+        generationOptions: this.options.generateImages,
       }
     }
 
@@ -227,20 +228,30 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
     server.endpoint({
       method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/generate_images`,
+      path: `/plugin/${this.pluginInstanceId}/regenerate_images`,
       handler: async ({ body, headers }) => {
-        const selectedIds = body.selectedIds || [];
+        const Id = body.Id || [];
         const STUB_MODE = true;
-        const tasks = selectedIds.map(async (ID) => {
-          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
+          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
           const attachmentFiles = await this.options.attachFiles({ record });
 
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-
             const prompt = this.options.generateImages[key].prompt;
-
             const images = await Promise.all(
               (new Array(this.options.generateImages[key].countToGenerate)).fill(0).map(async () => {
                 if (STUB_MODE) {
@@ -248,7 +259,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
                  // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
                 }
-                const start = +new Date();
+
                 const resp = await this.options.generateImages[key].adapter.generate(
                   {
                     prompt,
@@ -266,22 +277,29 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               })
             );
 
-            return { key, images };
+            return { images };
           });
 
           const fieldResults = await Promise.all(fieldTasks);
-          const recordResult: Record<string, string[]> = {};
-          fieldResults.forEach(({ key, images }) => {
-            recordResult[key] = images;
-          });
-
-          return recordResult;
-        });
-
-        const result = await Promise.all(tasks);
-        return { result };
+        return { fieldResults };
       }
     });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/initial_image_generate`,

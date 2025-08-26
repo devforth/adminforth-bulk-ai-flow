@@ -91,6 +91,8 @@
               <GenerationCarousel
                 v-if="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :images="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :prompt="props.meta.generationOptions[n].prompt"
+                :recordId="item[primaryKey]"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
               />
             </div>

@@ -194,7 +194,7 @@ const { t: $t } = useI18n();
 
 const prompt = ref('');
 const emit = defineEmits(['close', 'uploadImage']);
-const props = defineProps(['meta', 'record', 'images']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -210,8 +210,8 @@ const caurosel = ref(null);
 onMounted(async () => {
   // Initialize carousel
   images.value.push((props.images || []));
-  console.log('Initial images:', images.value);
-
+  console.log('Initial images:', images.value, "with id:", props.recordId, "and prompt:", props.prompt);
+  prompt.value = props.prompt || '';
   await nextTick();
 
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
@@ -368,16 +368,16 @@ async function generateImages() {
   }, 100);
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
 
-  await getHistoricalAverage();
+  //await getHistoricalAverage();
   let resp = null;
   let error = null;
   try {
     resp = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/generate_images`,
+      path: `/plugin/${props.meta.pluginInstanceId}/regenerate_images`,
       method: 'POST',
       body: {
         prompt: prompt.value,
-        recordId: props.record[props.meta.recorPkFieldName]
+        recordId: props.recordId,
       },
     });
   } catch (e) {
