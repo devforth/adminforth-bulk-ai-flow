@@ -360,7 +360,7 @@ async function generateImages() {
   }, 100);
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
 
-  //await getHistoricalAverage();
+  await getHistoricalAverage();
   let resp = null;
   let error = null;
   try {

@@ -9,10 +9,16 @@ import { RateLimiter } from "adminforth";
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
   uploadPlugin: AdminForthPlugin;
+  totalCalls: number;
+  totalDuration: number;
 
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
     this.options = options;
+
+    // for calculating average time
+    this.totalCalls = 0;
+    this.totalDuration = 0;
   }
 
   // Compile Handlebars templates in outputFields using record fields as context
@@ -263,7 +269,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         if (this.checkRateLimit(this.options.generateImages[fieldName].rateLimit, headers)) {
           return { error: "Rate limit exceeded" };
         }
-
+        const start = +new Date();
         const STUB_MODE = true;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
         const attachmentFiles = await this.options.attachFiles({ record });
@@ -286,6 +292,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             return resp.imageURLs[0]
           })
         );
+        this.totalCalls++;
+        this.totalDuration += (+new Date() - start) / 1000;
         return { images };
       }
     });
@@ -301,11 +309,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         if (this.checkRateLimit(this.options.bulkGenerationRateLimit, headers)) {
           return { error: "Rate limit exceeded" };
         }
-
+        const start = +new Date();
         const tasks = selectedIds.map(async (ID) => {
           const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
           const attachmentFiles = await this.options.attachFiles({ record });
-
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
             const prompt = this.compileGenerationFieldTemplates(record)[key];
             let images;
@@ -336,6 +343,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           return recordResult;
         });
         const result = await Promise.all(tasks);
+        
+        this.totalCalls++;
+        this.totalDuration += (+new Date() - start) / 1000;
+
         return { result };
       }
     });
@@ -353,6 +364,16 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     });
 
 
-
+    server.endpoint({
+      method: 'GET',
+      path: `/plugin/${this.pluginInstanceId}/averageDuration`,
+      handler: async () => {
+        return {
+          totalCalls: this.totalCalls,
+          totalDuration: this.totalDuration,
+          averageDuration: this.totalCalls ? this.totalDuration / this.totalCalls : null,
+        };
+      }
+    });
   }
 }
