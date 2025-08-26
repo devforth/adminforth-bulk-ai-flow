@@ -93,7 +93,10 @@
                 :images="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :prompt="props.meta.generationOptions[n].prompt"
                 :recordId="item[primaryKey]"
+                :meta="props.meta"
+                :fieldName="n"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
+                @selectImage="updateSelectedImage"
               />
             </div>
           </div>
@@ -172,6 +175,10 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
     label: item.label,
     value: item.value
   }));
+}
+
+function updateSelectedImage(image: string, id: any, fieldName: string) {
+  props.selected[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = image;
 }
 
 </script>

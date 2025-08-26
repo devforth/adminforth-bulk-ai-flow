@@ -1,7 +1,7 @@
 
 <template>
   <!-- Main modal -->
-  <div tabindex="-1" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-black/80 dark:bg-gray-900 dark:bg-opacity-50">
+  <div tabindex="-1" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-black/50 dark:bg-gray-900 dark:bg-opacity-50">
     <div class="relative p-4 w-10/12 max-w-full max-h-full ">
         <!-- Modal content -->
         <div class="relative bg-white rounded-lg shadow-xl dark:bg-gray-700">
@@ -193,8 +193,8 @@ import { ProgressBar } from '@/afcl';
 const { t: $t } = useI18n();
 
 const prompt = ref('');
-const emit = defineEmits(['close', 'uploadImage']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt']);
+const emit = defineEmits(['close', 'selectImage']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -210,8 +210,7 @@ const caurosel = ref(null);
 onMounted(async () => {
   // Initialize carousel
   images.value.push((props.images || []));
-  console.log('Initial images:', images.value, "with id:", props.recordId, "and prompt:", props.prompt);
-  prompt.value = props.prompt || '';
+  console.log('Initial images:', images.value, "with id:", props.recordId, "and prompt:", prompt.value);
   await nextTick();
 
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
@@ -240,8 +239,8 @@ onMounted(async () => {
     resource: props.meta.resourceLabel,
   }; 
   let template = '';
-  if (props.meta.generationPrompt) {
-    template = props.meta.generationPrompt;
+  if (props.prompt) {
+    template = props.prompt;
   } else {
     template = 'Generate image for field {{field}} in {{resource}}. No text should be on image.';
   }
@@ -294,9 +293,9 @@ async function slide(direction: number) {
   const curPos = caurosel.value.getActiveItem().position;
   if (curPos === 0 && direction === -1) return;
   if (curPos === images.value.length - 1 && direction === 1) {
-    //await generateImages();
+    await generateImages();
     console.log('At the end of carousel, cannot slide further');
-    return;
+    //return;
   }
   if (direction === 1) {
     caurosel.value.next();
@@ -310,26 +309,8 @@ async function confirmImage() {
 
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
   const img = images.value[currentIndex];
-  // read  url to base64 and send it to the parent component
 
-  let imgBlob;
-  if (img.startsWith('data:')) {
-    const base64 = img.split(',')[1];
-    const mimeType = img.split(';')[0].split(':')[1];
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    imgBlob = new Blob([byteArray], { type: mimeType });
-  } else {
-    imgBlob = await fetch(
-      `${process.env.VITE_ADMINFORTH_PUBLIC_PATH || ''}/adminapi/v1/plugin/${props.meta.pluginInstanceId}/cors-proxy?url=${encodeURIComponent(img)}`
-    ).then(res => { return res.blob() });
-  }
-
-  emit('uploadImage', imgBlob);
+  emit('selectImage', img, props.recordId, props.fieldName);
   emit('close');
 
   loading.value = false;
@@ -378,6 +359,7 @@ async function generateImages() {
       body: {
         prompt: prompt.value,
         recordId: props.recordId,
+        fieldName: props.fieldName,
       },
     });
   } catch (e) {

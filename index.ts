@@ -245,27 +245,26 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/regenerate_images`,
       handler: async ({ body, headers }) => {
-        const Id = body.Id || [];
+        const Id = body.recordId || [];
+        const prompt = body.prompt || '';
+        const fieldName = body.fieldName || '';
         const STUB_MODE = true;
           const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
           const attachmentFiles = await this.options.attachFiles({ record });
-
-          const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-            const prompt = this.options.generateImages[key].prompt;
             const images = await Promise.all(
-              (new Array(this.options.generateImages[key].countToGenerate)).fill(0).map(async () => {
+              (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
                 if (STUB_MODE) {
-                  await new Promise((resolve) => setTimeout(resolve, 200));
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
                   return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
                  // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
                 }
 
-                const resp = await this.options.generateImages[key].adapter.generate(
+                const resp = await this.options.generateImages[fieldName].adapter.generate(
                   {
                     prompt,
                     inputFiles: attachmentFiles,
                     n: 1,
-                    size: this.options.generateImages[key].outputSize,
+                    size: this.options.generateImages[fieldName].outputSize,
                   }
                 )
 
@@ -276,12 +275,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 return resp.imageURLs[0]
               })
             );
-
             return { images };
-          });
-
-          const fieldResults = await Promise.all(fieldTasks);
-        return { fieldResults };
       }
     });
 
@@ -316,7 +310,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
             let images;
               if (STUB_MODE) {
-                await new Promise((resolve) => setTimeout(resolve, 200));
+                await new Promise((resolve) => setTimeout(resolve, 2000));
                 images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
                 // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
               } else {
