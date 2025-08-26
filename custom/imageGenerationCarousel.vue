@@ -234,7 +234,6 @@ onMounted(async () => {
       override: true,
     }
   );
-  console.log('Carousel initialized:', caurosel.value);
 
   const context = {
     field: props.meta.pathColumnLabel,
@@ -296,8 +295,6 @@ async function slide(direction: number) {
   if (curPos === 0 && direction === -1) return;
   if (curPos === images.value.length - 1 && direction === 1) {
     await generateImages();
-    console.log('At the end of carousel, cannot slide further');
-    //return;
   }
   if (direction === 1) {
     caurosel.value.next();

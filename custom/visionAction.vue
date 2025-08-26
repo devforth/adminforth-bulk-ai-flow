@@ -8,10 +8,10 @@
       @click="closeDialog"
     >
       <div
-        class="relative max-w-[95vw] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
+        class="flex items-center justify-center relative max-w-[95vw] min-w-[640px] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
         @click.stop
       >
-        <div class="flex flex-col items-end justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+        <div class="flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
           <VisionTable
             v-if="records && props.checkboxes.length"
             :checkbox="props.checkboxes"
@@ -29,12 +29,14 @@
             :primaryKey="primaryKey"
             :openGenerationCarousel="openGenerationCarousel"
           />
-          <Button 
-            class="w-64"
-            @click="saveData"
-          >
-          {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
-          </Button>
+          <div class="flex w-full items-end justify-end">
+            <Button 
+              class="w-64"
+              @click="saveData"
+            >
+            {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
