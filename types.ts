@@ -22,12 +22,6 @@ export interface PluginOptions {
       outputSize?: string,
 
       /**
-       * Fields for conetext which will be used to generate the image.
-       * If specified, the plugin will use fields from the record to provide additional context to the AI model.
-       */
-      fieldsForContext?: string[],
-      
-      /**
        * Since AI generation can be expensive, we can limit the number of requests per IP.
        * E.g. 5/1d - 5 requests per day
        * 3/1h - 3 requests per hour
@@ -35,9 +29,13 @@ export interface PluginOptions {
       rateLimit?: string,
 
       /**
-       * The number of images to generate
+       * The number of images to regenerate
        * in one request
        */
       countToGenerate: number,
     }>,
+    /** 
+     * As rateLimit on generateImages, but applied to bulk generations  
+     **/
+    bulkGenerationRateLimit?: string, 
 }

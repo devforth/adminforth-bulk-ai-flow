@@ -46,6 +46,7 @@ import { callAdminForthApi } from '@/utils';
 import { ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionTable.vue'
+import adminforth from '@/adminforth';
 
 const props = defineProps<{
   checkboxes: any,
@@ -268,26 +269,47 @@ async function saveData() {
 
 async function generateImages() {
   isAiResponseReceivedImage.value = props.checkboxes.map(() => false);
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/initial_image_generate`,
-    method: 'POST',
-    body: {
-      selectedIds: props.checkboxes,
-    },
-  });
+  let res;
+  let error = null;
+
+  try {
+    res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/initial_image_generate`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+    });
+  } catch (e) {
+    console.error('Error generating images:', e);
+  }
   isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
 
-  res.result.forEach((item, idx) => {
-    const pk = selected.value[idx]?.[primaryKey]
+  if (res?.error) {
+    error = res.error;
+  }
+  if (!res) {
+    error = 'Error generating images, something went wrong';
+  }
 
-    if (pk) {
-      selected.value[idx] = {
-        ...selected.value[idx],
-        ...item,
-        [primaryKey]: pk
+  if (error) { 
+    adminforth.alert({
+      message: error,
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+  } else {
+    res.result.forEach((item, idx) => {
+      const pk = selected.value[idx]?.[primaryKey]
+      if (pk) {
+        selected.value[idx] = {
+          ...selected.value[idx],
+          ...item,
+          [primaryKey]: pk
+        }
       }
-    }
-  })
-
+    })
+  }
 }
+
 </script>

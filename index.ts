@@ -30,19 +30,21 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   // Compile Handlebars templates in generateImage using record fields as context
-  private compileImageGenerationFieldsTemplates(record: any): Record<string, string> {
-    const compiled: Record<string, string> = {};
-    for (const [key, templateStr] of Object.entries(this.options.generateImages.fields)) {
-      try {
-        const tpl = Handlebars.compile(String(templateStr));
-        compiled[key] = tpl(record);
-      } catch {
-        compiled[key] = String(templateStr);
+  private checkRateLimit(fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
+    if (fieldNameRateLimit) {
+      // rate limit
+      console.log('Checking rate limit', fieldNameRateLimit);
+      const { error } = RateLimiter.checkRateLimit(
+        this.pluginInstanceId,
+        fieldNameRateLimit,
+        this.adminforth.auth.getClientIp(headers),
+      );
+      if (error) {
+        return { error: "Rate limit exceeded" };
       }
     }
-    return compiled;
   }
- 
+
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
 
@@ -180,6 +182,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       return { result };
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
@@ -195,6 +199,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
@@ -210,6 +216,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
@@ -229,18 +237,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     });
 
 
-
-
-
-
-
-
-
-
-
-
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/regenerate_images`,
@@ -248,50 +244,35 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const Id = body.recordId || [];
         const prompt = body.prompt || '';
         const fieldName = body.fieldName || '';
+        if (this.checkRateLimit(this.options.generateImages[fieldName].rateLimit, headers)) {
+          return { error: "Rate limit exceeded" };
+        }
+
         const STUB_MODE = true;
-          const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
-          const attachmentFiles = await this.options.attachFiles({ record });
-            const images = await Promise.all(
-              (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
-                if (STUB_MODE) {
-                  await new Promise((resolve) => setTimeout(resolve, 2000));
-                  return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
-                 // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
-                }
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
+        const attachmentFiles = await this.options.attachFiles({ record });
+        const images = await Promise.all(
+          (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
 
-                const resp = await this.options.generateImages[fieldName].adapter.generate(
-                  {
-                    prompt,
-                    inputFiles: attachmentFiles,
-                    n: 1,
-                    size: this.options.generateImages[fieldName].outputSize,
-                  }
-                )
+            if (STUB_MODE) {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+            }
 
-                if (resp.error) {
-                  console.error('Error generating image', resp.error);
-                  return;
-                }
-                return resp.imageURLs[0]
-              })
-            );
-            return { images };
+            const resp = await this.options.generateImages[fieldName].adapter.generate(
+              {
+                prompt,
+                inputFiles: attachmentFiles,
+                n: 1,
+                size: this.options.generateImages[fieldName].outputSize,
+              }
+            )
+            return resp.imageURLs[0]
+          })
+        );
+        return { images };
       }
     });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     server.endpoint({
@@ -300,34 +281,30 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ({ body, headers }) => {
         const selectedIds = body.selectedIds || [];
         const STUB_MODE = true;
+
+        if (this.checkRateLimit(this.options.bulkGenerationRateLimit, headers)) {
+          return { error: "Rate limit exceeded" };
+        }
+        
         const tasks = selectedIds.map(async (ID) => {
           const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
           const attachmentFiles = await this.options.attachFiles({ record });
 
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-
             const prompt = this.options.generateImages[key].prompt;
-
             let images;
               if (STUB_MODE) {
                 await new Promise((resolve) => setTimeout(resolve, 2000));
                 images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
-                // return `https://comicbook.com/wp-content/uploads/sites/4/2021/08/3370c29e-9fd6-4228-84fb-bc3f9e8929d1.jpg`;
               } else {
-              const start = +new Date();
-              const resp = await this.options.generateImages[key].adapter.generate(
-                {
-                  prompt,
-                  inputFiles: attachmentFiles,
-                  n: 1,
-                  size: this.options.generateImages[key].outputSize,
-                }
-              )
-
-              // if (resp.error) {
-              //   console.error('Error generating image', resp.error);
-              //   return;
-              // }
+                const resp = await this.options.generateImages[key].adapter.generate(
+                  {
+                    prompt,
+                    inputFiles: attachmentFiles,
+                    n: 1,
+                    size: this.options.generateImages[key].outputSize,
+                  }
+                )
                 images = resp.imageURLs[0];
               }
             return { key, images };
@@ -335,16 +312,18 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
           const fieldResults = await Promise.all(fieldTasks);
           const recordResult: Record<string, string[]> = {};
+
           fieldResults.forEach(({ key, images }) => {
             recordResult[key] = images;
           });
 
           return recordResult;
         });
-
         const result = await Promise.all(tasks);
         return { result };
       }
     });
+
+
   }
 }
