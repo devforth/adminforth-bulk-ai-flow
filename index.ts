@@ -5,6 +5,8 @@ import { json } from "stream/consumers";
 import Handlebars, { compile } from 'handlebars';
 import { RateLimiter } from "adminforth";
 
+const ADMINFORTH_NOT_YET_USED_TAG = 'adminforth-candidate-for-cleanup';
+
 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
@@ -375,5 +377,70 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
+
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/get_file_upload_url`,
+      handler: async ({ body }) => {
+        const { originalFilename, contentType, size, originalExtension, recordPk } = body;
+
+
+        const columns = this.resourceConfig.columns;
+        let plugin;
+        for (const [key, value] of Object.entries(this.options.generateImages)) {
+          const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+          if (!column) {
+            throw new Error(`⚠️ No column found for key "${key}"`);
+          }
+          plugin = this.adminforth.activatedPlugins.find(p =>
+            p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+            p.pluginOptions.pathColumnName === key
+          );
+          if (!plugin) {
+            throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
+          }
+        }
+
+
+        if (plugin.allowedFileExtensions && !plugin.allowedFileExtensions.includes(originalExtension)) {
+          return {
+            error: `File extension "${originalExtension}" is not allowed, allowed extensions are: ${plugin.allowedFileExtensions.join(', ')}`
+          };
+        }
+
+        let record = undefined;
+        if (recordPk) {
+          // get record by recordPk
+          const pkName = this.resourceConfig.columns.find((column: any) => column.primaryKey)?.name;
+          record = await this.adminforth.resource(this.resourceConfig.resourceId).get(
+            [Filters.EQ(pkName, recordPk)]
+          )
+        }
+
+        const filePath: string = plugin.filePath({ originalFilename, originalExtension, contentType, record });
+        if (filePath.startsWith('/')) {
+          throw new Error('s3Path should not start with /, please adjust s3path function to not return / at the start of the path');
+        }
+        const { uploadUrl, uploadExtraParams } = await plugin.storageAdapter.getUploadSignedUrl(filePath, contentType, 1800);
+        let previewUrl;
+        if (plugin.preview?.previewUrl) {
+          previewUrl = plugin.preview.previewUrl({ filePath });
+        } else {
+          previewUrl = await plugin.storageAdapter.getDownloadUrl(filePath, 1800);
+        }
+        const tagline = `${ADMINFORTH_NOT_YET_USED_TAG}=true`;
+        
+        return {
+          uploadUrl,
+          tagline,
+          filePath,
+          uploadExtraParams,
+          previewUrl,
+        };
+      }
+    });
+
+
   }
 }
