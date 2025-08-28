@@ -1,6 +1,9 @@
 <template>
-  <div @click="openDialog">
-      <p class="">{{ props.meta.actionName }}</p>
+  <div class="flex items-center justify-center gap-2" @click="openDialog">
+    <p class="">{{ props.meta.actionName }}</p>
+    <div class="text-white font-extrabold bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center me-1 mb-1">
+      AI
+    </div>
   </div>
   <Dialog ref="confirmDialog">
     <div
