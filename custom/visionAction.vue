@@ -33,6 +33,8 @@
             <Button 
               class="w-64"
               @click="saveData"
+              :disabled="isLoading"
+              :loader="isLoading"
             >
             {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
             </Button>
@@ -49,12 +51,18 @@ import { ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionTable.vue'
 import adminforth from '@/adminforth';
+import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
+import { type AdminUser, type AdminForthResourceCommon } from '@/types';
+
+const route = useRoute();
+const { t } = useI18n();
 
 const props = defineProps<{
   checkboxes: any,
   meta: any,
-  resource: any,
-  adminUser: any,
+  resource: AdminForthResourceCommon,
+  adminUser: AdminUser,
   updateList: {
     type: Function,
     required: true
@@ -76,6 +84,7 @@ const isAiResponseReceived = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
+const isLoading = ref(false);
 
 const openDialog = async () => {
   confirmDialog.value.open();
@@ -94,20 +103,28 @@ const openDialog = async () => {
     return acc;
   },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
+  isLoading.value = true;
   await Promise.all([
     //analyzeFields(),
     generateImages()
   ]);
+  isLoading.value = false;
 }
  
-watch(selected, (val) => {
-  console.log('Selected changed:', val);
-}, { deep: true });
+// watch(selected, (val) => {
+//   console.log('Selected changed:', val);
+// }, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
   isAiResponseReceived.value = [];
   isAiResponseReceivedImage.value = [];
+
+  records.value = [];
+  images.value = [];
+  selected.value = [];
+  tableColumns.value = [];
+  tableColumnsIndexes.value = [];
 }
 
 function formatLabel(str) {
@@ -185,29 +202,38 @@ function isInColumnEnum(key: string): boolean {
 }
 
 async function getRecords() {
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
-    method: 'POST',
-    body: {
-      record: props.checkboxes,
-    },
-  });
-  records.value = res.records;
+  try {
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
+      method: 'POST',
+      body: {
+        record: props.checkboxes,
+      },
+    });
+    records.value = res.records;
+  } catch (error) {
+    console.error('Failed to get records:', error);
+    // Handle error appropriately
+  }
 }
 
 async function getImages() {
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
-    method: 'POST',
-    body: {
-      record: records.value,
-    },
-  });
-
-  images.value = res.images;
+  try {
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
+      method: 'POST',
+      body: {
+        record: records.value,
+      },
+    });
+    images.value = res.images;
+  } catch (error) {
+    console.error('Failed to get images:', error);
+    // Handle error appropriately
+  }
 }
 
-function prepareDataForSave() {
+async function prepareDataForSave() {
   const checkedItems = selected.value
     .filter(item => item.isChecked === true)
     .map(item => {
@@ -217,55 +243,119 @@ function prepareDataForSave() {
   const checkedItemsIDs = selected.value
     .filter(item => item.isChecked === true)
     .map(item => item[primaryKey]);
+
+  const promises = [];
+  for (const item of checkedItems) {
+    for (const [key, value] of Object.entries(item)) {
+      if(props.meta.outputImageFields?.includes(key)) {
+        const p = convertImages(key, value).then(result => {
+          item[key] = result;
+        });
+      
+        promises.push(p);
+      }
+    }
+  }
+  await Promise.all(promises);
+
   return [checkedItemsIDs, checkedItems];
 }
 
-async function analyzeFields() {
-  isAiResponseReceived.value = props.checkboxes.map(() => false);
-
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
-    method: 'POST',
-    body: {
-      selectedIds: props.checkboxes,
-    },
-  });
-
-  isAiResponseReceived.value = props.checkboxes.map(() => true);
-
-  res.result.forEach((item, idx) => {
-    const pk = selected.value[idx]?.[primaryKey]
-
-    if (pk) {
-      selected.value[idx] = {
-        ...selected.value[idx],
-        ...item,
-        isChecked: true,
-        [primaryKey]: pk
-      }
+async function convertImages(fieldName, img) {
+  let imgBlob;
+  if (img.startsWith('data:')) {
+    const base64 = img.split(',')[1];
+    const mimeType = img.split(';')[0].split(':')[1];
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-  })
+    const byteArray = new Uint8Array(byteNumbers);
+    imgBlob = new Blob([byteArray], { type: mimeType });
+  } else {
+    imgBlob = await fetch(
+      `/adminapi/v1/plugin/${props.meta.outputImagesPluginInstanceIds[fieldName]}/cors-proxy?url=${encodeURIComponent(img)}`
+    ).then(res => { return res.blob() });
+  }
+  return imgBlob;
+}
 
+
+async function analyzeFields() {
+  try {
+    isAiResponseReceived.value = props.checkboxes.map(() => false);
+
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+    });
+
+    isAiResponseReceived.value = props.checkboxes.map(() => true);
+
+    res.result.forEach((item, idx) => {
+      const pk = selected.value[idx]?.[primaryKey]
+
+      if (pk) {
+        selected.value[idx] = {
+          ...selected.value[idx],
+          ...item,
+          isChecked: true,
+          [primaryKey]: pk
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Failed to get records:', error);
+
+  }
 }
 
 async function saveData() {
-  const [checkedItemsIDs, reqData] = prepareDataForSave();
+  if (!selected.value?.length) {
+    adminforth.alert({ message: 'No items selected', variant: 'warning' });
+    return;
+  }
+  try {
+    isLoading.value = true;
+    const [checkedItemsIDs, reqData] = await prepareDataForSave();
 
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
-    method: 'POST',
-    body: {
-      selectedIds: checkedItemsIDs,
-      fields: reqData,
-    },
-  });
+    const imagesToUpload = [];
+    for (const item of reqData) {
+      for (const [key, value] of Object.entries(item)) {
+        if(props.meta.outputImageFields?.includes(key)) {
+          const p = uploadImage(value, item[primaryKey], key).then(result => {
+            item[key] = result;
+          });
+          imagesToUpload.push(p);
+        }
+      }
+    }
+    await Promise.all(imagesToUpload);
 
-  if(res.ok) {
-    confirmDialog.value.close();
-    props.updateList();
-    props.clearCheckboxes();
-  } else {
-    console.error('Error saving data:', res);
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
+      method: 'POST',
+      body: {
+        selectedIds: checkedItemsIDs,
+        fields: reqData,
+      },
+    });
+
+    if(res.ok) {
+      confirmDialog.value.close();
+      props.updateList();
+      props.clearCheckboxes();
+    } else {
+      console.error('Error saving data:', res);
+    }
+  } catch (error) {
+    console.error('Error saving data:', error);
+  } finally {
+    isLoading.value = false;
   }
 }
 
@@ -311,6 +401,75 @@ async function generateImages() {
         }
       }
     })
+  }
+}
+
+
+async function uploadImage(imgBlob, id, fieldName) {
+  const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type}`, { type: imgBlob.type });
+  const { name, size, type } = file;
+  
+  const extension = name.split('.').pop();
+  const nameNoExtension = name.replace(`.${extension}`, '');
+
+  try {
+    const { uploadUrl, uploadExtraParams, filePath, error } = await callAdminForthApi({
+        path: `/plugin/${props.meta.outputImagesPluginInstanceIds[fieldName]}/get_file_upload_url`,
+        method: 'POST',
+        body: {
+          originalFilename: nameNoExtension,
+          contentType: type,
+          size,
+          originalExtension: extension,
+          recordPk: route?.params?.primaryKey,
+        },
+    });
+
+    if (error) {
+      adminforth.alert({
+        message: t('File was not uploaded because of error: {error}', { error }),
+        variant: 'danger'
+      });
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    const success = await new Promise((resolve) => {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+        }
+      };
+      xhr.addEventListener('loadend', () => {
+        const success = xhr.readyState === 4 && xhr.status === 200;
+        // try to read response
+        resolve(success);
+      });
+      xhr.open('PUT', uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', type);
+      uploadExtraParams && Object.entries(uploadExtraParams).forEach(([key, value]: [string, string]) => {
+        xhr.setRequestHeader(key, value);
+      })
+      xhr.send(file);
+    });
+    if (!success) {
+      adminforth.alert({
+        messageHtml: `<div>${t('Sorry but the file was not uploaded because of internal storage Request Error:')}</div>
+        <pre style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">${
+          xhr.responseText.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        }</pre>`,
+        variant: 'danger',
+        timeout: 30,
+      });
+      return;
+    }
+    return filePath;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    adminforth.alert({
+      message: 'Sorry but the file was not be uploaded. Please try again.',
+      variant: 'danger'
+    });
+    return null;
   }
 }
 

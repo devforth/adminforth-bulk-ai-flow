@@ -92,7 +92,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         outputImageFields.push(key);
       }
     }
-
+    const outputImagesPluginInstanceIds = {};
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
       for (const [key, value] of Object.entries(this.options.generateImages)) {
@@ -113,7 +113,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
           `);
         }
-        this.uploadPlugin = plugin;
+
+        outputImagesPluginInstanceIds[key] = plugin.pluginInstanceId;
       }
     }
 
@@ -136,6 +137,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         columnEnums: columnEnums,
         outputImageFields: outputImageFields,
         primaryKey: primaryKeyColumn.name,
+        outputImagesPluginInstanceIds: outputImagesPluginInstanceIds,
       }
     }
 
@@ -248,6 +250,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ( body ) => {
         const selectedIds = body.body.selectedIds || [];
         const fieldsToUpdate = body.body.fields || {};
+        console.log("Updating fields for IDs:", selectedIds, fieldsToUpdate);
         const updates = selectedIds.map((ID, idx) =>
           this.adminforth
             .resource(this.resourceConfig.resourceId)
@@ -272,7 +275,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           return { error: "Rate limit exceeded" };
         }
         const start = +new Date();
-        const STUB_MODE = true;
+        const STUB_MODE = false;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
         const attachmentFiles = await this.options.attachFiles({ record });
         const images = await Promise.all(
@@ -306,7 +309,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/initial_image_generate`,
       handler: async ({ body, headers }) => {
         const selectedIds = body.selectedIds || [];
-        const STUB_MODE = true;
+        const STUB_MODE = false;
 
         if (this.checkRateLimit(this.options.bulkGenerationRateLimit, headers)) {
           return { error: "Rate limit exceeded" };
@@ -378,68 +381,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     });
 
-
-    server.endpoint({
-      method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/get_file_upload_url`,
-      handler: async ({ body }) => {
-        const { originalFilename, contentType, size, originalExtension, recordPk } = body;
-
-
-        const columns = this.resourceConfig.columns;
-        let plugin;
-        for (const [key, value] of Object.entries(this.options.generateImages)) {
-          const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
-          if (!column) {
-            throw new Error(`⚠️ No column found for key "${key}"`);
-          }
-          plugin = this.adminforth.activatedPlugins.find(p =>
-            p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
-            p.pluginOptions.pathColumnName === key
-          );
-          if (!plugin) {
-            throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
-          }
-        }
-
-
-        if (plugin.allowedFileExtensions && !plugin.allowedFileExtensions.includes(originalExtension)) {
-          return {
-            error: `File extension "${originalExtension}" is not allowed, allowed extensions are: ${plugin.allowedFileExtensions.join(', ')}`
-          };
-        }
-
-        let record = undefined;
-        if (recordPk) {
-          // get record by recordPk
-          const pkName = this.resourceConfig.columns.find((column: any) => column.primaryKey)?.name;
-          record = await this.adminforth.resource(this.resourceConfig.resourceId).get(
-            [Filters.EQ(pkName, recordPk)]
-          )
-        }
-
-        const filePath: string = plugin.filePath({ originalFilename, originalExtension, contentType, record });
-        if (filePath.startsWith('/')) {
-          throw new Error('s3Path should not start with /, please adjust s3path function to not return / at the start of the path');
-        }
-        const { uploadUrl, uploadExtraParams } = await plugin.storageAdapter.getUploadSignedUrl(filePath, contentType, 1800);
-        let previewUrl;
-        if (plugin.preview?.previewUrl) {
-          previewUrl = plugin.preview.previewUrl({ filePath });
-        } else {
-          previewUrl = await plugin.storageAdapter.getDownloadUrl(filePath, 1800);
-        }
-        const tagline = `${ADMINFORTH_NOT_YET_USED_TAG}=true`;
-        
-        return {
-          uploadUrl,
-          tagline,
-          filePath,
-          uploadExtraParams,
-          previewUrl,
-        };
-      }
-    });
 
 
   }
