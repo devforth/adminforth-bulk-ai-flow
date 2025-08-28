@@ -105,7 +105,7 @@ const openDialog = async () => {
   }
   isLoading.value = true;
   await Promise.all([
-    //analyzeFields(),
+    analyzeFields(),
     generateImages()
   ]);
   isLoading.value = false;
@@ -406,7 +406,7 @@ async function generateImages() {
 
 
 async function uploadImage(imgBlob, id, fieldName) {
-  const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type}`, { type: imgBlob.type });
+  const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type.split('/').pop()}`, { type: imgBlob.type });
   const { name, size, type } = file;
   
   const extension = name.split('.').pop();

@@ -212,11 +212,9 @@ onMounted(async () => {
   images.value.push((props.images || []));
   const temp = await getGenerationPrompt() || '';
   prompt.value = temp[props.fieldName];
-  console.log('Initial images:', images.value, "with id:", props.recordId, "and prompt:", prompt.value);
   await nextTick();
 
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
-  console.log("Setting up carousel with currentIndex:", currentIndex);
   caurosel.value = new Carousel(
     document.getElementById('gallery'), 
     images.value.map((img, index) => {
@@ -273,20 +271,6 @@ onMounted(async () => {
   const recordId = props.record[props.meta.recorPkFieldName];
   if (!recordId) return;
 
-  // try {
-  //   const resp = await callAdminForthApi({
-  //     path: `/plugin/${props.meta.pluginInstanceId}/get_attachment_files`,
-  //     method: 'POST',
-  //     body: { recordId },
-  //   });
-
-  //   if (resp?.files?.length) {
-  //     attachmentFiles.value = resp.files;
-  //     console.log('attachmentFiles', attachmentFiles.value);
-  //   }
-  // } catch (err) {
-  //   console.error('Failed to fetch attachment files', err);
-  // }
 });
 
 async function slide(direction: number) {
@@ -345,7 +329,6 @@ async function getGenerationPrompt() {
       recordId: props.recordId,
     },
   });
-  console.log('Received generation prompts from server:', resp);
   return resp?.generationOptions || null;
 }
 
