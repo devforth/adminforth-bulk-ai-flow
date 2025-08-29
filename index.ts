@@ -5,8 +5,6 @@ import { json } from "stream/consumers";
 import Handlebars, { compile } from 'handlebars';
 import { RateLimiter } from "adminforth";
 
-let outputImageFields = [];
-
 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
@@ -85,7 +83,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
 
-    outputImageFields = [];
+    const outputImageFields = [];
     if (this.options.generateImages) {
       for (const [key, value] of Object.entries(this.options.generateImages)) {
         outputImageFields.push(key);
@@ -247,6 +245,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ( body ) => {
         const selectedIds = body.body.selectedIds || [];
         const fieldsToUpdate = body.body.fields || {};
+        const outputImageFields = [];
+        if (this.options.generateImages) {
+          for (const [key, value] of Object.entries(this.options.generateImages)) {
+            outputImageFields.push(key);
+          }
+        }
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
         const updates = selectedIds.map(async (ID, idx) => {
           const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
