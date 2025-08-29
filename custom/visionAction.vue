@@ -11,10 +11,10 @@
       @click="closeDialog"
     >
       <div
-        class="flex items-center justify-center relative max-w-[95vw] min-w-[640px] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
+        class="bulk-vision-dialog flex items-center justify-center relative max-w-[95vw] min-w-[640px] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
         @click.stop
       >
-        <div class="flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+        <div class="bulk-vision-table flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
           <button type="button" 
             @click="closeDialog"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" >
@@ -22,6 +22,7 @@
                   <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
               </svg>
           </button>
+
           <VisionTable
             v-if="records && props.checkboxes.length"
             :checkbox="props.checkboxes"
