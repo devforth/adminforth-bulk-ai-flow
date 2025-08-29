@@ -1,7 +1,7 @@
 
 <template>
   <!-- Main modal -->
-  <div tabindex="-1" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-black/50 dark:bg-gray-900 dark:bg-opacity-50">
+  <div tabindex="-1" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-10 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-black/50 dark:bg-gray-900 dark:bg-opacity-50">
     <div class="relative p-4 w-10/12 max-w-full max-h-full ">
         <!-- Modal content -->
         <div class="relative bg-white rounded-lg shadow-xl dark:bg-gray-700">
@@ -193,8 +193,8 @@ import { ProgressBar } from '@/afcl';
 const { t: $t } = useI18n();
 
 const prompt = ref('');
-const emit = defineEmits(['close', 'selectImage']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName']);
+const emit = defineEmits(['close', 'selectImage', 'error']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -208,7 +208,6 @@ function minifyField(field: string): string {
 
 const caurosel = ref(null);
 onMounted(async () => {
-  // Initialize carousel
   images.value.push((props.images || []));
   const temp = await getGenerationPrompt() || '';
   prompt.value = temp[props.fieldName];
@@ -268,8 +267,15 @@ onMounted(async () => {
     return context[field.trim()] || '';
   });
   
+  if (props.record[props.record[props.meta.recorPkFieldName]]) {
   const recordId = props.record[props.meta.recorPkFieldName];
-  if (!recordId) return;
+  } else { 
+    emit('error', {
+      isError: true,
+      errorMessage: 'Record ID not found, cannot generate images'
+    });
+    return;
+  }
 
 });
 
@@ -322,14 +328,27 @@ async function getHistoricalAverage() {
 }
 
 async function getGenerationPrompt() {
-  const resp = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/get_generation_prompts`,
-    method: 'POST',
-    body: {
-      recordId: props.recordId,
-    },
-  });
-  return resp?.generationOptions || null;
+  try{
+    const resp = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_generation_prompts`,
+      method: 'POST',
+      body: {
+        recordId: props.recordId,
+      },
+    });
+    if(!resp) {
+      emit('error', {
+        isError: true,
+        errorMessage: "Something went wrong. Check your internet connection and try again."
+    });
+    }
+    return resp?.generationOptions || null;
+  } catch (e) {
+    emit('error', {
+      isError: true,
+      errorMessage: e.message
+    });
+  }
 }
 
 async function generateImages() {
@@ -379,6 +398,10 @@ async function generateImages() {
         variant: 'danger',
         timeout: 'unlimited',
       });
+    emit('error', {
+      isError: true,
+      errorMessage: error
+    });
     }
     return;
   }

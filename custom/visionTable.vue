@@ -94,6 +94,7 @@
                 :recordId="item[primaryKey]"
                 :meta="props.meta"
                 :fieldName="n"
+                @error="handleError"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
                 @selectImage="updateSelectedImage"
               />
@@ -130,7 +131,11 @@ const props = defineProps<{
   isAiResponseReceivedImage: boolean[],
   primaryKey: any,
   openGenerationCarousel: any
+  isError: boolean,
+  errorMessage: string
 }>();
+const emit = defineEmits(['error']);
+
 
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
@@ -178,6 +183,13 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
 
 function updateSelectedImage(image: string, id: any, fieldName: string) {
   props.selected[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = image;
+}
+
+function handleError({ isError, errorMessage }) {
+  emit('error', {
+    isError,
+    errorMessage
+  });
 }
 
 </script>

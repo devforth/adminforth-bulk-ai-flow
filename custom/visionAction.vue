@@ -7,7 +7,7 @@
   </div>
   <Dialog ref="confirmDialog">
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40"
       @click="closeDialog"
     >
       <div
@@ -15,6 +15,13 @@
         @click.stop
       >
         <div class="flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+          <button type="button" 
+            @click="closeDialog"
+            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" >
+              <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+              </svg>
+          </button>
           <VisionTable
             v-if="records && props.checkboxes.length"
             :checkbox="props.checkboxes"
@@ -31,12 +38,21 @@
             :isAiResponseReceivedImage="isAiResponseReceivedImage"
             :primaryKey="primaryKey"
             :openGenerationCarousel="openGenerationCarousel"
+            @error="handleTableError"
           />
-          <div class="flex w-full items-end justify-end">
+          <div class="flex w-full items-end justify-end gap-4">
+            <div class="h-full text-red-600 font-semibold flex items-center justify-center mb-2">
+              <p v-if="isError === true">{{ errorMessage }}</p>
+            </div>
+            <button type="button" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+              @click="closeDialog"
+            >
+              {{'Cancel'}}
+            </button>
             <Button 
               class="w-64"
               @click="saveData"
-              :disabled="isLoading"
+              :disabled="isLoading || isError"
               :loader="isLoading"
             >
             {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
@@ -50,7 +66,7 @@
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { ref, watch } from 'vue'
+import { handleError, ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionTable.vue'
 import adminforth from '@/adminforth';
@@ -88,6 +104,8 @@ const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
 const isLoading = ref(false);
+const isError = ref(false);
+const errorMessage = ref('');
 
 const openDialog = async () => {
   confirmDialog.value.open();
@@ -136,6 +154,8 @@ const closeDialog = () => {
   selected.value = [];
   tableColumns.value = [];
   tableColumnsIndexes.value = [];
+  isError.value = false;
+  errorMessage.value = '';
 }
 
 function formatLabel(str) {
@@ -213,6 +233,11 @@ function isInColumnEnum(key: string): boolean {
   return true;
 }
 
+function handleTableError(errorData) {
+  isError.value = errorData.isError;
+  errorMessage.value = errorData.errorMessage;
+}
+
 async function getRecords() {
   try {
     const res = await callAdminForthApi({
@@ -225,6 +250,8 @@ async function getRecords() {
     records.value = res.records;
   } catch (error) {
     console.error('Failed to get records:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
     // Handle error appropriately
   }
 }
@@ -241,6 +268,8 @@ async function getImages() {
     images.value = res.images;
   } catch (error) {
     console.error('Failed to get images:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to get images ${error}. Please, try to re-run the action.`;
     // Handle error appropriately
   }
 }
@@ -322,7 +351,8 @@ async function analyzeFields() {
     })
   } catch (error) {
     console.error('Failed to get records:', error);
-
+    isError.value = true;
+    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
   }
 }
 
@@ -356,7 +386,8 @@ async function analyzeFieldsNoImages() {
     })
   } catch (error) {
     console.error('Failed to get records:', error);
-
+    isError.value = true;
+    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
   }
 }
 
@@ -400,9 +431,13 @@ async function saveData() {
       props.clearCheckboxes();
     } else {
       console.error('Error saving data:', res);
+      isError.value = true;
+      errorMessage.value = `Failed to save data ${res}. Please, try to re-run the action.`;
     }
   } catch (error) {
     console.error('Error saving data:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to save data ${error}. Please, try to re-run the action.`;
   } finally {
     isLoading.value = false;
   }
@@ -423,6 +458,8 @@ async function generateImages() {
     });
   } catch (e) {
     console.error('Error generating images:', e);
+    isError.value = true;
+    errorMessage.value = `Failed to generate images ${e}. Please, try to re-run the action.`;
   }
   isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
 
@@ -431,6 +468,8 @@ async function generateImages() {
   }
   if (!res) {
     error = 'Error generating images, something went wrong';
+    isError.value = true;
+    errorMessage.value = `Failed to generate images ${e}. Please, try to re-run the action.`;
   }
 
   if (error) { 
@@ -518,6 +557,9 @@ async function uploadImage(imgBlob, id, fieldName) {
       message: 'Sorry but the file was not be uploaded. Please try again.',
       variant: 'danger'
     });
+
+    isError.value = true;
+    errorMessage.value = `Failed to upload images. Please, try to re-run the action.`;
     return null;
   }
 }
