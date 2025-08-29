@@ -35,6 +35,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
+  private compileOutputFieldsTemplatesNoImage(record: any): Record<string, string> {
+    const compiled: Record<string, string> = {};
+    for (const [key, templateStr] of Object.entries(this.options.fillPlainFields)) {
+      try {
+        const tpl = Handlebars.compile(String(templateStr));
+        compiled[key] = tpl(record);
+      } catch {
+        compiled[key] = String(templateStr);
+      }
+    }
+    return compiled;
+  }
+
   private compileGenerationFieldTemplates(record: any) {
     const compiled: Record<string, any> = {};
     for (const key in this.options.generateImages) {
@@ -68,20 +81,59 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     //check if options names are provided
     const columns = this.resourceConfig.columns;
     let columnEnums = [];
-    for (const [key, value] of Object.entries(this.options.fillFieldsFromImages)) {
-      const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
-      if (column) {
-        if(column.enum){
-          (this.options.fillFieldsFromImages as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
-          columnEnums.push({
-            name: key,
-            enum: column.enum,
-          });
+    if (this.options.fillFieldsFromImages) {
+      if (!this.options.attachFiles) {
+        throw new Error('⚠️ attachFiles function must be provided in options when fillFieldsFromImages is used');
+      }
+      if (!this.options.visionAdapter) {
+        throw new Error('⚠️ visionAdapter must be provided in options when fillFieldsFromImages is used');
+      }
+
+      for (const [key, value] of Object.entries((this.options.fillFieldsFromImages ))) {
+        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+        if (column) {
+          if(column.enum){
+            (this.options.fillFieldsFromImages as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
+            columnEnums.push({
+              name: key,
+              enum: column.enum,
+            });
+          }
+        } else {
+          throw new Error(`⚠️ No column found for key "${key}"`);
         }
-      } else {
-        throw new Error(`⚠️ No column found for key "${key}"`);
       }
     }
+
+    if (this.options.fillPlainFields) {
+      if (!this.options.textCompleteAdapter) {
+        throw new Error('⚠️ textCompleteAdapter must be provided in options when fillPlainFields is used');
+      }
+
+      for (const [key, value] of Object.entries((this.options.fillPlainFields))) {
+        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+        if (column) {
+          if(column.enum){
+            (this.options.fillPlainFields as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
+            columnEnums.push({
+              name: key,
+              enum: column.enum,
+            });
+          }
+        } else {
+          throw new Error(`⚠️ No column found for key "${key}"`);
+        }
+      }
+    }
+
+    if (this.options.generateImages && !this.options.imageGenerationAdapter) {
+      for (const [key, value] of Object.entries(this.options.generateImages)) {
+        if (!this.options.generateImages[key].adapter) {
+          throw new Error(`⚠️ No image generation adapter found for key "${key}"`);
+        }
+      }
+    }
+  
 
     const outputImageFields = [];
     if (this.options.generateImages) {
@@ -117,6 +169,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     const outputFields = {
       ...this.options.fillFieldsFromImages,
+      ...this.options.fillPlainFields,
       ...(this.options.generateImages || {})
     };
 
@@ -131,8 +184,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         actionName: this.options.actionName,
         columnEnums: columnEnums,
         outputImageFields: outputImageFields,
+        outputPlainFields: this.options.fillPlainFields,
         primaryKey: primaryKeyColumn.name,
         outputImagesPluginInstanceIds: outputImagesPluginInstanceIds,
+        isFieldsForAnalizeFromImages: this.options.fillFieldsFromImages ? Object.keys(this.options.fillFieldsFromImages).length > 0 : false,
+        isFieldsForAnalizePlain: this.options.fillPlainFields ? Object.keys(this.options.fillPlainFields).length > 0 : false,
+        isImageGeneration: this.options.generateImages ? Object.keys(this.options.generateImages).length > 0 : false
       }
     }
 
@@ -194,6 +251,43 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
         //parse response and update record
         const resData = JSON.parse(textOutput);
+
+        return resData;
+      });
+
+      const result = await Promise.all(tasks);
+
+      return { result };
+      }
+    });
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/analyze_no_images`,
+      handler: async ({ body, adminUser, headers }) => {
+      const selectedIds = body.selectedIds || [];
+      const tasks = selectedIds.map(async (ID) => {
+        // Fetch the record using the provided ID
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
+
+        //create prompt for OpenAI
+        const compiledOutputFields = this.compileOutputFieldsTemplatesNoImage(record);
+        const prompt = `Analyze the following fields and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
+          Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
+          Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
+          If it's number field - return only number.`;
+        //send prompt to OpenAI and get response
+        const { content: chatResponse, finishReason } = await this.options.textCompleteAdapter.complete(prompt, [], 500);
+
+        const resp: any = (chatResponse as any).response;
+        const topLevelError = (chatResponse as any).error;
+        if (topLevelError || resp?.error) {
+          throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
+        }
+
+        //parse response and update record
+        const resData = JSON.parse(chatResponse);
 
         return resData;
       });
@@ -308,7 +402,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
             }
 
-            const resp = await this.options.generateImages[fieldName].adapter.generate(
+            let generationAdapter;
+            if (this.options.generateImages[fieldName].adapter) {
+              generationAdapter = this.options.generateImages[fieldName].adapter;
+            } else {
+              generationAdapter = this.options.imageGenerationAdapter;
+            }
+            const resp = await generationAdapter.generate(
               {
                 prompt,
                 inputFiles: attachmentFiles,
@@ -348,7 +448,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 //images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
                 images = "https://cdn.rafled.com/anime-icons/images/6d5f85159da70f7cb29c1121248031fb4a649588a9cd71ff1784653a1f64be31.jpg";
               } else {
-                const resp = await this.options.generateImages[key].adapter.generate(
+                let generationAdapter;
+                if (this.options.generateImages[key].adapter) {
+                  generationAdapter = this.options.generateImages[key].adapter;
+                } else {
+                  generationAdapter = this.options.imageGenerationAdapter;``
+                }
+                const resp = await generationAdapter.generate(
                   {
                     prompt,
                     inputFiles: attachmentFiles,

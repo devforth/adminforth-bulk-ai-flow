@@ -44,7 +44,7 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
+        <div v-if="isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
           <div v-if="isInColumnEnum(n)">
             <Select
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
@@ -126,7 +126,7 @@ const props = defineProps<{
   customFieldNames: any,
   tableColumnsIndexes: any,
   selected: any,
-  isAiResponseReceived: boolean[],
+  isAiResponseReceivedAnalize: boolean[],
   isAiResponseReceivedImage: boolean[],
   primaryKey: any,
   openGenerationCarousel: any

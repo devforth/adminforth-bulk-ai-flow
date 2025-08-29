@@ -27,7 +27,7 @@
             :customFieldNames="customFieldNames"
             :tableColumnsIndexes="tableColumnsIndexes"
             :selected="selected"
-            :isAiResponseReceived="isAiResponseReceived"
+            :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
             :isAiResponseReceivedImage="isAiResponseReceivedImage"
             :primaryKey="primaryKey"
             :openGenerationCarousel="openGenerationCarousel"
@@ -83,7 +83,7 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
-const isAiResponseReceived = ref([]);
+const isAiResponseReceivedAnalize = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
@@ -97,7 +97,7 @@ const openDialog = async () => {
   const result = generateTableColumns();
   tableColumns.value = result.tableData;
   tableColumnsIndexes.value = result.indexes;
-  customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
+  customFieldNames.value = tableHeaders.value.slice(props.meta.isFieldsForAnalizeFromImages ? 3 : 2).map(h => h.fieldName);
   setSelected();
   for (let i = 0; i < selected.value?.length; i++) {
   openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
@@ -107,10 +107,17 @@ const openDialog = async () => {
   },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
   isLoading.value = true;
-  await Promise.all([
-    analyzeFields(),
-    generateImages()
-  ]);
+  const tasks = [];
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    tasks.push(analyzeFields());
+  }
+  if (props.meta.isFieldsForAnalizePlain) {
+    tasks.push(analyzeFieldsNoImages());
+  }
+  if (props.meta.isImageGeneration) {
+    tasks.push(generateImages());
+  }
+  await Promise.all(tasks);
   isLoading.value = false;
 }
  
@@ -120,7 +127,7 @@ const openDialog = async () => {
 
 const closeDialog = () => {
   confirmDialog.value.close();
-  isAiResponseReceived.value = [];
+  isAiResponseReceivedAnalize.value = [];
   isAiResponseReceivedImage.value = [];
 
   records.value = [];
@@ -192,7 +199,7 @@ function setSelected() {
     }
     selected.value[index].isChecked = true;
     selected.value[index][primaryKey] = record[primaryKey];
-    isAiResponseReceived.value[index] = true;
+    isAiResponseReceivedAnalize.value[index] = true;
   });
 }
 
@@ -287,7 +294,7 @@ async function convertImages(fieldName, img) {
 
 async function analyzeFields() {
   try {
-    isAiResponseReceived.value = props.checkboxes.map(() => false);
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
 
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
@@ -297,7 +304,7 @@ async function analyzeFields() {
       },
     });
 
-    isAiResponseReceived.value = props.checkboxes.map(() => true);
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
 
     res.result.forEach((item, idx) => {
       const pk = selected.value[idx]?.[primaryKey]
@@ -316,6 +323,43 @@ async function analyzeFields() {
 
   }
 }
+
+
+async function analyzeFieldsNoImages() {
+  try {
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
+
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/analyze_no_images`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+    });
+    if(!props.meta.isFieldsForAnalizeFromImages) {
+      isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
+    }
+
+    res.result.forEach((item, idx) => {
+      const pk = selected.value[idx]?.[primaryKey]
+
+      if (pk) {
+        selected.value[idx] = {
+          ...selected.value[idx],
+          ...item,
+          isChecked: true,
+          [primaryKey]: pk
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Failed to get records:', error);
+
+  }
+}
+
+
+
 
 async function saveData() {
   if (!selected.value?.length) {
