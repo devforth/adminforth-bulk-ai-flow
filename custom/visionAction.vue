@@ -92,7 +92,9 @@ const isLoading = ref(false);
 const openDialog = async () => {
   confirmDialog.value.open();
   await getRecords();
-  await getImages();
+  if (props.meta.isFieldsForAnalizeFromImages || props.meta.isImageGeneration) {
+    await getImages();
+  }
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
   const result = generateTableColumns();
   tableColumns.value = result.tableData;
@@ -149,8 +151,9 @@ function generateTableHeaders(outputFields) {
 
   headers.push({ label: 'Checkboxes', fieldName: 'checkboxes' });
   headers.push({ label: 'Field name', fieldName: 'label' });
-  headers.push({ label: 'Source Images', fieldName: 'images' });
-
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    headers.push({ label: 'Source Images', fieldName: 'images' });
+  }
   for (const key in outputFields) {
     headers.push({
       label: formatLabel(key),

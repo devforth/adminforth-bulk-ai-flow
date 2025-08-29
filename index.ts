@@ -323,7 +323,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         let images = [];
         if(body.body.record){
           for( const record of body.body.record ) {
-            images.push(await this.options.attachFiles({ record: record }));
+            if (this.options.attachFiles) {
+              images.push(await this.options.attachFiles({ record: record }));
+            }
           }
         }
         return {
@@ -393,7 +395,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const start = +new Date();
         const STUB_MODE = false;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
-        const attachmentFiles = await this.options.attachFiles({ record });
+        let attachmentFiles
+          if(!this.options.attachFiles){
+            attachmentFiles = [];
+          } else {
+            attachmentFiles = await this.options.attachFiles({ record });
+          }
         const images = await Promise.all(
           (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
 
@@ -439,7 +446,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const start = +new Date();
         const tasks = selectedIds.map(async (ID) => {
           const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, ID)]);
-          const attachmentFiles = await this.options.attachFiles({ record });
+          let attachmentFiles
+          if(!this.options.attachFiles){
+            attachmentFiles = [];
+          } else {
+            attachmentFiles = await this.options.attachFiles({ record });
+          }
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
             const prompt = this.compileGenerationFieldTemplates(record)[key];
             let images;
