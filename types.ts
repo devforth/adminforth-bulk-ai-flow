@@ -5,6 +5,9 @@ export interface PluginOptions {
     actionName: string,
     visionAdapter?: ImageVisionAdapter,
     textCompleteAdapter?: CompletionAdapter,
+    /**
+     * The adapter to use for image generation. 
+     */
     imageGenerationAdapter?: ImageGenerationAdapter,
     fillFieldsFromImages?: Record<string, string>, // can analyze what is on image and fill fields, typical tasks "find dominant color", "describe what is on image", "clasify to one enum item, e.g. what is on image dog/cat/plant"
     fillPlainFields?: Record<string, string>,
@@ -17,6 +20,9 @@ export interface PluginOptions {
         // can generate from images or just from another fields, e.g. "remove text from images", "improve image quality", "turn image into ghibli style"
       prompt: string,
 
+      /*
+       * Redefine the adapter for your specific generation task 
+       */
       adapter?: ImageGenerationAdapter,
 
       /**

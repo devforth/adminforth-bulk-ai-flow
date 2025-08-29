@@ -102,11 +102,10 @@ const openDialog = async () => {
   customFieldNames.value = tableHeaders.value.slice(props.meta.isFieldsForAnalizeFromImages ? 3 : 2).map(h => h.fieldName);
   setSelected();
   for (let i = 0; i < selected.value?.length; i++) {
-  openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
-
-    acc[key] = false;
-    return acc;
-  },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
+    openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
+      acc[key] = false;
+      return acc;
+    },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
   isLoading.value = true;
   const tasks = [];

@@ -457,8 +457,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             let images;
               if (STUB_MODE) {
                 await new Promise((resolve) => setTimeout(resolve, 2000));
-                //images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
-                images = "https://cdn.rafled.com/anime-icons/images/6d5f85159da70f7cb29c1121248031fb4a649588a9cd71ff1784653a1f64be31.jpg";
+                images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
               } else {
                 let generationAdapter;
                 if (this.options.generateImages[key].adapter) {
