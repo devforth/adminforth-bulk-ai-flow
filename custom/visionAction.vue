@@ -1,17 +1,28 @@
 <template>
-  <div @click="openDialog">
-      <p class="">{{ props.meta.actionName }}</p>
+  <div class="flex items-end justify-start gap-2" @click="openDialog">
+    <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
+      AI
+    </div>
+    <p class="text-justify max-h-[18px]">{{ props.meta.actionName }}</p>
   </div>
   <Dialog ref="confirmDialog">
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40"
       @click="closeDialog"
     >
       <div
-        class="bulk-vision-dialog relative max-w-[95vw] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
+        class="bulk-vision-dialog flex items-center justify-center relative max-w-[95vw] min-w-[640px] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
         @click.stop
       >
-        <div class="bulk-vision-table flex flex-col items-end justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+        <div class="bulk-vision-table flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+          <button type="button" 
+            @click="closeDialog"
+            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" >
+              <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+              </svg>
+          </button>
+
           <VisionTable
             v-if="records && props.checkboxes.length"
             :checkbox="props.checkboxes"
@@ -24,15 +35,30 @@
             :customFieldNames="customFieldNames"
             :tableColumnsIndexes="tableColumnsIndexes"
             :selected="selected"
-            :isAiResponseReceived="isAiResponseReceived"
+            :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
+            :isAiResponseReceivedImage="isAiResponseReceivedImage"
             :primaryKey="primaryKey"
+            :openGenerationCarousel="openGenerationCarousel"
+            @error="handleTableError"
           />
-          <Button 
-            class="bulk-vision-button w-64"
-            @click="saveData"
-          >
-          {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
-          </Button>
+          <div class="flex w-full items-end justify-end gap-4">
+            <div class="h-full text-red-600 font-semibold flex items-center justify-center mb-2">
+              <p v-if="isError === true">{{ "Network error, please try again" }}</p>
+            </div>
+            <button type="button" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+              @click="closeDialog"
+            >
+              {{'Cancel'}}
+            </button>
+            <Button 
+              class="w-64"
+              @click="saveData"
+              :disabled="isLoading || checkedCount < 1"
+              :loader="isLoading"
+            >
+            {{ checkedCount > 1 ? 'Save fields' : 'Save field' }}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -41,15 +67,22 @@
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { ref, watch } from 'vue'
+import { handleError, ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionTable.vue'
+import adminforth from '@/adminforth';
+import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
+import { type AdminUser, type AdminForthResourceCommon } from '@/types';
+
+const route = useRoute();
+const { t } = useI18n();
 
 const props = defineProps<{
   checkboxes: any,
   meta: any,
-  resource: any,
-  adminUser: any,
+  resource: AdminForthResourceCommon,
+  adminUser: AdminUser,
   updateList: {
     type: Function,
     required: true
@@ -67,30 +100,65 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
-const isAiResponseReceived = ref([]);
+const isAiResponseReceivedAnalize = ref([]);
+const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
+const openGenerationCarousel = ref([]);
+const isLoading = ref(false);
+const isError = ref(false);
+const errorMessage = ref('');
+const checkedCount = ref(0);
 
 const openDialog = async () => {
   confirmDialog.value.open();
   await getRecords();
-  await getImages();
+  if (props.meta.isFieldsForAnalizeFromImages || props.meta.isImageGeneration) {
+    await getImages();
+  }
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
   const result = generateTableColumns();
   tableColumns.value = result.tableData;
   tableColumnsIndexes.value = result.indexes;
-  
-  customFieldNames.value = tableHeaders.value.slice(3).map(h => h.fieldName);
+  customFieldNames.value = tableHeaders.value.slice(props.meta.isFieldsForAnalizeFromImages ? 3 : 2).map(h => h.fieldName);
   setSelected();
-  analyzeFields();
+  for (let i = 0; i < selected.value?.length; i++) {
+    openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
+      acc[key] = false;
+      return acc;
+    },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
+  }
+  isLoading.value = true;
+  const tasks = [];
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    tasks.push(analyzeFields());
+  }
+  if (props.meta.isFieldsForAnalizePlain) {
+    tasks.push(analyzeFieldsNoImages());
+  }
+  if (props.meta.isImageGeneration) {
+    tasks.push(generateImages());
+  }
+  await Promise.all(tasks);
+  isLoading.value = false;
 }
  
-// watch(selected, (val) => {
-//   console.log('Selected changed:', val);
-// }, { deep: true });
+watch(selected, (val) => {
+  //console.log('Selected changed:', val);
+  checkedCount.value = val.filter(item => item.isChecked === true).length;
+}, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
-  isAiResponseReceived.value = [];
+  isAiResponseReceivedAnalize.value = [];
+  isAiResponseReceivedImage.value = [];
+
+  records.value = [];
+  images.value = [];
+  selected.value = [];
+  tableColumns.value = [];
+  tableColumnsIndexes.value = [];
+  isError.value = false;
+  errorMessage.value = '';
 }
 
 function formatLabel(str) {
@@ -105,8 +173,9 @@ function generateTableHeaders(outputFields) {
 
   headers.push({ label: 'Checkboxes', fieldName: 'checkboxes' });
   headers.push({ label: 'Field name', fieldName: 'label' });
-  headers.push({ label: 'Source Images', fieldName: 'images' });
-
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    headers.push({ label: 'Source Images', fieldName: 'images' });
+  }
   for (const key in outputFields) {
     headers.push({
       label: formatLabel(key),
@@ -145,7 +214,7 @@ function setSelected() {
   selected.value = records.value.map(() => ({}));
   records.value.forEach((record, index) => {
     for (const key in props.meta.outputFields) {
-      if(isInColumnEnum(key)){
+      if (isInColumnEnum(key)) {
         const colEnum = props.meta.columnEnums.find(c => c.name === key);
         const object = colEnum.enum.find(item => item.value === record[key]);
         selected.value[index][key] = object ? record[key] : null;
@@ -155,7 +224,7 @@ function setSelected() {
     }
     selected.value[index].isChecked = true;
     selected.value[index][primaryKey] = record[primaryKey];
-    isAiResponseReceived.value[index] = true;
+    isAiResponseReceivedAnalize.value[index] = true;
   });
 }
 
@@ -167,30 +236,48 @@ function isInColumnEnum(key: string): boolean {
   return true;
 }
 
+function handleTableError(errorData) {
+  isError.value = errorData.isError;
+  errorMessage.value = errorData.errorMessage;
+}
+
 async function getRecords() {
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
-    method: 'POST',
-    body: {
-      record: props.checkboxes,
-    },
-  });
-  records.value = res.records;
+  try {
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
+      method: 'POST',
+      body: {
+        record: props.checkboxes,
+      },
+    });
+    records.value = res.records;
+  } catch (error) {
+    console.error('Failed to get records:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
+    // Handle error appropriately
+  }
 }
 
 async function getImages() {
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
-    method: 'POST',
-    body: {
-      record: records.value,
-    },
-  });
-
-  images.value = res.images;
+  try {
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
+      method: 'POST',
+      body: {
+        record: records.value,
+      },
+    });
+    images.value = res.images;
+  } catch (error) {
+    console.error('Failed to get images:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to get images ${error}. Please, try to re-run the action.`;
+    // Handle error appropriately
+  }
 }
 
-function prepareDataForSave() {
+async function prepareDataForSave() {
   const checkedItems = selected.value
     .filter(item => item.isChecked === true)
     .map(item => {
@@ -200,51 +287,284 @@ function prepareDataForSave() {
   const checkedItemsIDs = selected.value
     .filter(item => item.isChecked === true)
     .map(item => item[primaryKey]);
+
+  const promises = [];
+  for (const item of checkedItems) {
+    for (const [key, value] of Object.entries(item)) {
+      if(props.meta.outputImageFields?.includes(key)) {
+        const p = convertImages(key, value).then(result => {
+          item[key] = result;
+        });
+      
+        promises.push(p);
+      }
+    }
+  }
+  await Promise.all(promises);
+
   return [checkedItemsIDs, checkedItems];
 }
 
-async function analyzeFields() {
-  isAiResponseReceived.value = props.checkboxes.map(() => false);
-
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
-    method: 'POST',
-    body: {
-      selectedIds: props.checkboxes,
-    },
-  });
-
-  isAiResponseReceived.value = props.checkboxes.map(() => true);
-
-  selected.value.splice(
-    0,
-    selected.value.length,
-    ...res.result.map((item, idx) => ({
-      ...item,
-      isChecked: true,
-      [primaryKey]: selected.value[idx]?.[primaryKey],
-    }))
-  )
+async function convertImages(fieldName, img) {
+  let imgBlob;
+  if (img.startsWith('data:')) {
+    const base64 = img.split(',')[1];
+    const mimeType = img.split(';')[0].split(':')[1];
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    imgBlob = new Blob([byteArray], { type: mimeType });
+  } else {
+    imgBlob = await fetch(
+      `/adminapi/v1/plugin/${props.meta.outputImagesPluginInstanceIds[fieldName]}/cors-proxy?url=${encodeURIComponent(img)}`
+    ).then(res => { return res.blob() });
+  }
+  return imgBlob;
 }
 
-async function saveData() {
-  const [checkedItemsIDs, reqData] = prepareDataForSave();
 
-  const res = await callAdminForthApi({
-    path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
-    method: 'POST',
-    body: {
-      selectedIds: checkedItemsIDs,
-      fields: reqData,
-    },
-  });
+async function analyzeFields() {
+  try {
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
 
-  if(res.ok) {
-    confirmDialog.value.close();
-    props.updateList();
-    props.clearCheckboxes();
-  } else {
-    console.error('Error saving data:', res);
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+    });
+
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
+
+    res.result.forEach((item, idx) => {
+      const pk = selected.value[idx]?.[primaryKey]
+
+      if (pk) {
+        selected.value[idx] = {
+          ...selected.value[idx],
+          ...item,
+          isChecked: true,
+          [primaryKey]: pk
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Failed to get records:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
   }
 }
+
+
+async function analyzeFieldsNoImages() {
+  try {
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
+
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/analyze_no_images`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+    });
+    if(!props.meta.isFieldsForAnalizeFromImages) {
+      isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
+    }
+
+    res.result.forEach((item, idx) => {
+      const pk = selected.value[idx]?.[primaryKey]
+
+      if (pk) {
+        selected.value[idx] = {
+          ...selected.value[idx],
+          ...item,
+          isChecked: true,
+          [primaryKey]: pk
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Failed to get records:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
+  }
+}
+
+
+
+
+async function saveData() {
+  if (!selected.value?.length) {
+    adminforth.alert({ message: 'No items selected', variant: 'warning' });
+    return;
+  }
+  try {
+    isLoading.value = true;
+    const [checkedItemsIDs, reqData] = await prepareDataForSave();
+
+    const imagesToUpload = [];
+    for (const item of reqData) {
+      for (const [key, value] of Object.entries(item)) {
+        if(props.meta.outputImageFields?.includes(key)) {
+          const p = uploadImage(value, item[primaryKey], key).then(result => {
+            item[key] = result;
+          });
+          imagesToUpload.push(p);
+        }
+      }
+    }
+    await Promise.all(imagesToUpload);
+
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
+      method: 'POST',
+      body: {
+        selectedIds: checkedItemsIDs,
+        fields: reqData,
+      },
+    });
+
+    if(res.ok) {
+      confirmDialog.value.close();
+      props.updateList();
+      props.clearCheckboxes();
+    } else {
+      console.error('Error saving data:', res);
+      isError.value = true;
+      errorMessage.value = `Failed to save data ${res}. Please, try to re-run the action.`;
+    }
+  } catch (error) {
+    console.error('Error saving data:', error);
+    isError.value = true;
+    errorMessage.value = `Failed to save data ${error}. Please, try to re-run the action.`;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+async function generateImages() {
+  isAiResponseReceivedImage.value = props.checkboxes.map(() => false);
+  let res;
+  let error = null;
+
+  try {
+    res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/initial_image_generate`,
+      method: 'POST',
+      body: {
+        selectedIds: props.checkboxes,
+      },
+    });
+  } catch (e) {
+    console.error('Error generating images:', e);
+    isError.value = true;
+    errorMessage.value = `Failed to generate images ${e}. Please, try to re-run the action.`;
+  }
+  isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
+
+  if (res?.error) {
+    error = res.error;
+  }
+  if (!res) {
+    error = 'Error generating images, something went wrong';
+    isError.value = true;
+    errorMessage.value = `Failed to generate images ${e}. Please, try to re-run the action.`;
+  }
+
+  if (error) { 
+    adminforth.alert({
+      message: error,
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+  } else {
+    res.result.forEach((item, idx) => {
+      const pk = selected.value[idx]?.[primaryKey]
+      if (pk) {
+        selected.value[idx] = {
+          ...selected.value[idx],
+          ...item,
+          [primaryKey]: pk
+        }
+      }
+    })
+  }
+}
+
+
+async function uploadImage(imgBlob, id, fieldName) {
+  const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type.split('/').pop()}`, { type: imgBlob.type });
+  const { name, size, type } = file;
+  
+  const extension = name.split('.').pop();
+  const nameNoExtension = name.replace(`.${extension}`, '');
+
+  try {
+    const { uploadUrl, uploadExtraParams, filePath, error } = await callAdminForthApi({
+        path: `/plugin/${props.meta.outputImagesPluginInstanceIds[fieldName]}/get_file_upload_url`,
+        method: 'POST',
+        body: {
+          originalFilename: nameNoExtension,
+          contentType: type,
+          size,
+          originalExtension: extension,
+          recordPk: route?.params?.primaryKey,
+        },
+    });
+
+    if (error) {
+      adminforth.alert({
+        message: t('File was not uploaded because of error: {error}', { error }),
+        variant: 'danger'
+      });
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    const success = await new Promise((resolve) => {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+        }
+      };
+      xhr.addEventListener('loadend', () => {
+        const success = xhr.readyState === 4 && xhr.status === 200;
+        // try to read response
+        resolve(success);
+      });
+      xhr.open('PUT', uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', type);
+      uploadExtraParams && Object.entries(uploadExtraParams).forEach(([key, value]: [string, string]) => {
+        xhr.setRequestHeader(key, value);
+      })
+      xhr.send(file);
+    });
+    if (!success) {
+      adminforth.alert({
+        messageHtml: `<div>${t('Sorry but the file was not uploaded because of internal storage Request Error:')}</div>
+        <pre style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">${
+          xhr.responseText.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        }</pre>`,
+        variant: 'danger',
+        timeout: 30,
+      });
+      return;
+    }
+    return filePath;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    adminforth.alert({
+      message: 'Sorry but the file was not be uploaded. Please try again.',
+      variant: 'danger'
+    });
+
+    isError.value = true;
+    errorMessage.value = `Failed to upload images. Please, try to re-run the action.`;
+    return null;
+  }
+}
+
 </script>

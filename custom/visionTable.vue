@@ -13,7 +13,7 @@
       <template #cell:checkboxes="{ item }">
         <div class="flex items-center justify-center">
           <Checkbox
-            v-model="selected[tableColumnsIndexes.findIndex(el => el.label === item.label)].isChecked"
+            v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])].isChecked"
           />
         </div>
       </template>
@@ -44,7 +44,7 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceived[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
+        <div v-if="isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
           <div v-if="isInColumnEnum(n)">
             <Select
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
@@ -77,6 +77,35 @@
             />
           </div>
         </div>
+
+        <div v-else-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
+          <div v-if="isInColumnImage(n)">
+            <div class="mt-2 flex items-center justify-center gap-2">
+              <img 
+                  :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"  
+                  class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
+                  @click="() => {openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"
+              />
+            </div>
+            <div>
+              <GenerationCarousel
+                v-if="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :images="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :recordId="item[primaryKey]"
+                :meta="props.meta"
+                :fieldName="n"
+                @error="handleError"
+                @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
+                @selectImage="updateSelectedImage"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="isInColumnImage(n)">
+            <Skeleton type="image" class="w-20 h-20" />
+        </div>
+
         <div v-else>
           <Skeleton class="w-full h-6" />
         </div>
@@ -89,6 +118,7 @@
 import { ref, nextTick, watch } from 'vue'
 import mediumZoom from 'medium-zoom'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle } from '@/afcl'
+import GenerationCarousel from './imageGenerationCarousel.vue'
 
 const props = defineProps<{
   meta: any,
@@ -97,12 +127,19 @@ const props = defineProps<{
   customFieldNames: any,
   tableColumnsIndexes: any,
   selected: any,
-  isAiResponseReceived: boolean[],
-  primaryKey: any
+  isAiResponseReceivedAnalize: boolean[],
+  isAiResponseReceivedImage: boolean[],
+  primaryKey: any,
+  openGenerationCarousel: any
+  isError: boolean,
+  errorMessage: string
 }>();
+const emit = defineEmits(['error']);
+
 
 const zoomedImage = ref(null)
 const zoomedImg = ref(null)
+
 
 function zoomImage(img) {
   zoomedImage.value = img
@@ -131,6 +168,10 @@ function isInColumnEnum(key: string): boolean {
   return true;
 }
 
+function isInColumnImage(key: string): boolean {
+  return props.meta.outputImageFields?.includes(key) || false;
+}
+
 function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
   const col = columnEnumArray.find(c => c.name === key);
   if (!col) return [];
@@ -138,6 +179,17 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
     label: item.label,
     value: item.value
   }));
+}
+
+function updateSelectedImage(image: string, id: any, fieldName: string) {
+  props.selected[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = image;
+}
+
+function handleError({ isError, errorMessage }) {
+  emit('error', {
+    isError,
+    errorMessage
+  });
 }
 
 </script>
