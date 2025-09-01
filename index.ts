@@ -338,10 +338,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
-      handler: async ( body ) => {
-        if(this.options.isAllowedToSave !== false) {
-          const selectedIds = body.body.selectedIds || [];
-          const fieldsToUpdate = body.body.fields || {};
+      handler: async ({ body, adminUser, headers }) => {
+        let isAllowedToSave: any = { ok: true, error: '' };
+        if(this.options.isAllowedToSave) {
+          isAllowedToSave = await this.options.isAllowedToSave({ record: {}, adminUser: adminUser, resource: this.resourceConfig });
+        }
+        if (isAllowedToSave.ok !== false) {
+          const selectedIds = body.selectedIds || [];
+          const fieldsToUpdate = body.fields || {};
           const outputImageFields = [];
           if (this.options.generateImages) {
             for (const [key, value] of Object.entries(this.options.generateImages)) {
@@ -380,7 +384,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           await Promise.all(updates);
           return { ok: true };
         } else {
-          return { ok: false }
+          return { ok: false, error: isAllowedToSave.error };
         }
       }
     });

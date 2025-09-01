@@ -8,7 +8,6 @@
   <Dialog ref="confirmDialog">
     <div
       class="fixed inset-0 z-20 flex items-center justify-center bg-black/40"
-      @click="closeDialog"
     >
       <div
         class="bulk-vision-dialog flex items-center justify-center relative max-w-[95vw] min-w-[640px] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
@@ -73,7 +72,7 @@ import VisionTable from './visionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
-import { type AdminUser, type AdminForthResourceCommon } from '@/types';
+import { AdminUser, type AdminForthResourceCommon } from '@/types';
 
 const route = useRoute();
 const { t } = useI18n();
@@ -435,7 +434,7 @@ async function saveData() {
       props.clearCheckboxes();
     } else if (res.ok === false) {
       adminforth.alert({
-        message: 'You are not allowed to save.',
+        message: res.error,
         variant: 'danger',
         timeout: 'unlimited',
       });

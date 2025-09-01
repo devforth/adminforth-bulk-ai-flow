@@ -51,5 +51,15 @@ export interface PluginOptions {
     /**
      * Whether the user is allowed to save the generated images
      */
-    isAllowedToSave?: boolean
+    isAllowedToSave?: ({ record, adminUser, resource }: {
+      record: any;
+      adminUser: any;
+      resource: any;
+    }) => Promise<{
+      ok: boolean;
+      error: string;
+    } | {
+      ok: boolean;
+      error?: undefined;
+    }>
 }
