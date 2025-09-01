@@ -42,7 +42,7 @@
           />
           <div class="flex w-full items-end justify-end gap-4">
             <div class="h-full text-red-600 font-semibold flex items-center justify-center mb-2">
-              <p v-if="isError === true">{{ "Network error, please try again" }}</p>
+              <p v-if="isError === true">{{ errorMessage }}</p>
             </div>
             <button type="button" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
               @click="closeDialog"
@@ -52,10 +52,10 @@
             <Button 
               class="w-64"
               @click="saveData"
-              :disabled="isLoading || checkedCount < 1"
+              :disabled="isLoading || isError"
               :loader="isLoading"
             >
-            {{ checkedCount > 1 ? 'Save fields' : 'Save field' }}
+            {{ props.checkboxes.length > 1 ? 'Save fields' : 'Save field' }}
             </Button>
           </div>
         </div>
@@ -106,7 +106,6 @@ const openGenerationCarousel = ref([]);
 const isLoading = ref(false);
 const isError = ref(false);
 const errorMessage = ref('');
-const checkedCount = ref(0);
 
 const openDialog = async () => {
   confirmDialog.value.open();
@@ -141,10 +140,9 @@ const openDialog = async () => {
   isLoading.value = false;
 }
  
-watch(selected, (val) => {
-  //console.log('Selected changed:', val);
-  checkedCount.value = val.filter(item => item.isChecked === true).length;
-}, { deep: true });
+// watch(selected, (val) => {
+//   console.log('Selected changed:', val);
+// }, { deep: true });
 
 const closeDialog = () => {
   confirmDialog.value.close();
