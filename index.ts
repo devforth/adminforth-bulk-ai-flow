@@ -1,5 +1,5 @@
 import { AdminForthPlugin, Filters } from "adminforth";
-import type { IAdminForth, IHttpServer, AdminForthResourcePages, AdminForthResourceColumn, AdminForthDataTypes, AdminForthResource } from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResourceColumn, AdminForthDataTypes, AdminForthResource } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { json } from "stream/consumers";
 import Handlebars, { compile } from 'handlebars';
@@ -192,15 +192,18 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         isImageGeneration: this.options.generateImages ? Object.keys(this.options.generateImages).length > 0 : false
       }
     }
-
-    if (!this.resourceConfig.options.pageInjections) {
-      this.resourceConfig.options.pageInjections = {};
+    
+    if (!resourceConfig.options.pageInjections) {
+      resourceConfig.options.pageInjections = {};
     }
-    if (!this.resourceConfig.options.pageInjections.list) {
-      this.resourceConfig.options.pageInjections.list = {};
+    if (!resourceConfig.options.pageInjections.list) {
+      resourceConfig.options.pageInjections.list = {};
+    }
+    if (!resourceConfig.options.pageInjections.list.threeDotsDropdownItems) {
+      resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [];
     }
 
-    this.resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [pageInjection];
+    (resourceConfig.options.pageInjections.list.threeDotsDropdownItems as AdminForthComponentDeclaration[]).push(pageInjection);
   }
   
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
