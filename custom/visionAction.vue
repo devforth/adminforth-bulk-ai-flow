@@ -43,7 +43,7 @@
           />
           <div class="flex w-full items-end justify-end gap-4">
             <div class="h-full text-red-600 font-semibold flex items-center justify-center mb-2">
-              <p v-if="isError === true">{{ "Network error, please try again" }}</p>
+              <p v-if="isError === true">{{ errorMessage }}</p>
             </div>
             <button type="button" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
               @click="closeDialog"
@@ -53,7 +53,7 @@
             <Button 
               class="w-64"
               @click="saveData"
-              :disabled="isLoading || checkedCount < 1"
+              :disabled="isLoading || checkedCount < 1 || isCriticalError"
               :loader="isLoading"
             >
             {{ checkedCount > 1 ? 'Save fields' : 'Save field' }}
@@ -106,6 +106,7 @@ const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
 const isLoading = ref(false);
 const isError = ref(false);
+const isCriticalError = ref(false);
 const errorMessage = ref('');
 const checkedCount = ref(0);
 
@@ -143,7 +144,7 @@ const openDialog = async () => {
 }
  
 watch(selected, (val) => {
-  //console.log('Selected changed:', val);
+  console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
 
@@ -254,7 +255,7 @@ async function getRecords() {
   } catch (error) {
     console.error('Failed to get records:', error);
     isError.value = true;
-    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
+    errorMessage.value = `Failed to fetch records. Please, try to re-run the action.`;
     // Handle error appropriately
   }
 }
@@ -272,7 +273,7 @@ async function getImages() {
   } catch (error) {
     console.error('Failed to get images:', error);
     isError.value = true;
-    errorMessage.value = `Failed to get images ${error}. Please, try to re-run the action.`;
+    errorMessage.value = `Failed to fetch images. Please, try to re-run the action.`;
     // Handle error appropriately
   }
 }
@@ -353,9 +354,9 @@ async function analyzeFields() {
       }
     })
   } catch (error) {
-    console.error('Failed to get records:', error);
+    console.error('Failed to analyze image(s):', error);
     isError.value = true;
-    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
+    errorMessage.value = `Failed to fetch analyze image(s). Please, try to re-run the action.`;
   }
 }
 
@@ -388,9 +389,9 @@ async function analyzeFieldsNoImages() {
       }
     })
   } catch (error) {
-    console.error('Failed to get records:', error);
+    console.error('Failed to analyze fields:', error);
     isError.value = true;
-    errorMessage.value = `Failed to get records ${error}. Please, try to re-run the action.`;
+    errorMessage.value = `Failed to analyze fields. Please, try to re-run the action.`;
   }
 }
 
@@ -435,12 +436,12 @@ async function saveData() {
     } else {
       console.error('Error saving data:', res);
       isError.value = true;
-      errorMessage.value = `Failed to save data ${res}. Please, try to re-run the action.`;
+      errorMessage.value = `Failed to save data. Please, try to re-run the action.`;
     }
   } catch (error) {
     console.error('Error saving data:', error);
     isError.value = true;
-    errorMessage.value = `Failed to save data ${error}. Please, try to re-run the action.`;
+    errorMessage.value = `Failed to save data. Please, try to re-run the action.`;
   } finally {
     isLoading.value = false;
   }
@@ -462,7 +463,8 @@ async function generateImages() {
   } catch (e) {
     console.error('Error generating images:', e);
     isError.value = true;
-    errorMessage.value = `Failed to generate images ${e}. Please, try to re-run the action.`;
+    isCriticalError.value = true;
+    errorMessage.value = `Failed to generate images. Please, try to re-run the action.`;
   }
   isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
 
@@ -472,7 +474,8 @@ async function generateImages() {
   if (!res) {
     error = 'Error generating images, something went wrong';
     isError.value = true;
-    errorMessage.value = `Failed to generate images ${e}. Please, try to re-run the action.`;
+    isCriticalError.value = true;
+    errorMessage.value = `Failed to generate images. Please, try to re-run the action.`;
   }
 
   if (error) { 
