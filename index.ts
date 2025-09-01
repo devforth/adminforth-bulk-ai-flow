@@ -339,45 +339,49 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
       handler: async ( body ) => {
-        const selectedIds = body.body.selectedIds || [];
-        const fieldsToUpdate = body.body.fields || {};
-        const outputImageFields = [];
-        if (this.options.generateImages) {
-          for (const [key, value] of Object.entries(this.options.generateImages)) {
-            outputImageFields.push(key);
+        if(this.options.isAllowedToSave !== false) {
+          const selectedIds = body.body.selectedIds || [];
+          const fieldsToUpdate = body.body.fields || {};
+          const outputImageFields = [];
+          if (this.options.generateImages) {
+            for (const [key, value] of Object.entries(this.options.generateImages)) {
+              outputImageFields.push(key);
+            }
           }
-        }
-        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        const updates = selectedIds.map(async (ID, idx) => {
-          const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
-          for (const [key, value] of Object.entries(outputImageFields)) {
-            const columnPlugin = this.adminforth.activatedPlugins.find(p => 
-              p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
-              p.pluginOptions.pathColumnName === value
-            );
-            if (columnPlugin) {
-              if(columnPlugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
-                if (oldRecord[value]) {
-                  // put tag to delete old file
-                  try {
-                    await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletation(oldRecord[value]);
-                  } catch (e) {
-                    // file might be e.g. already deleted, so we catch error
-                    console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`, e);
+          const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+          const updates = selectedIds.map(async (ID, idx) => {
+            const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
+            for (const [key, value] of Object.entries(outputImageFields)) {
+              const columnPlugin = this.adminforth.activatedPlugins.find(p => 
+                p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+                p.pluginOptions.pathColumnName === value
+              );
+              if (columnPlugin) {
+                if(columnPlugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
+                  if (oldRecord[value]) {
+                    // put tag to delete old file
+                    try {
+                      await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletation(oldRecord[value]);
+                    } catch (e) {
+                      // file might be e.g. already deleted, so we catch error
+                      console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`, e);
+                    }
                   }
-                }
-                if (fieldsToUpdate[idx][key] !== null) {
-                // remove tag from new file
-                // in this case we let it crash if it fails: this is a new file which just was uploaded. 
-                  await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
+                  if (fieldsToUpdate[idx][key] !== null) {
+                  // remove tag from new file
+                  // in this case we let it crash if it fails: this is a new file which just was uploaded. 
+                    await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
+                  }
                 }
               }
             }
-          }
-          return this.adminforth.resource(this.resourceConfig.resourceId).update(ID, fieldsToUpdate[idx])
-        });
-        await Promise.all(updates);
-      return { ok: true };
+            return this.adminforth.resource(this.resourceConfig.resourceId).update(ID, fieldsToUpdate[idx])
+          });
+          await Promise.all(updates);
+          return { ok: true };
+        } else {
+          return { ok: false }
+        }
       }
     });
 

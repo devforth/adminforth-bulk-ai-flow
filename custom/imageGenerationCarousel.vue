@@ -339,7 +339,7 @@ async function getGenerationPrompt() {
     if(!resp) {
       emit('error', {
         isError: true,
-        errorMessage: "Something went wrong. Check your internet connection and try again."
+        errorMessage: "Error getting generation prompts."
     });
     }
     return resp?.generationOptions || null;
@@ -400,7 +400,7 @@ async function generateImages() {
       });
     emit('error', {
       isError: true,
-      errorMessage: error
+      errorMessage: "Error re-generating images"
     });
     }
     return;

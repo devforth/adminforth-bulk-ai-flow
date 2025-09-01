@@ -429,10 +429,18 @@ async function saveData() {
       },
     });
 
-    if(res.ok) {
+    if(res.ok === true) {
       confirmDialog.value.close();
       props.updateList();
       props.clearCheckboxes();
+    } else if (res.ok === false) {
+      adminforth.alert({
+        message: 'You are not allowed to save.',
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      isError.value = true;
+      errorMessage.value = `Failed to save data. You are not allowed to save.`;
     } else {
       console.error('Error saving data:', res);
       isError.value = true;

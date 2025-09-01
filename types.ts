@@ -47,4 +47,9 @@ export interface PluginOptions {
      * As rateLimit on generateImages, but applied to bulk generations  
      **/
     bulkGenerationRateLimit?: string, 
+
+    /**
+     * Whether the user is allowed to save the generated images
+     */
+    isAllowedToSave?: boolean
 }
