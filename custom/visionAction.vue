@@ -73,6 +73,7 @@ import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
+import { RateLimiter } from "adminforth";
 
 const route = useRoute();
 const { t } = useI18n();
@@ -143,7 +144,7 @@ const openDialog = async () => {
 }
  
 watch(selected, (val) => {
-  console.log('Selected changed:', val);
+  //console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
 
@@ -158,6 +159,7 @@ const closeDialog = () => {
   tableColumns.value = [];
   tableColumnsIndexes.value = [];
   isError.value = false;
+  isCriticalError.value = false;
   errorMessage.value = '';
 }
 
@@ -340,22 +342,42 @@ async function analyzeFields() {
 
     isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
 
-    res.result.forEach((item, idx) => {
-      const pk = selected.value[idx]?.[primaryKey]
+    if (res?.error) {
+      adminforth.alert({
+        message: res.error,
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
 
-      if (pk) {
-        selected.value[idx] = {
-          ...selected.value[idx],
-          ...item,
-          isChecked: true,
-          [primaryKey]: pk
+      console.error('Failed to analyze image(s):', res.error);
+      isError.value = true;
+      isCriticalError.value = true;
+      errorMessage.value = `Failed to fetch analyze image(s). Please, try to re-run the action.`;
+    } else {
+      res.result.forEach((item, idx) => {
+        const pk = selected.value[idx]?.[primaryKey]
+
+        if (pk) {
+          selected.value[idx] = {
+            ...selected.value[idx],
+            ...item,
+            isChecked: true,
+            [primaryKey]: pk
+          }
         }
-      }
-    })
+      })
+    }
   } catch (error) {
+    adminforth.alert({
+      message: error,
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+
     console.error('Failed to analyze image(s):', error);
     isError.value = true;
-    errorMessage.value = `Failed to fetch analyze image(s). Please, try to re-run the action.`;
+    isCriticalError.value = true;
+    errorMessage.value = res.error;
   }
 }
 
@@ -374,23 +396,40 @@ async function analyzeFieldsNoImages() {
     if(!props.meta.isFieldsForAnalizeFromImages) {
       isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
     }
+    if(res?.error) {
+      adminforth.alert({
+        message: res.error,
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      console.error('Failed to analyze fields:', res.error);
+      isError.value = true;
+      isCriticalError.value = true;
+      errorMessage.value = res.error;
+    } else {
+      res.result.forEach((item, idx) => {
+        const pk = selected.value[idx]?.[primaryKey]
 
-    res.result.forEach((item, idx) => {
-      const pk = selected.value[idx]?.[primaryKey]
-
-      if (pk) {
-        selected.value[idx] = {
-          ...selected.value[idx],
-          ...item,
-          isChecked: true,
-          [primaryKey]: pk
+        if (pk) {
+          selected.value[idx] = {
+            ...selected.value[idx],
+            ...item,
+            isChecked: true,
+            [primaryKey]: pk
+          }
         }
-      }
-    })
+      })
+    }
   } catch (error) {
-    console.error('Failed to analyze fields:', error);
-    isError.value = true;
-    errorMessage.value = `Failed to analyze fields. Please, try to re-run the action.`;
+      adminforth.alert({
+        message: error,
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      console.error('Failed to analyze fields:', error);
+      isError.value = true;
+      isCriticalError.value = true;
+      errorMessage.value = `Failed to analyze fields. Please, try to re-run the action.`;
   }
 }
 
@@ -490,7 +529,10 @@ async function generateImages() {
       message: error,
       variant: 'danger',
       timeout: 'unlimited',
-    });
+    });;
+    isError.value = true;
+    isCriticalError.value = true;
+    errorMessage.value = error;
   } else {
     res.result.forEach((item, idx) => {
       const pk = selected.value[idx]?.[primaryKey]

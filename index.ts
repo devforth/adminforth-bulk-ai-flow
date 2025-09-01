@@ -437,7 +437,7 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
           return { error: "Rate limit exceeded" };
         }
         const start = +new Date();
-        const STUB_MODE = true;
+        const STUB_MODE = false;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
         let attachmentFiles
           if(!this.options.attachFiles){
@@ -482,7 +482,7 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
       path: `/plugin/${this.pluginInstanceId}/initial_image_generate`,
       handler: async ({ body, headers }) => {
         const selectedIds = body.selectedIds || [];
-        const STUB_MODE = true;
+        const STUB_MODE = false;
         if (this.checkRateLimitForBulkGenerationRateLimit("generateImages",headers)) {
           return { error: "Rate limit exceeded" };
         }
