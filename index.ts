@@ -96,7 +96,7 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
     
     if (shouldCheckRateLimit) {
       const result = this.checkRateLimit(this.options.bulkGenerationRateLimit, headers);
-      if (result?.error) {
+      if (result) {
         return { error: "Rate limit exceeded" };
       }
     }
