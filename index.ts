@@ -61,11 +61,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
-  private checkRateLimit(fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
+  private checkRateLimit(field: string,fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
     if (fieldNameRateLimit) {
       // rate limit
       const { error } = RateLimiter.checkRateLimit(
-        this.pluginInstanceId,
+        field,
         fieldNameRateLimit,
         this.adminforth.auth.getClientIp(headers),
       );
@@ -75,32 +75,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
-    if (!this.options.bulkGenerationRateLimit) {
-      return;
-    }
-    
-    const hasGenerateImages = !!this.options.generateImages && Object.keys(this.options.generateImages).length > 0;
-    const hasFillFieldsFromImages = !!this.options.fillFieldsFromImages && Object.keys(this.options.fillFieldsFromImages).length > 0;
-    const hasFillPlainFields = !!this.options.fillPlainFields && Object.keys(this.options.fillPlainFields).length > 0;
-
-    let shouldCheckRateLimit = false;
-    
-    if (hasGenerateImages && source_api === 'generateImages') {
-      shouldCheckRateLimit = true;
-    } else if (hasFillFieldsFromImages && source_api === 'fillFieldsFromImages' && !hasGenerateImages) {
-      shouldCheckRateLimit = true;
-    } else if (hasFillPlainFields && source_api === 'fillPlainFields' && !hasFillFieldsFromImages && !hasGenerateImages) {
-      shouldCheckRateLimit = true;
-    }
-    
-    if (shouldCheckRateLimit) {
-      const result = this.checkRateLimit(this.options.bulkGenerationRateLimit, headers);
-      if (result) {
-        return { error: "Rate limit exceeded" };
-      }
-    }
-}
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
@@ -251,8 +225,10 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
       path: `/plugin/${this.pluginInstanceId}/analyze`,
       handler: async ({ body, adminUser, headers }) => {
       const selectedIds = body.selectedIds || [];
-      if (this.checkRateLimitForBulkGenerationRateLimit("fillFieldsFromImages",headers)) {
-        return { error: "Rate limit exceeded" };
+      if (typeof(this.options.rateLimits.fillFieldsFromImages) === 'string'){
+        if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
+          return { error: "Rate limit exceeded" };
+        }
       }
       const tasks = selectedIds.map(async (ID) => {
         // Fetch the record using the provided ID
@@ -299,8 +275,10 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
       path: `/plugin/${this.pluginInstanceId}/analyze_no_images`,
       handler: async ({ body, adminUser, headers }) => {
       const selectedIds = body.selectedIds || [];
-      if (this.checkRateLimitForBulkGenerationRateLimit("fillPlainFields",headers)) {
-        return { error: "Rate limit exceeded" };
+      if (typeof(this.options.rateLimits.fillPlainFields) === 'string'){
+        if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
+          return { error: "Rate limit exceeded" };
+        }
       }
       const tasks = selectedIds.map(async (ID) => {
         // Fetch the record using the provided ID
@@ -433,11 +411,11 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
         const Id = body.recordId || [];
         const prompt = body.prompt || '';
         const fieldName = body.fieldName || '';
-        if (this.checkRateLimit(this.options.generateImages[fieldName].rateLimit, headers)) {
+        if (this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
           return { error: "Rate limit exceeded" };
         }
         const start = +new Date();
-        const STUB_MODE = false;
+        const STUB_MODE = true;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
         let attachmentFiles
           if(!this.options.attachFiles){
@@ -482,9 +460,11 @@ private checkRateLimitForBulkGenerationRateLimit(source_api: string, headers: Re
       path: `/plugin/${this.pluginInstanceId}/initial_image_generate`,
       handler: async ({ body, headers }) => {
         const selectedIds = body.selectedIds || [];
-        const STUB_MODE = false;
-        if (this.checkRateLimitForBulkGenerationRateLimit("generateImages",headers)) {
-          return { error: "Rate limit exceeded" };
+        const STUB_MODE = true;
+        if (typeof(this.options.rateLimits.generateImages) === 'string'){
+          if (this.checkRateLimit("generateImages", this.options.rateLimits.generateImages, headers)) {
+            return { error: "Rate limit exceeded" };
+          }
         }
         const start = +new Date();
         const tasks = selectedIds.map(async (ID) => {

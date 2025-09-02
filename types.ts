@@ -43,10 +43,12 @@ export interface PluginOptions {
        */
       countToGenerate: number,
     }>,
-    /** 
-     * As rateLimit on generateImages, but applied to bulk generations  
-     **/
-    bulkGenerationRateLimit?: string, 
+    rateLimits?: {
+      fillFieldsFromImages?: string, // e.g. 5/1d - 5 requests per day
+      fillPlainFields?: string,
+      generateImages?: string,
+    },
+
 
     /**
      * Whether the user is allowed to save the generated images

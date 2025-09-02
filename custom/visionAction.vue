@@ -66,14 +66,13 @@
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { handleError, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
-import { RateLimiter } from "adminforth";
 
 const route = useRoute();
 const { t } = useI18n();
