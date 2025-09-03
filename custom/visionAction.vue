@@ -492,7 +492,7 @@ async function uploadImage(imgBlob, id, fieldName) {
           contentType: type,
           size,
           originalExtension: extension,
-          recordPk: route?.params?.primaryKey,
+          recordPk: id,
         },
     });
 
