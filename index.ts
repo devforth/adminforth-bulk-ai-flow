@@ -204,7 +204,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   instanceUniqueRepresentation(pluginOptions: any) : string {
     // optional method to return unique string representation of plugin instance. 
     // Needed if plugin can have multiple instances on one resource 
-    return `single`;
+    return `${this.pluginOptions.actionName}`;
   }
 
   setupEndpoints(server: IHttpServer) {
