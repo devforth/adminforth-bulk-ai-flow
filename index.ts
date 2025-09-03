@@ -180,7 +180,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         outputImagesPluginInstanceIds: outputImagesPluginInstanceIds,
         isFieldsForAnalizeFromImages: this.options.fillFieldsFromImages ? Object.keys(this.options.fillFieldsFromImages).length > 0 : false,
         isFieldsForAnalizePlain: this.options.fillPlainFields ? Object.keys(this.options.fillPlainFields).length > 0 : false,
-        isImageGeneration: this.options.generateImages ? Object.keys(this.options.generateImages).length > 0 : false
+        isImageGeneration: this.options.generateImages ? Object.keys(this.options.generateImages).length > 0 : false,
+        isAttachFiles: this.options.attachFiles ? true : false,
       }
     }
     

@@ -114,14 +114,14 @@ const checkedCount = ref(0);
 const openDialog = async () => {
   confirmDialog.value.open();
   await getRecords();
-  if (props.meta.isFieldsForAnalizeFromImages || props.meta.isImageGeneration) {
+  if (props.meta.isAttachFiles) {
     await getImages();
   }
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
   const result = generateTableColumns();
   tableColumns.value = result.tableData;
   tableColumnsIndexes.value = result.indexes;
-  customFieldNames.value = tableHeaders.value.slice(props.meta.isFieldsForAnalizeFromImages ? 3 : 2).map(h => h.fieldName);
+  customFieldNames.value = tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName);
   setSelected();
   for (let i = 0; i < selected.value?.length; i++) {
     openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
@@ -189,7 +189,7 @@ function generateTableHeaders(outputFields) {
 
   headers.push({ label: 'Checkboxes', fieldName: 'checkboxes' });
   headers.push({ label: 'Field name', fieldName: 'label' });
-  if (props.meta.isFieldsForAnalizeFromImages) {
+  if (props.meta.isAttachFiles) {
     headers.push({ label: 'Source Images', fieldName: 'images' });
   }
   for (const key in outputFields) {
