@@ -22,43 +22,34 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   // Compile Handlebars templates in outputFields using record fields as context
-  private compileOutputFieldsTemplates(record: any): Record<string, string> {
+  private compileTemplates<T extends Record<string, any>>(
+    source: T,
+    record: any,
+    valueSelector: (value: T[keyof T]) => string
+  ): Record<string, string> {
     const compiled: Record<string, string> = {};
-    for (const [key, templateStr] of Object.entries(this.options.fillFieldsFromImages)) {
+    for (const [key, value] of Object.entries(source)) {
+      const templateStr = valueSelector(value);
       try {
-        const tpl = Handlebars.compile(String(templateStr));
+        const tpl = Handlebars.compile(templateStr);
         compiled[key] = tpl(record);
       } catch {
-        compiled[key] = String(templateStr);
+        compiled[key] = templateStr;
       }
     }
     return compiled;
   }
 
-  private compileOutputFieldsTemplatesNoImage(record: any): Record<string, string> {
-    const compiled: Record<string, string> = {};
-    for (const [key, templateStr] of Object.entries(this.options.fillPlainFields)) {
-      try {
-        const tpl = Handlebars.compile(String(templateStr));
-        compiled[key] = tpl(record);
-      } catch {
-        compiled[key] = String(templateStr);
-      }
-    }
-    return compiled;
+  private compileOutputFieldsTemplates(record: any) {
+    return this.compileTemplates(this.options.fillFieldsFromImages, record, v => String(v));
+  }
+
+  private compileOutputFieldsTemplatesNoImage(record: any) {
+    return this.compileTemplates(this.options.fillPlainFields, record, v => String(v));
   }
 
   private compileGenerationFieldTemplates(record: any) {
-    const compiled: Record<string, any> = {};
-    for (const key in this.options.generateImages) {
-      try {
-        const tpl = Handlebars.compile(String(this.options.generateImages[key].prompt));
-        compiled[key] = tpl(record);
-      } catch {
-        compiled[key] = String(this.options.generateImages[key].prompt);
-      }
-    }
-    return compiled;
+    return this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
   }
 
   private checkRateLimit(field: string,fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
@@ -294,7 +285,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
           If it's number field - return only number.`;
         //send prompt to OpenAI and get response
-        const { content: chatResponse, finishReason } = await this.options.textCompleteAdapter.complete(prompt, [], 500);
+        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], 500);
 
         const resp: any = (chatResponse as any).response;
         const topLevelError = (chatResponse as any).error;
@@ -494,7 +485,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   if (this.options.generateImages[key].adapter) {
                     generationAdapter = this.options.generateImages[key].adapter;
                   } else {
-                    generationAdapter = this.options.imageGenerationAdapter;``
+                    generationAdapter = this.options.imageGenerationAdapter;
                   }
                   const resp = await generationAdapter.generate(
                     {
