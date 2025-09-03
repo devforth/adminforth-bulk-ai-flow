@@ -237,31 +237,33 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
         //recieve image URLs to analyze
         const attachmentFiles = await this.options.attachFiles({ record: record });
-        //create prompt for OpenAI
-        const compiledOutputFields = this.compileOutputFieldsTemplates(record);
-        const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
-          Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-          Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
-          Image URLs:`;
-          
-        //send prompt to OpenAI and get response
-        const chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
+        if (attachmentFiles.length !== 0) {
+          //create prompt for OpenAI
+          const compiledOutputFields = this.compileOutputFieldsTemplates(record);
+          const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
+            Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
+            Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
+            Image URLs:`;
+            
+          //send prompt to OpenAI and get response
+          const chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
 
-        const resp: any = (chatResponse as any).response;
-        const topLevelError = (chatResponse as any).error;
-        if (topLevelError || resp?.error) {
-          throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
-        }
+          const resp: any = (chatResponse as any).response;
+          const topLevelError = (chatResponse as any).error;
+          if (topLevelError || resp?.error) {
+            throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
+          }
 
-        const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
-        if (!textOutput || typeof textOutput !== 'string') {
-          throw new Error('Unexpected AI response format');
-        }
+          const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+          if (!textOutput || typeof textOutput !== 'string') {
+            throw new Error('Unexpected AI response format');
+          }
 
-        //parse response and update record
-        const resData = JSON.parse(textOutput);
+          //parse response and update record
+          const resData = JSON.parse(textOutput);
 
-        return resData;
+          return resData;
+        };
       });
 
       const result = await Promise.all(tasks);
@@ -386,7 +388,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                       console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`, e);
                     }
                   }
-                  if (fieldsToUpdate[idx][key] !== null) {
+                  if (fieldsToUpdate[idx][key] && fieldsToUpdate[idx][key] !== null) {
                   // remove tag from new file
                   // in this case we let it crash if it fails: this is a new file which just was uploaded. 
                     await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
@@ -479,27 +481,31 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
             const prompt = this.compileGenerationFieldTemplates(record)[key];
             let images;
-              if (STUB_MODE) {
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-                images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
+              if (this.options.attachFiles && attachmentFiles.length === 0) {
+                return { key, images: [] };
               } else {
-                let generationAdapter;
-                if (this.options.generateImages[key].adapter) {
-                  generationAdapter = this.options.generateImages[key].adapter;
+                if (STUB_MODE) {
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  images = `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
                 } else {
-                  generationAdapter = this.options.imageGenerationAdapter;``
-                }
-                const resp = await generationAdapter.generate(
-                  {
-                    prompt,
-                    inputFiles: attachmentFiles,
-                    n: 1,
-                    size: this.options.generateImages[key].outputSize,
+                  let generationAdapter;
+                  if (this.options.generateImages[key].adapter) {
+                    generationAdapter = this.options.generateImages[key].adapter;
+                  } else {
+                    generationAdapter = this.options.imageGenerationAdapter;``
                   }
-                )
-                images = resp.imageURLs[0];
-              }
-            return { key, images };
+                  const resp = await generationAdapter.generate(
+                    {
+                      prompt,
+                      inputFiles: attachmentFiles,
+                      n: 1,
+                      size: this.options.generateImages[key].outputSize,
+                    }
+                  )
+                  images = resp.imageURLs[0];
+                }
+              return { key, images };
+            }
           });
 
           const fieldResults = await Promise.all(fieldTasks);

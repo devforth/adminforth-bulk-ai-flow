@@ -310,7 +310,7 @@ async function prepareDataForSave() {
 
 async function convertImages(fieldName, img) {
   let imgBlob;
-  if (img.startsWith('data:')) {
+  if (typeof img === 'string' && img.startsWith('data:')) {
     const base64 = img.split(',')[1];
     const mimeType = img.split(';')[0].split(':')[1];
     const byteCharacters = atob(base64);
@@ -320,7 +320,7 @@ async function convertImages(fieldName, img) {
     }
     const byteArray = new Uint8Array(byteNumbers);
     imgBlob = new Blob([byteArray], { type: mimeType });
-  } else {
+  } else if (typeof img === 'string') {
     imgBlob = await fetch(
       `/adminapi/v1/plugin/${props.meta.outputImagesPluginInstanceIds[fieldName]}/cors-proxy?url=${encodeURIComponent(img)}`
     ).then(res => { return res.blob() });
@@ -447,6 +447,9 @@ async function saveData() {
       for (const item of reqData) {
         for (const [key, value] of Object.entries(item)) {
           if(props.meta.outputImageFields?.includes(key)) {
+            if (!value) {
+              continue;
+            }
             const p = uploadImage(value, item[primaryKey], key).then(result => {
               item[key] = result;
             });
