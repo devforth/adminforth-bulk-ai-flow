@@ -360,6 +360,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         if (isAllowedToSave.ok !== false) {
           const selectedIds = body.selectedIds || [];
           const fieldsToUpdate = body.fields || {};
+          const saveImages = body.saveImages;
           const outputImageFields = [];
           if (this.options.generateImages) {
             for (const [key, value] of Object.entries(this.options.generateImages)) {
@@ -374,7 +375,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
                 p.pluginOptions.pathColumnName === value
               );
-              if (columnPlugin) {
+              if (columnPlugin && saveImages) {
                 if(columnPlugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
                   if (oldRecord[value]) {
                     // put tag to delete old file

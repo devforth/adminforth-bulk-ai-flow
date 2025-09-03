@@ -106,6 +106,7 @@ const openGenerationCarousel = ref([]);
 const isLoading = ref(false);
 const isError = ref(false);
 const isCriticalError = ref(false);
+const isImageGenerationError = ref(false);
 const errorMessage = ref('');
 const checkedCount = ref(0);
 
@@ -289,20 +290,21 @@ async function prepareDataForSave() {
     .filter(item => item.isChecked === true)
     .map(item => item[primaryKey]);
 
-  const promises = [];
-  for (const item of checkedItems) {
-    for (const [key, value] of Object.entries(item)) {
-      if(props.meta.outputImageFields?.includes(key)) {
-        const p = convertImages(key, value).then(result => {
-          item[key] = result;
-        });
-      
-        promises.push(p);
+  if (isImageGenerationError.value !== true) {
+    const promises = [];
+    for (const item of checkedItems) {
+      for (const [key, value] of Object.entries(item)) {
+        if(props.meta.outputImageFields?.includes(key)) {
+          const p = convertImages(key, value).then(result => {
+            item[key] = result;
+          });
+        
+          promises.push(p);
+        }
       }
     }
+    await Promise.all(promises);
   }
-  await Promise.all(promises);
-
   return [checkedItemsIDs, checkedItems];
 }
 
@@ -350,7 +352,7 @@ async function analyzeFields() {
 
       console.error('Failed to analyze image(s):', res.error);
       isError.value = true;
-      isCriticalError.value = true;
+      //isCriticalError.value = true;
       errorMessage.value = `Failed to fetch analyze image(s). Please, try to re-run the action.`;
     } else {
       res.result.forEach((item, idx) => {
@@ -375,7 +377,7 @@ async function analyzeFields() {
 
     console.error('Failed to analyze image(s):', error);
     isError.value = true;
-    isCriticalError.value = true;
+    //isCriticalError.value = true;
     errorMessage.value = res.error;
   }
 }
@@ -403,7 +405,7 @@ async function analyzeFieldsNoImages() {
       });
       console.error('Failed to analyze fields:', res.error);
       isError.value = true;
-      isCriticalError.value = true;
+      //isCriticalError.value = true;
       errorMessage.value = res.error;
     } else {
       res.result.forEach((item, idx) => {
@@ -427,7 +429,7 @@ async function analyzeFieldsNoImages() {
       });
       console.error('Failed to analyze fields:', error);
       isError.value = true;
-      isCriticalError.value = true;
+      //isCriticalError.value = true;
       errorMessage.value = `Failed to analyze fields. Please, try to re-run the action.`;
   }
 }
@@ -443,19 +445,20 @@ async function saveData() {
   try {
     isLoading.value = true;
     const [checkedItemsIDs, reqData] = await prepareDataForSave();
-
-    const imagesToUpload = [];
-    for (const item of reqData) {
-      for (const [key, value] of Object.entries(item)) {
-        if(props.meta.outputImageFields?.includes(key)) {
-          const p = uploadImage(value, item[primaryKey], key).then(result => {
-            item[key] = result;
-          });
-          imagesToUpload.push(p);
+    if (isImageGenerationError.value === false) {
+      const imagesToUpload = [];
+      for (const item of reqData) {
+        for (const [key, value] of Object.entries(item)) {
+          if(props.meta.outputImageFields?.includes(key)) {
+            const p = uploadImage(value, item[primaryKey], key).then(result => {
+              item[key] = result;
+            });
+            imagesToUpload.push(p);
+          }
         }
       }
+      await Promise.all(imagesToUpload);
     }
-    await Promise.all(imagesToUpload);
 
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
@@ -463,6 +466,7 @@ async function saveData() {
       body: {
         selectedIds: checkedItemsIDs,
         fields: reqData,
+        saveImages: !isImageGenerationError.value
       },
     });
 
@@ -508,7 +512,7 @@ async function generateImages() {
   } catch (e) {
     console.error('Error generating images:', e);
     isError.value = true;
-    isCriticalError.value = true;
+    isImageGenerationError.value = true;
     errorMessage.value = `Failed to generate images. Please, try to re-run the action.`;
   }
   isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
@@ -519,7 +523,7 @@ async function generateImages() {
   if (!res) {
     error = 'Error generating images, something went wrong';
     isError.value = true;
-    isCriticalError.value = true;
+    isImageGenerationError.value = true;
     errorMessage.value = `Failed to generate images. Please, try to re-run the action.`;
   }
 
@@ -528,9 +532,9 @@ async function generateImages() {
       message: error,
       variant: 'danger',
       timeout: 'unlimited',
-    });;
+    });
     isError.value = true;
-    isCriticalError.value = true;
+    isImageGenerationError.value = true;
     errorMessage.value = error;
   } else {
     res.result.forEach((item, idx) => {
