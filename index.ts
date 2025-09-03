@@ -428,7 +428,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           }
         const images = await Promise.all(
           (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
-
+            if (this.options.attachFiles && attachmentFiles.length === 0) {
+              return null;
+            }
             if (STUB_MODE) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
               return `https://picsum.photos/200/300?random=${Math.floor(Math.random() * 1000)}`;
