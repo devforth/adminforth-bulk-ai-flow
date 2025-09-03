@@ -225,7 +225,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/analyze`,
       handler: async ({ body, adminUser, headers }) => {
       const selectedIds = body.selectedIds || [];
-      if (typeof(this.options.rateLimits.fillFieldsFromImages) === 'string'){
+      if (typeof(this.options.rateLimits?.fillFieldsFromImages) === 'string'){
         if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
           return { error: "Rate limit exceeded" };
         }
@@ -275,7 +275,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/analyze_no_images`,
       handler: async ({ body, adminUser, headers }) => {
       const selectedIds = body.selectedIds || [];
-      if (typeof(this.options.rateLimits.fillPlainFields) === 'string'){
+      if (typeof(this.options.rateLimits?.fillPlainFields) === 'string'){
         if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
           return { error: "Rate limit exceeded" };
         }
@@ -461,7 +461,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ({ body, headers }) => {
         const selectedIds = body.selectedIds || [];
         const STUB_MODE = false;
-        if (typeof(this.options.rateLimits.generateImages) === 'string'){
+        if (typeof(this.options.rateLimits?.generateImages) === 'string'){
           if (this.checkRateLimit("generateImages", this.options.rateLimits.generateImages, headers)) {
             return { error: "Rate limit exceeded" };
           }
