@@ -78,7 +78,7 @@
           </div>
         </div>
 
-        <div v-else-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
+        <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
           <div v-if="isInColumnImage(n)">
             <div class="mt-2 flex items-center justify-center gap-2">
               <img 
@@ -102,11 +102,11 @@
           </div>
         </div>
 
-        <div v-else-if="isInColumnImage(n)">
+        <div v-if="!isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && isInColumnImage(n)">
             <Skeleton type="image" class="w-20 h-20" />
         </div>
 
-        <div v-else>
+        <div v-if="!isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
           <Skeleton class="w-full h-6" />
         </div>
       </template>

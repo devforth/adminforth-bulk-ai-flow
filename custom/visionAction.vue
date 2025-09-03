@@ -330,9 +330,8 @@ async function convertImages(fieldName, img) {
 
 
 async function analyzeFields() {
+  isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
   try {
-    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
-
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
       method: 'POST',
@@ -340,8 +339,6 @@ async function analyzeFields() {
         selectedIds: props.checkboxes,
       },
     });
-
-    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
 
     if (res?.error) {
       adminforth.alert({
@@ -380,13 +377,13 @@ async function analyzeFields() {
     //isCriticalError.value = true;
     errorMessage.value = res.error;
   }
+  isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
 }
 
 
 async function analyzeFieldsNoImages() {
+  isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
   try {
-    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
-
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/analyze_no_images`,
       method: 'POST',
@@ -394,9 +391,6 @@ async function analyzeFieldsNoImages() {
         selectedIds: props.checkboxes,
       },
     });
-    if(!props.meta.isFieldsForAnalizeFromImages) {
-      isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
-    }
     if(res?.error) {
       adminforth.alert({
         message: res.error,
@@ -431,6 +425,9 @@ async function analyzeFieldsNoImages() {
       isError.value = true;
       //isCriticalError.value = true;
       errorMessage.value = `Failed to analyze fields. Please, try to re-run the action.`;
+  }
+  if(!props.meta.isFieldsForAnalizeFromImages) {
+    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
   }
 }
 
