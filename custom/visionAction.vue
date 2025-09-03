@@ -1,19 +1,19 @@
 <template>
-  <div class="flex items-end justify-start gap-2" @click="openDialog">
+  <div class="flex items-end justify-start gap-2 cursor-pointer" @click="openDialog">
     <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
       AI
     </div>
-    <p class="text-justify max-h-[18px]">{{ props.meta.actionName }}</p>
+    <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
   </div>
   <Dialog ref="confirmDialog">
     <div
       class="fixed inset-0 z-20 flex items-center justify-center bg-black/40"
     >
       <div
-        class="bulk-vision-dialog flex items-center justify-center relative max-w-[95vw] min-w-[640px] max-h-[90vh] bg-white dark:bg-gray-900 rounded-md shadow-2xl overflow-hidden"
+        class="bulk-vision-dialog flex items-center justify-center relative w-[100vw] h-[100vh] max-h-[100vh] md:w-auto md:max-w-[95vw] md:min-w-[640px] md:h-auto md:max-h-[90vh] bg-white dark:bg-gray-900 rounded-none md:rounded-md shadow-2xl overflow-hidden"
         @click.stop
       >
-        <div class="bulk-vision-table flex flex-col items-center justify-evenly gap-4 w-full h-full p-6 overflow-y-auto">
+        <div class="bulk-vision-table flex flex-col items-center justify-evenly gap-3 md:gap-4 w-full h-full p-4 md:p-6 overflow-y-auto overflow-x-auto">
           <button type="button" 
             @click="closeDialog"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" >
@@ -22,35 +22,36 @@
               </svg>
           </button>
 
-          <VisionTable
-            v-if="records && props.checkboxes.length"
-            :checkbox="props.checkboxes"
-            :records="records"
-            :index="0"
-            :meta="props.meta"
-            :images="images"
-            :tableHeaders="tableHeaders"
-            :tableColumns="tableColumns"
-            :customFieldNames="customFieldNames"
-            :tableColumnsIndexes="tableColumnsIndexes"
-            :selected="selected"
-            :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
-            :isAiResponseReceivedImage="isAiResponseReceivedImage"
-            :primaryKey="primaryKey"
-            :openGenerationCarousel="openGenerationCarousel"
-            @error="handleTableError"
-          />
-          <div class="flex w-full items-end justify-end gap-4">
-            <div class="h-full text-red-600 font-semibold flex items-center justify-center mb-2">
+          <div v-if="records && props.checkboxes.length" class="w-full overflow-x-auto">
+            <VisionTable
+              :checkbox="props.checkboxes"
+              :records="records"
+              :index="0"
+              :meta="props.meta"
+              :images="images"
+              :tableHeaders="tableHeaders"
+              :tableColumns="tableColumns"
+              :customFieldNames="customFieldNames"
+              :tableColumnsIndexes="tableColumnsIndexes"
+              :selected="selected"
+              :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
+              :isAiResponseReceivedImage="isAiResponseReceivedImage"
+              :primaryKey="primaryKey"
+              :openGenerationCarousel="openGenerationCarousel"
+              @error="handleTableError"
+            />
+          </div>
+          <div class="flex w-full flex-col md:flex-row items-stretch md:items-end justify-end gap-3 md:gap-4">
+            <div class="h-full text-red-600 font-semibold flex items-center justify-center md:mb-2">
               <p v-if="isError === true">{{ errorMessage }}</p>
             </div>
-            <button type="button" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+            <button type="button" class="w-full md:w-auto py-2.5 px-5 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
               @click="closeDialog"
             >
               {{'Cancel'}}
             </button>
             <Button 
-              class="w-64"
+              class="w-full md:w-64"
               @click="saveData"
               :disabled="isLoading || checkedCount < 1 || isCriticalError"
               :loader="isLoading"

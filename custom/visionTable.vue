@@ -47,6 +47,7 @@
         <div v-if="isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
           <div v-if="isInColumnEnum(n)">
             <Select
+              class="min-w-[150px] "
               :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
               v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
               :teleportToTop="true"
@@ -56,7 +57,7 @@
           </div>
           <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'object'">
             <Textarea
-              class="w-full h-full"
+              class="min-w-[150px] w-full h-full"
               type="text"
               v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
             >
