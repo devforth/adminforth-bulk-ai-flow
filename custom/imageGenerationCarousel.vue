@@ -183,7 +183,7 @@
 
 <script setup lang="ts">
 
-import { ref, onMounted, nextTick, Ref, h, computed, watch, reactive } from 'vue'
+import { ref, onMounted, nextTick, Ref, watch } from 'vue'
 import { Carousel } from 'flowbite';
 import { callAdminForthApi } from '@/utils';
 import { useI18n } from 'vue-i18n';
@@ -267,9 +267,8 @@ onMounted(async () => {
     return context[field.trim()] || '';
   });
   
-  if (props.record[props.record[props.meta.recorPkFieldName]]) {
   const recordId = props.record[props.meta.recorPkFieldName];
-  } else { 
+  if (!recordId) {
     emit('error', {
       isError: true,
       errorMessage: 'Record ID not found, cannot generate images'
