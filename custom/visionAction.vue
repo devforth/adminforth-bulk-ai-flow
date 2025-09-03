@@ -66,7 +66,7 @@
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { ref, watch } from 'vue'
+import { Ref, ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
 import VisionTable from './visionTable.vue'
 import adminforth from '@/adminforth';
@@ -131,13 +131,25 @@ const openDialog = async () => {
   isLoading.value = true;
   const tasks = [];
   if (props.meta.isFieldsForAnalizeFromImages) {
-    tasks.push(analyzeFields());
+    tasks.push(runAiAction({
+      endpoint: 'analyze',
+      actionType: 'analyze',
+      responseFlag: isAiResponseReceivedAnalize,
+    }));
   }
   if (props.meta.isFieldsForAnalizePlain) {
-    tasks.push(analyzeFieldsNoImages());
+    tasks.push(runAiAction({
+      endpoint: 'analyze_no_images',
+      actionType: 'analyze_no_images',
+      responseFlag: isAiResponseReceivedAnalize,
+    }));
   }
   if (props.meta.isImageGeneration) {
-    tasks.push(generateImages());
+    tasks.push(runAiAction({
+      endpoint: 'initial_image_generate',
+      actionType: 'generate_images',
+      responseFlag: isAiResponseReceivedImage,
+    }));
   }
   await Promise.all(tasks);
   isLoading.value = false;
@@ -160,6 +172,7 @@ const closeDialog = () => {
   tableColumnsIndexes.value = [];
   isError.value = false;
   isCriticalError.value = false;
+  isImageGenerationError.value = false;
   errorMessage.value = '';
 }
 
@@ -329,111 +342,6 @@ async function convertImages(fieldName, img) {
 }
 
 
-async function analyzeFields() {
-  isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
-  try {
-    const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/analyze`,
-      method: 'POST',
-      body: {
-        selectedIds: props.checkboxes,
-      },
-    });
-
-    if (res?.error) {
-      adminforth.alert({
-        message: res.error,
-        variant: 'danger',
-        timeout: 'unlimited',
-      });
-
-      console.error('Failed to analyze image(s):', res.error);
-      isError.value = true;
-      //isCriticalError.value = true;
-      errorMessage.value = `Failed to fetch analyze image(s). Please, try to re-run the action.`;
-    } else {
-      res.result.forEach((item, idx) => {
-        const pk = selected.value[idx]?.[primaryKey]
-
-        if (pk) {
-          selected.value[idx] = {
-            ...selected.value[idx],
-            ...item,
-            isChecked: true,
-            [primaryKey]: pk
-          }
-        }
-      })
-    }
-  } catch (error) {
-    adminforth.alert({
-      message: error,
-      variant: 'danger',
-      timeout: 'unlimited',
-    });
-
-    console.error('Failed to analyze image(s):', error);
-    isError.value = true;
-    //isCriticalError.value = true;
-    errorMessage.value = res.error;
-  }
-  isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
-}
-
-
-async function analyzeFieldsNoImages() {
-  isAiResponseReceivedAnalize.value = props.checkboxes.map(() => false);
-  try {
-    const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/analyze_no_images`,
-      method: 'POST',
-      body: {
-        selectedIds: props.checkboxes,
-      },
-    });
-    if(res?.error) {
-      adminforth.alert({
-        message: res.error,
-        variant: 'danger',
-        timeout: 'unlimited',
-      });
-      console.error('Failed to analyze fields:', res.error);
-      isError.value = true;
-      //isCriticalError.value = true;
-      errorMessage.value = res.error;
-    } else {
-      res.result.forEach((item, idx) => {
-        const pk = selected.value[idx]?.[primaryKey]
-
-        if (pk) {
-          selected.value[idx] = {
-            ...selected.value[idx],
-            ...item,
-            isChecked: true,
-            [primaryKey]: pk
-          }
-        }
-      })
-    }
-  } catch (error) {
-      adminforth.alert({
-        message: error,
-        variant: 'danger',
-        timeout: 'unlimited',
-      });
-      console.error('Failed to analyze fields:', error);
-      isError.value = true;
-      //isCriticalError.value = true;
-      errorMessage.value = `Failed to analyze fields. Please, try to re-run the action.`;
-  }
-  if(!props.meta.isFieldsForAnalizeFromImages) {
-    isAiResponseReceivedAnalize.value = props.checkboxes.map(() => true);
-  }
-}
-
-
-
-
 async function saveData() {
   if (!selected.value?.length) {
     adminforth.alert({ message: 'No items selected', variant: 'warning' });
@@ -496,57 +404,73 @@ async function saveData() {
   }
 }
 
-async function generateImages() {
-  isAiResponseReceivedImage.value = props.checkboxes.map(() => false);
-  let res;
-  let error = null;
+
+async function runAiAction({
+  endpoint,
+  actionType,
+  responseFlag,
+  updateOnSuccess = true,
+}: {
+  endpoint: string;
+  actionType: 'analyze' | 'analyze_no_images' | 'generate_images';
+  responseFlag: Ref<boolean[]>;
+  updateOnSuccess?: boolean;
+}) {
+  let res: any;
+  let error: any = null;
 
   try {
+    responseFlag.value = props.checkboxes.map(() => false);
+
     res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/initial_image_generate`,
+      path: `/plugin/${props.meta.pluginInstanceId}/${endpoint}`,
       method: 'POST',
       body: {
         selectedIds: props.checkboxes,
       },
     });
+
+    if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+      responseFlag.value = props.checkboxes.map(() => true);
+    }
   } catch (e) {
-    console.error('Error generating images:', e);
-    isError.value = true;
-    isImageGenerationError.value = true;
-    errorMessage.value = `Failed to generate images. Please, try to re-run the action.`;
+    console.error(`Error during ${actionType}:`, e);
+    error = `Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`;
   }
-  isAiResponseReceivedImage.value = props.checkboxes.map(() => true);
 
   if (res?.error) {
     error = res.error;
   }
-  if (!res) {
-    error = 'Error generating images, something went wrong';
-    isError.value = true;
-    isImageGenerationError.value = true;
-    errorMessage.value = `Failed to generate images. Please, try to re-run the action.`;
+  if (!res && !error) {
+    error = `Error: ${actionType} request returned empty response.`;
   }
 
-  if (error) { 
+  if (error) {
     adminforth.alert({
       message: error,
       variant: 'danger',
       timeout: 'unlimited',
     });
     isError.value = true;
-    isImageGenerationError.value = true;
+    if (actionType === 'generate_images') {
+      isImageGenerationError.value = true;
+    }
     errorMessage.value = error;
-  } else {
-    res.result.forEach((item, idx) => {
-      const pk = selected.value[idx]?.[primaryKey]
+    return;
+  }
+
+  if (updateOnSuccess) {
+    res.result.forEach((item: any, idx: number) => {
+      const pk = selected.value[idx]?.[primaryKey];
       if (pk) {
         selected.value[idx] = {
           ...selected.value[idx],
           ...item,
-          [primaryKey]: pk
-        }
+          isChecked: true,
+          [primaryKey]: pk,
+        };
       }
-    })
+    });
   }
 }
 
