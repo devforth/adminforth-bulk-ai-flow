@@ -285,7 +285,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
           If it's number field - return only number.`;
         //send prompt to OpenAI and get response
-        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], 500);
+        const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
+        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
 
         const resp: any = (chatResponse as any).response;
         const topLevelError = (chatResponse as any).error;
