@@ -73,7 +73,7 @@
             <Input
               type="number"
               v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-              class="w-full "
+              class="w-full min-w-[80px]"
               :fullWidth="true"
             />
           </div>

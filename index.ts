@@ -289,7 +289,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
           Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
           If it's number field - return only number.`;
-        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], 500);
+        //send prompt to OpenAI and get response
+        const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
+        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
+
         const resp: any = (chatResponse as any).response;
         const topLevelError = (chatResponse as any).error;
         if (topLevelError || resp?.error) {
@@ -382,6 +385,35 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 }
               }
             }
+            try {
+              const AuditLogPlugin = this.adminforth.getPluginByClassName('AuditLogPlugin');
+              if (AuditLogPlugin) {
+
+                for (const [key, value] of Object.entries(oldRecord)) {
+                  if (!(key in fieldsToUpdate[idx])) {
+                    delete oldRecord[key];
+                  }
+                }
+
+                const reorderedOldRecord = Object.keys(fieldsToUpdate[idx]).reduce((acc, key) => {
+                  if (key in oldRecord) {
+                    acc[key] = oldRecord[key];
+                  }
+                  return acc;
+                }, {} as Record<string, unknown>);
+
+                AuditLogPlugin.logCustomAction({
+                  resourceId: this.resourceConfig.resourceId,
+                  recordId: ID,
+                  actionId: 'Bulk-ai-flow',
+                  oldData: reorderedOldRecord,
+                  data: fieldsToUpdate[idx],
+                  user: adminUser,
+                  headers: headers
+                });
+              }
+            } catch (error) { }
+            
             return this.adminforth.resource(this.resourceConfig.resourceId).update(ID, fieldsToUpdate[idx])
           });
           await Promise.all(updates);
