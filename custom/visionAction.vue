@@ -13,7 +13,7 @@
         class="bulk-vision-dialog flex items-center justify-center relative w-[100vw] h-[100vh] max-h-[100vh] md:w-auto md:max-w-[95vw] md:min-w-[640px] md:h-auto md:max-h-[90vh] bg-white dark:bg-gray-900 rounded-none md:rounded-md shadow-2xl overflow-hidden"
         @click.stop
       >
-        <div class="bulk-vision-table flex flex-col items-center justify-evenly gap-3 md:gap-4 w-full h-full p-4 md:p-6 overflow-y-auto overflow-x-auto">
+        <div class="bulk-vision-table flex flex-col items-center justify-evenly md:max-h-[90vh] gap-3 md:gap-4 w-full h-full p-4 md:p-6 overflow-y-auto overflow-x-auto">
           <button type="button" 
             @click="closeDialog"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" >
