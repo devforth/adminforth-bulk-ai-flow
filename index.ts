@@ -312,9 +312,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ( body ) => {
         let records = [];
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        for( const record of body.body.record ) {
-          records.push(await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, record)] ));
-          records[records.length - 1]._label = this.resourceConfig.recordLabel(records[records.length - 1]);
+        records = await this.adminforth.resource(this.resourceConfig.resourceId).list([Filters.IN(primaryKeyColumn.name, body.body.record)]);
+        for( const [index, record] of records.entries() ) {
+          records[index]._label = this.resourceConfig.recordLabel(records[index]);
         }
         return {
           records,
