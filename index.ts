@@ -73,58 +73,30 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     const columns = this.resourceConfig.columns;
     let columnEnums = [];
     if (this.options.fillFieldsFromImages) {
-      if (!this.options.attachFiles) {
-        throw new Error('⚠️ attachFiles function must be provided in options when fillFieldsFromImages is used');
-      }
-      if (!this.options.visionAdapter) {
-        throw new Error('⚠️ visionAdapter must be provided in options when fillFieldsFromImages is used');
-      }
-
       for (const [key, value] of Object.entries((this.options.fillFieldsFromImages ))) {
         const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
-        if (column) {
-          if(column.enum){
-            (this.options.fillFieldsFromImages as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
-            columnEnums.push({
-              name: key,
-              enum: column.enum,
-            });
-          }
-        } else {
-          throw new Error(`⚠️ No column found for key "${key}"`);
+        if (column && column.enum) {
+          (this.options.fillFieldsFromImages as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
+          columnEnums.push({
+            name: key,
+            enum: column.enum,
+          });
         }
       }
     }
 
     if (this.options.fillPlainFields) {
-      if (!this.options.textCompleteAdapter) {
-        throw new Error('⚠️ textCompleteAdapter must be provided in options when fillPlainFields is used');
-      }
-
       for (const [key, value] of Object.entries((this.options.fillPlainFields))) {
         const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
-        if (column) {
-          if(column.enum){
-            (this.options.fillPlainFields as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
-            columnEnums.push({
-              name: key,
-              enum: column.enum,
-            });
-          }
-        } else {
-          throw new Error(`⚠️ No column found for key "${key}"`);
+        if (column && column.enum) {
+          (this.options.fillPlainFields as any)[key] = `${value} Select ${key} from the list (USE ONLY VALUE FIELD. USE ONLY VALUES FROM THIS LIST): ${JSON.stringify(column.enum)}`;
+          columnEnums.push({
+            name: key,
+            enum: column.enum,
+          });
         }
       }
-    }
-
-    if (this.options.generateImages && !this.options.imageGenerationAdapter) {
-      for (const [key, value] of Object.entries(this.options.generateImages)) {
-        if (!this.options.generateImages[key].adapter) {
-          throw new Error(`⚠️ No image generation adapter found for key "${key}"`);
-        }
-      }
-    }
-  
+    }  
 
     const outputImageFields = [];
     if (this.options.generateImages) {
@@ -136,25 +108,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
       for (const [key, value] of Object.entries(this.options.generateImages)) {
-        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
-        if (!column) {
-          throw new Error(`⚠️ No column found for key "${key}"`);
-        }
         const plugin = adminforth.activatedPlugins.find(p => 
           p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
           p.pluginOptions.pathColumnName === key
         );
-        if (!plugin) {
-          throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
+        if (plugin && plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
+          outputImagesPluginInstanceIds[key] = plugin.pluginInstanceId;
         }
-        if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
-          throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' 
-            uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
-            Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
-          `);
-        }
-
-        outputImagesPluginInstanceIds[key] = plugin.pluginInstanceId;
       }
     }
 
@@ -168,7 +128,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
     const pageInjection = {
-      file: this.componentPath('visionAction.vue'),
+      file: this.componentPath('VisionAction.vue'),
       meta: {
         pluginInstanceId: this.pluginInstanceId,
         outputFields: outputFields,
@@ -199,18 +159,65 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
   
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
-    // optional method where you can safely check field types after database discovery was performed
+    const columns = this.resourceConfig.columns;
+    if (this.options.fillFieldsFromImages) {
+      if (!this.options.attachFiles) {
+        throw new Error('⚠️ attachFiles function must be provided when fillFieldsFromImages is used');
+      }
+      if (!this.options.visionAdapter) {
+        throw new Error('⚠️ visionAdapter must be provided when fillFieldsFromImages is used');
+      }
+      for (const key of Object.keys(this.options.fillFieldsFromImages)) {
+        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+        if (!column) {
+          throw new Error(`⚠️ No column found for key "${key}"`);
+        }
+      }
+    }
+    if (this.options.fillPlainFields) {
+      if (!this.options.textCompleteAdapter) {
+        throw new Error('⚠️ textCompleteAdapter must be provided when fillPlainFields is used');
+      }
+      for (const key of Object.keys(this.options.fillPlainFields)) {
+        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+        if (!column) {
+          throw new Error(`⚠️ No column found for key "${key}"`);
+        }
+      }
+    }
+    if (this.options.generateImages) {
+      for (const key of Object.keys(this.options.generateImages)) {
+        const column = columns.find(c => c.name.toLowerCase() === key.toLowerCase());
+        if (!column) {
+          throw new Error(`⚠️ No column found for key "${key}"`);
+        }
+        const perKeyAdapter = this.options.generateImages[key].adapter;
+        if (!perKeyAdapter && !this.options.imageGenerationAdapter) {
+          throw new Error(`⚠️ No image generation adapter provided for key "${key}"`);
+        }
+
+        const plugin = adminforth.activatedPlugins.find(p => 
+          p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+          p.pluginOptions.pathColumnName === key
+        );
+        if (!plugin) {
+          throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
+        }
+        if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
+          throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' 
+            uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
+            Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
+          `);
+        }
+      }
+    }
   }
 
   instanceUniqueRepresentation(pluginOptions: any) : string {
-    // optional method to return unique string representation of plugin instance. 
-    // Needed if plugin can have multiple instances on one resource 
     return `${this.pluginOptions.actionName}`;
   }
 
   setupEndpoints(server: IHttpServer) {
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/analyze`,
@@ -224,7 +231,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const tasks = selectedIds.map(async (ID) => {
         // Fetch the record using the provided ID
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(primaryKeyColumn.name, ID)] );
 
         //recieve image URLs to analyze
         const attachmentFiles = await this.options.attachFiles({ record: record });
@@ -274,26 +281,20 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
       }
       const tasks = selectedIds.map(async (ID) => {
-        // Fetch the record using the provided ID
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
 
-        //create prompt for OpenAI
         const compiledOutputFields = this.compileOutputFieldsTemplatesNoImage(record);
         const prompt = `Analyze the following fields and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
           Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
           Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
           If it's number field - return only number.`;
-        //send prompt to OpenAI and get response
         const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], 500);
-
         const resp: any = (chatResponse as any).response;
         const topLevelError = (chatResponse as any).error;
         if (topLevelError || resp?.error) {
           throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
         }
-
-        //parse response and update record
         const resData = JSON.parse(chatResponse);
 
         return resData;
@@ -304,8 +305,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       return { result };
       }
     });
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
@@ -321,8 +320,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
@@ -340,8 +337,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
@@ -396,8 +391,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
       }
     });
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/regenerate_images`,
@@ -449,8 +442,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { images };
       }
     });
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/initial_image_generate`,
@@ -518,8 +509,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { result };
       }
     });
-
-
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_generation_prompts`,
@@ -530,8 +519,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { generationOptions: compiledGenerationOptions };
       }
     });
-
-
     server.endpoint({
       method: 'GET',
       path: `/plugin/${this.pluginInstanceId}/averageDuration`,
@@ -543,8 +530,5 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
-
-
-
   }
 }

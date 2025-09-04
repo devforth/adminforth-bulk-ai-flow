@@ -25,7 +25,6 @@
             <VisionTable
               :checkbox="props.checkboxes"
               :records="records"
-              :index="0"
               :meta="props.meta"
               :images="images"
               :tableHeaders="tableHeaders"
@@ -68,13 +67,11 @@
 import { callAdminForthApi } from '@/utils';
 import { Ref, ref, watch } from 'vue'
 import { Dialog, Button } from '@/afcl';
-import VisionTable from './visionTable.vue'
+import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
 
-const route = useRoute();
 const { t } = useI18n();
 
 const props = defineProps<{
@@ -270,7 +267,6 @@ async function getRecords() {
     console.error('Failed to get records:', error);
     isError.value = true;
     errorMessage.value = `Failed to fetch records. Please, try to re-run the action.`;
-    // Handle error appropriately
   }
 }
 
@@ -288,7 +284,6 @@ async function getImages() {
     console.error('Failed to get images:', error);
     isError.value = true;
     errorMessage.value = `Failed to fetch images. Please, try to re-run the action.`;
-    // Handle error appropriately
   }
 }
 

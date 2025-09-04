@@ -119,7 +119,7 @@
 import { ref, nextTick, watch } from 'vue'
 import mediumZoom from 'medium-zoom'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle } from '@/afcl'
-import GenerationCarousel from './imageGenerationCarousel.vue'
+import GenerationCarousel from './ImageGenerationCarousel.vue'
 
 const props = defineProps<{
   meta: any,
