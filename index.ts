@@ -387,6 +387,35 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 }
               }
             }
+            try {
+              const AuditLogPlugin = this.adminforth.getPluginByClassName('AuditLogPlugin');
+              if (AuditLogPlugin) {
+
+                for (const [key, value] of Object.entries(oldRecord)) {
+                  if (!(key in fieldsToUpdate[idx])) {
+                    delete oldRecord[key];
+                  }
+                }
+
+                const reorderedOldRecord = Object.keys(fieldsToUpdate[idx]).reduce((acc, key) => {
+                  if (key in oldRecord) {
+                    acc[key] = oldRecord[key];
+                  }
+                  return acc;
+                }, {} as Record<string, unknown>);
+
+                AuditLogPlugin.logCustomAction({
+                  resourceId: this.resourceConfig.resourceId,
+                  recordId: ID,
+                  actionId: 'Bulk-ai-flow',
+                  oldData: reorderedOldRecord,
+                  data: fieldsToUpdate[idx],
+                  user: adminUser,
+                  headers: headers
+                });
+              }
+            } catch (error) { }
+            
             return this.adminforth.resource(this.resourceConfig.resourceId).update(ID, fieldsToUpdate[idx])
           });
           await Promise.all(updates);
