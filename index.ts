@@ -391,7 +391,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               }
             }
             try {
-              const AuditLogPlugin = this.adminforth.getPluginByClassName('AuditLogPlugin');
+              const AuditLogPlugin:any = this.adminforth.getPluginByClassName('AuditLogPlugin');
               if (AuditLogPlugin) {
 
                 for (const [key, value] of Object.entries(oldRecord)) {
