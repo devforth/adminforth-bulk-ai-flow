@@ -53,7 +53,7 @@
             <Button 
               class="w-full md:w-64"
               @click="saveData"
-              :disabled="isLoading || checkedCount < 1 || isCriticalError"
+              :disabled="isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords"
               :loader="isLoading"
             >
             {{ checkedCount > 1 ? 'Save fields' : 'Save field' }}
@@ -105,6 +105,7 @@ const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
 const isLoading = ref(false);
+const isFetchingRecords = ref(false);
 const isError = ref(false);
 const isCriticalError = ref(false);
 const isImageGenerationError = ref(false);
@@ -129,7 +130,7 @@ const openDialog = async () => {
       return acc;
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
-  isLoading.value = true;
+  isFetchingRecords.value = true;
   const tasks = [];
   if (props.meta.isFieldsForAnalizeFromImages) {
     tasks.push(runAiAction({
@@ -158,7 +159,7 @@ const openDialog = async () => {
     fillCarouselSaveImages();
   }
   
-  isLoading.value = false;
+  isFetchingRecords.value = false;
 }
  
 watch(selected, (val) => {
