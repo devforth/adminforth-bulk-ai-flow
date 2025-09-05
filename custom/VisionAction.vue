@@ -37,6 +37,8 @@
               :primaryKey="primaryKey"
               :openGenerationCarousel="openGenerationCarousel"
               @error="handleTableError"
+              :carouselSaveImages="carouselSaveImages"
+              :carouselImageIndex="carouselImageIndex"
             />
           </div>
           <div class="flex w-full flex-col md:flex-row items-stretch md:items-end justify-end gap-3 md:gap-4">
@@ -96,6 +98,8 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
+const carouselSaveImages = ref<any[]>([]);
+const carouselImageIndex = ref<any[]>([]);
 const isAiResponseReceivedAnalize = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
@@ -149,6 +153,11 @@ const openDialog = async () => {
     }));
   }
   await Promise.all(tasks);
+
+  if (props.meta.isImageGeneration) {
+    fillCarouselSaveImages();
+  }
+  
   isLoading.value = false;
 }
  
@@ -171,6 +180,23 @@ const closeDialog = () => {
   isCriticalError.value = false;
   isImageGenerationError.value = false;
   errorMessage.value = '';
+  carouselSaveImages.value = [];
+  carouselImageIndex.value = [];
+}
+
+function fillCarouselSaveImages() {
+  for (const item of selected.value) {
+    const tempItem: any = {};
+    const tempItemIndex: any = {};
+    for (const [key, value] of Object.entries(item)) {
+        if (props.meta.outputImageFields?.includes(key)) {
+          tempItem[key] = [value];
+          tempItemIndex[key] = 0;
+        }
+    }
+    carouselSaveImages.value.push(tempItem);
+    carouselImageIndex.value.push(tempItemIndex);
+  }
 }
 
 function formatLabel(str) {
