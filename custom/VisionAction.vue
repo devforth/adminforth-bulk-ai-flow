@@ -5,59 +5,36 @@
     </div>
     <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
   </div>
-  <Dialog ref="confirmDialog">
-    <div
-      class="fixed inset-0 z-20 flex items-center justify-center bg-black/40"
-    >
-      <div
-        class="bulk-vision-dialog flex items-center justify-center relative w-[100vw] h-[100vh] max-h-[100vh] md:w-auto md:max-w-[95vw] md:min-w-[640px] md:h-auto md:max-h-[90vh] bg-white dark:bg-gray-900 rounded-none md:rounded-md shadow-2xl overflow-hidden"
-      >
-        <div class="bulk-vision-table flex flex-col items-center justify-evenly md:max-h-[90vh] gap-3 md:gap-4 w-full h-full p-4 md:p-6 overflow-y-auto overflow-x-auto">
-          <button type="button" 
-            @click="closeDialog"
-            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" >
-              <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-              </svg>
-          </button>
-
-          <div v-if="records && props.checkboxes.length" class="w-full overflow-x-auto">
-            <VisionTable
-              :checkbox="props.checkboxes"
-              :records="records"
-              :meta="props.meta"
-              :images="images"
-              :tableHeaders="tableHeaders"
-              :tableColumns="tableColumns"
-              :customFieldNames="customFieldNames"
-              :tableColumnsIndexes="tableColumnsIndexes"
-              :selected="selected"
-              :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
-              :isAiResponseReceivedImage="isAiResponseReceivedImage"
-              :primaryKey="primaryKey"
-              :openGenerationCarousel="openGenerationCarousel"
-              @error="handleTableError"
-            />
-          </div>
-          <div class="flex w-full flex-col md:flex-row items-stretch md:items-end justify-end gap-3 md:gap-4">
-            <div class="h-full text-red-600 font-semibold flex items-center justify-center md:mb-2">
-              <p v-if="isError === true">{{ errorMessage }}</p>
-            </div>
-            <button type="button" class="w-full md:w-auto py-2.5 px-5 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
-              @click="closeDialog"
-            >
-              {{'Cancel'}}
-            </button>
-            <Button 
-              class="w-full md:w-64"
-              @click="saveData"
-              :disabled="isLoading || checkedCount < 1 || isCriticalError"
-              :loader="isLoading"
-            >
-            {{ checkedCount > 1 ? 'Save fields' : 'Save field' }}
-            </Button>
-          </div>
-        </div>
+  <Dialog 
+    ref="confirmDialog"
+    header="Bulk AI Flow"
+    class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
+    :buttons="[
+      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
+      { label: 'Cancel', onclick: (dialog) => dialog.hide() },
+    ]"
+  >
+    <div class="bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
+      <div v-if="records && props.checkboxes.length" class="w-full overflow-x-auto">
+        <VisionTable
+          :checkbox="props.checkboxes"
+          :records="records"
+          :meta="props.meta"
+          :images="images"
+          :tableHeaders="tableHeaders"
+          :tableColumns="tableColumns"
+          :customFieldNames="customFieldNames"
+          :tableColumnsIndexes="tableColumnsIndexes"
+          :selected="selected"
+          :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
+          :isAiResponseReceivedImage="isAiResponseReceivedImage"
+          :primaryKey="primaryKey"
+          :openGenerationCarousel="openGenerationCarousel"
+          @error="handleTableError"
+        />
+      </div>
+      <div class="text-red-600 flex items-center w-full">
+        <p v-if="isError === true">{{ errorMessage }}</p>
       </div>
     </div>
   </Dialog>
@@ -157,21 +134,6 @@ watch(selected, (val) => {
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
 
-const closeDialog = () => {
-  confirmDialog.value.close();
-  isAiResponseReceivedAnalize.value = [];
-  isAiResponseReceivedImage.value = [];
-
-  records.value = [];
-  images.value = [];
-  selected.value = [];
-  tableColumns.value = [];
-  tableColumnsIndexes.value = [];
-  isError.value = false;
-  isCriticalError.value = false;
-  isImageGenerationError.value = false;
-  errorMessage.value = '';
-}
 
 function formatLabel(str) {
   return str

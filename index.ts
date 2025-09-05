@@ -112,9 +112,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
           p.pluginOptions.pathColumnName === key
         );
-        if (plugin && plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
           outputImagesPluginInstanceIds[key] = plugin.pluginInstanceId;
-        }
       }
     }
 
@@ -202,6 +200,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         );
         if (!plugin) {
           throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
+        }
+        if (!plugin.pluginOptions || !plugin.pluginOptions.storageAdapter) {
+          throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' is missing a storageAdapter configuration.`);
+        }
+        if (typeof plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly !== 'function') {
+          throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' uses a storage adapter without 'objectCanBeAccesedPublicly' method.`);
         }
         if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
           throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' 

@@ -1,9 +1,8 @@
 <template>
-  <div>
     <Table
       :columns="tableHeaders"
       :data="tableColumns"
-      :pageSize="8"
+      :pageSize="6"
       >
       <!-- HEADER TEMPLATE -->
       <template #header:checkboxes="{ item }">
@@ -28,18 +27,22 @@
                   @click="zoomImage(image)"
               />
             </div>
+          </div>
+          <transition name="fade">
             <div
               v-if="zoomedImage"
               class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
               @click.self="closeZoom"
             >
-              <img
-                :src="zoomedImage"
-                ref="zoomedImg"
-                class="max-w-full max-h-full rounded-lg object-contain cursor-grab z-75"
-              />
+              <transition name="zoom">
+                <img
+                  v-if="zoomedImage"
+                  :src="zoomedImage"
+                  class="max-w-full max-h-full rounded-lg object-contain cursor-grab z-75"
+                />
+              </transition>
             </div>
-          </div>
+          </transition>
         </div>
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
@@ -112,12 +115,10 @@
         </div>
       </template>
     </Table>
-  </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, nextTick, watch } from 'vue'
-import mediumZoom from 'medium-zoom'
+import { ref } from 'vue'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle } from '@/afcl'
 import GenerationCarousel from './ImageGenerationCarousel.vue'
 
@@ -139,7 +140,6 @@ const emit = defineEmits(['error']);
 
 
 const zoomedImage = ref(null)
-const zoomedImg = ref(null)
 
 
 function zoomImage(img) {
@@ -149,17 +149,6 @@ function zoomImage(img) {
 function closeZoom() {
   zoomedImage.value = null
 }
-
-watch(zoomedImage, async (val) => {
-  await nextTick()
-  if (val && zoomedImg.value) {
-    mediumZoom(zoomedImg.value, {
-      margin: 24,
-      background: 'rgba(0, 0, 0, 0.9)',
-      scrollOffset: 150
-    }).show()
-  }
-})
 
 function isInColumnEnum(key: string): boolean {
   const colEnum = props.meta.columnEnums?.find(c => c.name === key);
@@ -194,3 +183,20 @@ function handleError({ isError, errorMessage }) {
 }
 
 </script>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.zoom-enter-active, .zoom-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.zoom-enter-from, .zoom-leave-to {
+  transform: scale(0.95);
+  opacity: 0;
+}
+</style>

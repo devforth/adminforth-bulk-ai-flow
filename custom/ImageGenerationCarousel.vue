@@ -1,8 +1,8 @@
 
 <template>
   <!-- Main modal -->
-  <div tabindex="-1" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-10 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-black/50 dark:bg-gray-900 dark:bg-opacity-50">
-    <div class="relative p-4 w-10/12 max-w-full max-h-full ">
+  <div tabindex="-1" class="fixed inset-0 z-10 flex justify-center items-center dark:bg-gray-900/50 overflow-y-auto">
+    <div class="relative p-4 w-full max-w-[1600px] max-h-[90vh] ">
         <!-- Modal content -->
         <div class="relative bg-white rounded-lg shadow-xl dark:bg-gray-700">
             <!-- Modal header -->
@@ -95,20 +95,20 @@
                 </div>
 
                 
-                <div id="gallery" class="relative w-full" data-carousel="static">
+                <div id="gallery" class="relative w-full min-w-0" data-carousel="static">
                   <!-- Carousel wrapper -->
                   <div class="relative h-56 overflow-hidden rounded-lg md:h-[calc(100vh-400px)]">
                       <!-- Item 1 -->
                       <div
                         v-for="(img, index) in images"
                         :key="index"
+                        class="flex items-center justify-center w-full h-full"
                         :class="[
-                          index === 0 ? 'block' : 'hidden',
-                          'duration-700 ease-in-out'
+                          index === 0 ? 'block' : 'hidden'
                         ]"
                         data-carousel-item
                       >
-                          <img :src="img" class="absolute block max-w-full max-h-full -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 object-cover" 
+                          <img :src="img" class="max-w-full max-h-full object-contain" 
                             :alt="`Generated image ${index + 1}`"
                           />
                       </div>
