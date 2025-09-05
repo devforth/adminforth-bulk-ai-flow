@@ -10,7 +10,7 @@
     header="Bulk AI Flow"
     class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
     :buttons="[
-      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
+      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
       { label: 'Cancel', onclick: (dialog) => dialog.hide() },
     ]"
   >
@@ -31,6 +31,8 @@
           :primaryKey="primaryKey"
           :openGenerationCarousel="openGenerationCarousel"
           @error="handleTableError"
+          :carouselSaveImages="carouselSaveImages"
+          :carouselImageIndex="carouselImageIndex"
         />
       </div>
       <div class="text-red-600 flex items-center w-full">
@@ -73,11 +75,14 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
+const carouselSaveImages = ref<any[]>([]);
+const carouselImageIndex = ref<any[]>([]);
 const isAiResponseReceivedAnalize = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
 const isLoading = ref(false);
+const isFetchingRecords = ref(false);
 const isError = ref(false);
 const isCriticalError = ref(false);
 const isImageGenerationError = ref(false);
@@ -102,7 +107,7 @@ const openDialog = async () => {
       return acc;
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
-  isLoading.value = true;
+  isFetchingRecords.value = true;
   const tasks = [];
   if (props.meta.isFieldsForAnalizeFromImages) {
     tasks.push(runAiAction({
@@ -126,13 +131,33 @@ const openDialog = async () => {
     }));
   }
   await Promise.all(tasks);
-  isLoading.value = false;
+
+  if (props.meta.isImageGeneration) {
+    fillCarouselSaveImages();
+  }
+  
+  isFetchingRecords.value = false;
 }
  
 watch(selected, (val) => {
   //console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
+
+function fillCarouselSaveImages() {
+  for (const item of selected.value) {
+    const tempItem: any = {};
+    const tempItemIndex: any = {};
+    for (const [key, value] of Object.entries(item)) {
+        if (props.meta.outputImageFields?.includes(key)) {
+          tempItem[key] = [value];
+          tempItemIndex[key] = 0;
+        }
+    }
+    carouselSaveImages.value.push(tempItem);
+    carouselImageIndex.value.push(tempItemIndex);
+  }
+}
 
 
 function formatLabel(str) {

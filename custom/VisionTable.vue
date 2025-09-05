@@ -94,13 +94,15 @@
             <div>
               <GenerationCarousel
                 v-if="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-                :images="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :images="carouselSaveImages[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :recordId="item[primaryKey]"
                 :meta="props.meta"
                 :fieldName="n"
+                :carouselImageIndex="carouselImageIndex[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 @error="handleError"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
                 @selectImage="updateSelectedImage"
+                @updateCarouselIndex="updateActiveIndex"
               />
             </div>
           </div>
@@ -135,6 +137,8 @@ const props = defineProps<{
   openGenerationCarousel: any
   isError: boolean,
   errorMessage: string
+  carouselSaveImages: any[]
+  carouselImageIndex: any[]
 }>();
 const emit = defineEmits(['error']);
 
@@ -180,6 +184,10 @@ function handleError({ isError, errorMessage }) {
     isError,
     errorMessage
   });
+}
+
+function updateActiveIndex(newIndex: number, id: any, fieldName: string) {
+  props.carouselImageIndex[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = newIndex;
 }
 
 </script>

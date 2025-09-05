@@ -189,8 +189,8 @@ import { ProgressBar } from '@/afcl';
 const { t: $t } = useI18n();
 
 const prompt = ref('');
-const emit = defineEmits(['close', 'selectImage', 'error']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage']);
+const emit = defineEmits(['close', 'selectImage', 'error', 'updateCarouselIndex']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -204,12 +204,14 @@ function minifyField(field: string): string {
 
 const caurosel = ref(null);
 onMounted(async () => {
-  images.value.push((props.images || []));
+  for (const img of props.images || []) {
+    images.value.push(img);
+  }
   const temp = await getGenerationPrompt() || '';
   prompt.value = temp[props.fieldName];
   await nextTick();
 
-  const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
+  const currentIndex = props.carouselImageIndex || 0;
   caurosel.value = new Carousel(
     document.getElementById('gallery'), 
     images.value.map((img, index) => {
@@ -294,6 +296,12 @@ async function confirmImage() {
   const currentIndex = caurosel.value?.getActiveItem()?.position || 0;
   const img = images.value[currentIndex];
 
+  props.images.splice(0, props.images.length);
+  for (const i of images.value) {
+    props.images.push(i);
+  }
+
+  emit('updateCarouselIndex', currentIndex, props.recordId, props.fieldName);
   emit('selectImage', img, props.recordId, props.fieldName);
   emit('close');
 

@@ -322,8 +322,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         for( const [index, record] of records.entries() ) {
           records[index]._label = this.resourceConfig.recordLabel(records[index]);
         }
+        const order = Object.fromEntries(body.body.record.map((id, i) => [id, i]));
+
+        const sortedRecords = records.sort(
+          (a, b) => order[a.id] - order[b.id]
+        );
         return {
-          records,
+          records: sortedRecords,
         };
       }
     });
@@ -390,7 +395,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               }
             }
             try {
-              const AuditLogPlugin = this.adminforth.getPluginByClassName('AuditLogPlugin');
+              const AuditLogPlugin:any = this.adminforth.getPluginByClassName('AuditLogPlugin');
               if (AuditLogPlugin) {
 
                 for (const [key, value] of Object.entries(oldRecord)) {
