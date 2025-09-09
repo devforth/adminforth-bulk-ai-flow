@@ -277,7 +277,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/analyze_no_images`,
       handler: async ({ body, adminUser, headers }) => {
-      const selectedIds = body.selectedId || [];
+      const selectedId = body.selectedId || [];
       if (typeof(this.options.rateLimits?.fillPlainFields) === 'string'){
         if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
           return { error: "Rate limit exceeded" };
