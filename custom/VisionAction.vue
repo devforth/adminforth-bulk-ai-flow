@@ -10,7 +10,7 @@
     header="Bulk AI Flow"
     class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
     :buttons="[
-      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
+      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
       { label: 'Cancel', onclick: (dialog) => dialog.hide() },
     ]"
   >
@@ -33,6 +33,7 @@
           @error="handleTableError"
           :carouselSaveImages="carouselSaveImages"
           :carouselImageIndex="carouselImageIndex"
+          :regenerateImagesRefreshRate="props.meta.refreshRates?.regenerateImages"
         />
       </div>
       <div class="text-red-600 flex items-center w-full">
@@ -88,9 +89,14 @@ const isCriticalError = ref(false);
 const isImageGenerationError = ref(false);
 const errorMessage = ref('');
 const checkedCount = ref(0);
+const isGeneratingImages = ref(false);
+const isAnalizingFields = ref(false);
+const isAnalizingImages = ref(false);
+
 
 const openDialog = async () => {
   confirmDialog.value.open();
+  isFetchingRecords.value = true;
   await getRecords();
   if (props.meta.isAttachFiles) {
     await getImages();
@@ -110,9 +116,10 @@ const openDialog = async () => {
       return acc;
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
-  isFetchingRecords.value = true;
+  isFetchingRecords.value = false;
   
   if (props.meta.isImageGeneration) {
+    isGeneratingImages.value = true;
     runAiAction({
       endpoint: 'initial_image_generate',
       actionType: 'generate_images',
@@ -120,6 +127,7 @@ const openDialog = async () => {
     });
   }
   if (props.meta.isFieldsForAnalizeFromImages) {
+    isAnalizingImages.value = true;
     runAiAction({
       endpoint: 'analyze',
       actionType: 'analyze',
@@ -127,23 +135,18 @@ const openDialog = async () => {
     });
   }
   if (props.meta.isFieldsForAnalizePlain) {
+    isAnalizingFields.value = true;
     runAiAction({
       endpoint: 'analyze_no_images',
       actionType: 'analyze_no_images',
       responseFlag: isAiResponseReceivedAnalize,
     });
   }
-  
-  isFetchingRecords.value = false;
 }
  
 watch(selected, (val) => {
-  console.log('Selected changed:', val);
+  //console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
-}, { deep: true });
-
-watch(carouselSaveImages, (val) => {
-  console.log('carouselSaveImages changed:', val);
 }, { deep: true });
 
 function fillCarouselSaveImages() {
@@ -400,19 +403,20 @@ async function runAiAction({
   responseFlag: Ref<boolean[]>;
   updateOnSuccess?: boolean;
 }) {
-  const results: any[] = new Array(props.checkboxes.length);
   let hasError = false;
   let errorMessage = '';
-  
+  const jobsIds: { jobId: any; recordId: any; }[] = [];
   responseFlag.value = props.checkboxes.map(() => false);
 
+  //creating jobs
   const tasks = props.checkboxes.map(async (checkbox, i) => {
     try {
       const res = await callAdminForthApi({
-        path: `/plugin/${props.meta.pluginInstanceId}/${endpoint}`,
+        path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
         method: 'POST',
         body: {
-          selectedId: checkbox,
+          actionType: actionType,
+          recordId: checkbox,
         },
       });
 
@@ -424,32 +428,7 @@ async function runAiAction({
         throw new Error(`${actionType} request returned empty response.`);
       }
 
-      results[i] = res;
-      
-      if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
-        responseFlag.value[i] = true;
-      }
-
-      if (res.result) {
-        if (actionType === 'generate_images') {
-          for (const [key, value] of Object.entries(carouselSaveImages.value[i])) {
-            if (props.meta.outputImageFields?.includes(key)) {
-              carouselSaveImages.value[i][key] = [res.result[key]];
-            }
-          }
-        }
-
-        const pk = selected.value[i]?.[primaryKey];
-        if (pk) {
-          selected.value[i] = {
-            ...selected.value[i],
-            ...res.result,
-            isChecked: true,
-            [primaryKey]: pk,
-          };
-        }
-      }
-      return { success: true, index: i, data: res };
+      jobsIds.push({ jobId: res.jobId, recordId: checkbox });
     } catch (e) {
       console.error(`Error during ${actionType} for item ${i}:`, e);
       hasError = true;
@@ -457,8 +436,88 @@ async function runAiAction({
       return { success: false, index: i, error: e };
     }
   });
-
   await Promise.all(tasks);
+
+  //polling jobs
+  let isInProgress = true;
+  //if no jobs were created, skip polling
+  while (isInProgress) {
+    //check if at least one job is still in progress
+    let isAtLeastOneInProgress = false;
+    //checking status of each job
+    for (const { jobId, recordId } of jobsIds) {
+      //check job status
+      const jobResponse = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
+        method: 'POST',
+        body: { jobId },
+      });
+      //check for errors
+      if (jobResponse?.error) {
+        console.error(`Error during ${actionType}:`, jobResponse.error);
+        break;
+      };
+      // extract job status
+      let jobStatus = jobResponse?.job?.status;
+      // check if job is still in progress. If in progress - skip to next job
+      if (jobStatus === 'in_progress') {
+        isAtLeastOneInProgress = true;
+      //if job is completed - update record data
+      } else if (jobStatus === 'completed') {
+        // finding index of the record in selected array
+        const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
+        //if we are generating images - update carouselSaveImages with new image
+        if (actionType === 'generate_images') {
+          for (const [key, value] of Object.entries(carouselSaveImages.value[index])) {
+            if (props.meta.outputImageFields?.includes(key)) {
+              carouselSaveImages.value[index][key] = [jobResponse.job.result[key]];
+            }
+          }
+        }
+        //marking that we received response for this record
+        if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+          responseFlag.value[index] = true;
+        }
+        //updating selected with new data from AI
+        const pk = selected.value[index]?.[primaryKey];
+        if (pk) {
+          selected.value[index] = {
+            ...selected.value[index],
+            ...jobResponse.job.result,
+            isChecked: true,
+            [primaryKey]: pk,
+          };
+        }
+        //removing job from jobsIds
+        if (index !== -1) {
+          jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
+        }
+        // checking one more time if we have in progress jobs
+        isAtLeastOneInProgress = true;
+        // if job is failed - set error
+      } else if (jobStatus === 'failed') {
+        adminforth.alert({
+          message: `Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`,
+          variant: 'danger',
+          timeout: 'unlimited',
+        });
+      }
+    }
+    if (!isAtLeastOneInProgress) {
+      isInProgress = false;
+    }
+    if (jobsIds.length > 0) {
+      if (actionType === 'generate_images') {
+        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.generateImages));
+      } else if (actionType === 'analyze') {
+        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillFieldsFromImages));
+      } else if (actionType === 'analyze_no_images') {
+        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  }
 
   if (hasError) {
     adminforth.alert({
@@ -472,6 +531,14 @@ async function runAiAction({
     }
     this.errorMessage.value = errorMessage;
     return;
+  }
+
+  if (actionType === 'generate_images') {
+    isGeneratingImages.value = false;
+  } else if (actionType === 'analyze') {
+    isAnalizingImages.value = false;
+  } else if (actionType === 'analyze_no_images') {
+    isAnalizingFields.value = false;
   }
 }
 

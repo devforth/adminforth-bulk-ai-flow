@@ -85,6 +85,15 @@ export interface PluginOptions {
       generateImages?: string,
     },
 
+    /**
+     * Job refresh rate for each ai flow job in milliseconds
+     */
+    refreshRates?: {
+      fillFieldsFromImages?: number,
+      fillPlainFields?: number,
+      generateImages?: number,
+      regenerateImages?: number,
+    },
 
     /**
      * Whether the user is allowed to save the generated images
