@@ -109,6 +109,13 @@ const openDialog = async () => {
   }
   isFetchingRecords.value = true;
   const tasks = [];
+  if (props.meta.isImageGeneration) {
+    tasks.push(runAiAction({
+      endpoint: 'initial_image_generate',
+      actionType: 'generate_images',
+      responseFlag: isAiResponseReceivedImage,
+    }));
+  }
   if (props.meta.isFieldsForAnalizeFromImages) {
     tasks.push(runAiAction({
       endpoint: 'analyze',
@@ -123,13 +130,6 @@ const openDialog = async () => {
       responseFlag: isAiResponseReceivedAnalize,
     }));
   }
-  if (props.meta.isImageGeneration) {
-    tasks.push(runAiAction({
-      endpoint: 'initial_image_generate',
-      actionType: 'generate_images',
-      responseFlag: isAiResponseReceivedImage,
-    }));
-  }
   await Promise.all(tasks);
 
   if (props.meta.isImageGeneration) {
@@ -140,7 +140,7 @@ const openDialog = async () => {
 }
  
 watch(selected, (val) => {
-  //console.log('Selected changed:', val);
+  console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
 
@@ -398,38 +398,60 @@ async function runAiAction({
   responseFlag: Ref<boolean[]>;
   updateOnSuccess?: boolean;
 }) {
-  let res: any;
-  let error: any = null;
+  const results: any[] = new Array(props.checkboxes.length);
+  let hasError = false;
+  let errorMessage = '';
+  
+  responseFlag.value = props.checkboxes.map(() => false);
 
-  try {
-    responseFlag.value = props.checkboxes.map(() => false);
+  const tasks = props.checkboxes.map(async (checkbox, i) => {
+    try {
+      const res = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/${endpoint}`,
+        method: 'POST',
+        body: {
+          selectedId: checkbox,
+        },
+      });
 
-    res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/${endpoint}`,
-      method: 'POST',
-      body: {
-        selectedIds: props.checkboxes,
-      },
-    });
+      if (res?.error) {
+        throw new Error(res.error);
+      }
+      
+      if (!res) {
+        throw new Error(`${actionType} request returned empty response.`);
+      }
 
-    if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
-      responseFlag.value = props.checkboxes.map(() => true);
+      results[i] = res;
+      
+      if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+        responseFlag.value[i] = true;
+      }
+        if (res.result) {
+          const pk = selected.value[i]?.[primaryKey];
+          if (pk) {
+            selected.value[i] = {
+              ...selected.value[i],
+              ...res.result,
+              isChecked: true,
+              [primaryKey]: pk,
+            };
+          }
+        }
+      return { success: true, index: i, data: res };
+    } catch (e) {
+      console.error(`Error during ${actionType} for item ${i}:`, e);
+      hasError = true;
+      errorMessage = `Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`;
+      return { success: false, index: i, error: e };
     }
-  } catch (e) {
-    console.error(`Error during ${actionType}:`, e);
-    error = `Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`;
-  }
+  });
 
-  if (res?.error) {
-    error = res.error;
-  }
-  if (!res && !error) {
-    error = `Error: ${actionType} request returned empty response.`;
-  }
+  await Promise.all(tasks);
 
-  if (error) {
+  if (hasError) {
     adminforth.alert({
-      message: error,
+      message: errorMessage,
       variant: 'danger',
       timeout: 'unlimited',
     });
@@ -437,25 +459,10 @@ async function runAiAction({
     if (actionType === 'generate_images') {
       isImageGenerationError.value = true;
     }
-    errorMessage.value = error;
+    this.errorMessage.value = errorMessage;
     return;
   }
-
-  if (updateOnSuccess) {
-    res.result.forEach((item: any, idx: number) => {
-      const pk = selected.value[idx]?.[primaryKey];
-      if (pk) {
-        selected.value[idx] = {
-          ...selected.value[idx],
-          ...item,
-          isChecked: true,
-          [primaryKey]: pk,
-        };
-      }
-    });
-  }
 }
-
 
 async function uploadImage(imgBlob, id, fieldName) {
   const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type.split('/').pop()}`, { type: imgBlob.type });
