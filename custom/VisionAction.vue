@@ -101,6 +101,9 @@ const openDialog = async () => {
   tableColumnsIndexes.value = result.indexes;
   customFieldNames.value = tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName);
   setSelected();
+  if (props.meta.isImageGeneration) {
+    fillCarouselSaveImages();
+  }
   for (let i = 0; i < selected.value?.length; i++) {
     openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
       acc[key] = false;
@@ -108,32 +111,27 @@ const openDialog = async () => {
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
   isFetchingRecords.value = true;
-  const tasks = [];
+  
   if (props.meta.isImageGeneration) {
-    tasks.push(runAiAction({
+    runAiAction({
       endpoint: 'initial_image_generate',
       actionType: 'generate_images',
       responseFlag: isAiResponseReceivedImage,
-    }));
+    });
   }
   if (props.meta.isFieldsForAnalizeFromImages) {
-    tasks.push(runAiAction({
+    runAiAction({
       endpoint: 'analyze',
       actionType: 'analyze',
       responseFlag: isAiResponseReceivedAnalize,
-    }));
+    });
   }
   if (props.meta.isFieldsForAnalizePlain) {
-    tasks.push(runAiAction({
+    runAiAction({
       endpoint: 'analyze_no_images',
       actionType: 'analyze_no_images',
       responseFlag: isAiResponseReceivedAnalize,
-    }));
-  }
-  await Promise.all(tasks);
-
-  if (props.meta.isImageGeneration) {
-    fillCarouselSaveImages();
+    });
   }
   
   isFetchingRecords.value = false;
@@ -144,13 +142,17 @@ watch(selected, (val) => {
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
 
+watch(carouselSaveImages, (val) => {
+  console.log('carouselSaveImages changed:', val);
+}, { deep: true });
+
 function fillCarouselSaveImages() {
   for (const item of selected.value) {
     const tempItem: any = {};
     const tempItemIndex: any = {};
     for (const [key, value] of Object.entries(item)) {
         if (props.meta.outputImageFields?.includes(key)) {
-          tempItem[key] = [value];
+          tempItem[key] = "";
           tempItemIndex[key] = 0;
         }
     }
@@ -427,17 +429,26 @@ async function runAiAction({
       if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
         responseFlag.value[i] = true;
       }
-        if (res.result) {
-          const pk = selected.value[i]?.[primaryKey];
-          if (pk) {
-            selected.value[i] = {
-              ...selected.value[i],
-              ...res.result,
-              isChecked: true,
-              [primaryKey]: pk,
-            };
+
+      if (res.result) {
+        if (actionType === 'generate_images') {
+          for (const [key, value] of Object.entries(carouselSaveImages.value[i])) {
+            if (props.meta.outputImageFields?.includes(key)) {
+              carouselSaveImages.value[i][key] = [res.result[key]];
+            }
           }
         }
+
+        const pk = selected.value[i]?.[primaryKey];
+        if (pk) {
+          selected.value[i] = {
+            ...selected.value[i],
+            ...res.result,
+            isChecked: true,
+            [primaryKey]: pk,
+          };
+        }
+      }
       return { success: true, index: i, data: res };
     } catch (e) {
       console.error(`Error during ${actionType} for item ${i}:`, e);

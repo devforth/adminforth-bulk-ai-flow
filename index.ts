@@ -273,6 +273,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     });
 
+    
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/analyze_no_images`,
@@ -285,7 +286,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
       //const tasks = selectedIds.map(async (ID) => {
         if (STUB_MODE) {
-          await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 8000) + 1000));
+          await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
           return {};
         } else {
           const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
@@ -315,6 +316,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
      // });
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
@@ -335,6 +338,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
@@ -352,6 +357,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         };
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
@@ -435,6 +442,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
       }
     });
+
+
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/regenerate_images`,
@@ -564,6 +573,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { generationOptions: compiledGenerationOptions };
       }
     });
+
+
     server.endpoint({
       method: 'GET',
       path: `/plugin/${this.pluginInstanceId}/averageDuration`,
