@@ -53,7 +53,6 @@ import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
 
 const { t } = useI18n();
-
 const props = defineProps<{
   checkboxes: any,
   meta: any,
