@@ -4,7 +4,6 @@ import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
 import { randomUUID } from "crypto";
-import { ref } from "process";
 
 const STUB_MODE = false;
 const jobs = new Map();
@@ -70,6 +69,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
+    let isError = false;
     if (typeof(this.options.rateLimits?.fillFieldsFromImages) === 'string'){
       if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
         jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -96,31 +96,38 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           Image URLs:`;
           
         //send prompt to OpenAI and get response
-        const chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
-
-        const resp: any = (chatResponse as any).response;
-        const topLevelError = (chatResponse as any).error;
-        if (topLevelError || resp?.error) {
-          jobs.set(jobId, { status: 'failed', error: topLevelError || resp?.error });
-          throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
+        let chatResponse;
+        try {
+          chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
+        } catch (e) {
+          isError = true;
+          jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analize images' });
+          return { ok: false, error: 'AI provider refused to analize images' };
         }
+        if (!isError) {
+          const resp: any = (chatResponse as any).response;
+          const topLevelError = (chatResponse as any).error;
+          if (topLevelError || resp?.error) {
+            jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError || resp?.error)}` });
+          }
 
-        const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
-        if (!textOutput || typeof textOutput !== 'string') {
-          jobs.set(jobId, { status: 'failed', error: 'Unexpected AI response format' });
-          throw new Error('Unexpected AI response format');
+          const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+          if (!textOutput || typeof textOutput !== 'string') {
+            jobs.set(jobId, { status: 'failed', error: 'Unexpected AI response format' });
+          }
+
+          //parse response and update record
+          const resData = JSON.parse(textOutput);
+          const result = resData;
+          jobs.set(jobId, { status: 'completed', result });
+          return { ok: true };
         }
-
-        //parse response and update record
-        const resData = JSON.parse(textOutput);
-        const result = resData;
-        jobs.set(jobId, { status: 'completed', result });
-        return { ok: true };
       };
     }
   
     private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
       const selectedId = recordId;
+      let isError = false;
       if (typeof(this.options.rateLimits?.fillPlainFields) === 'string'){
         if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
           jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -128,7 +135,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
       }
       if (STUB_MODE) {
-        await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 2000) + 1000));
+        await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
         jobs.set(jobId, { status: 'completed', result: {} });
         return {};
       } else {
@@ -142,15 +149,22 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           If it's number field - return only number.`;
         //send prompt to OpenAI and get response
         const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
-        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
-
-        const resp: any = (chatResponse as any).response;
-        const topLevelError = (chatResponse as any).error;
-        if (topLevelError || resp?.error) {
-          jobs.set(jobId, { status: 'failed', error: topLevelError || resp?.error });
-          throw new Error(`ERROR: ${JSON.stringify(topLevelError || resp?.error)}`);
+        let resp: any;
+        try {
+          const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
+          resp = (chatResponse as any).response;
+          const topLevelError = (chatResponse as any).error;
+          if (topLevelError || resp?.error) {
+            isError = true;
+            jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError || resp?.error)}` });
+          }
+          resp = chatResponse
+        } catch (e) {
+          isError = true;
+          jobs.set(jobId, { status: 'failed', error: 'AI provider refused to fill fields' });
+          return { ok: false, error: 'AI provider refused to fill fields' };
         }
-        const resData = JSON.parse(chatResponse);
+        const resData = JSON.parse(resp);
 
         //return resData;
         const result = resData;
@@ -161,6 +175,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
         const selectedId = recordId;
+        let isError = false;
         if (typeof(this.options.rateLimits?.generateImages) === 'string'){
           if (this.checkRateLimit("generateImages", this.options.rateLimits.generateImages, headers)) {
             jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -184,7 +199,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 return { key, images: [] };
               } else {
                 if (STUB_MODE) {
-                  await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 8000) + 1000));
+                  await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
                   images = `https://pic.re/image`;
                 } else {
                   let generationAdapter;
@@ -193,14 +208,21 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   } else {
                     generationAdapter = this.options.imageGenerationAdapter;
                   }
-                  const resp = await generationAdapter.generate(
-                    {
-                      prompt,
-                      inputFiles: attachmentFiles,
-                      n: 1,
-                      size: this.options.generateImages[key].outputSize,
-                    }
-                  )
+                  let resp;
+                  try {
+                    resp = await generationAdapter.generate(
+                      {
+                        prompt,
+                        inputFiles: attachmentFiles,
+                        n: 1,
+                        size: this.options.generateImages[key].outputSize,
+                      }
+                    )
+                  } catch (e) {
+                    jobs.set(jobId, { status: 'failed', error: "AI provider refused to generate image" });
+                    isError = true;
+                    return { key, images: [] };
+                  }
                   images = resp.imageURLs[0];
                 }
               return { key, images };
@@ -219,12 +241,17 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         
         this.totalCalls++;
         this.totalDuration += (+new Date() - start) / 1000;
+        if (!isError) {
         jobs.set(jobId, { status: 'completed', result });
-        return { ok: true };
+        return { ok: true }
+        } else {
+          return { ok: false, error: 'Error during image generation' };
+        }
       }
   
     private async regenerateImage(jobId: string, recordId: string, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
         const Id = recordId;
+        let isError = false;
         if (this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
           jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
           return { error: "Rate limit exceeded" };
@@ -255,21 +282,32 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             } else {
               generationAdapter = this.options.imageGenerationAdapter;
             }
-            const resp = await generationAdapter.generate(
-              {
-                prompt,
-                inputFiles: attachmentFiles,
-                n: 1,
-                size: this.options.generateImages[fieldName].outputSize,
-              }
-            )
+            let resp;
+            try {
+              resp = await generationAdapter.generate(
+                {
+                  prompt,
+                  inputFiles: attachmentFiles,
+                  n: 1,
+                  size: this.options.generateImages[fieldName].outputSize,
+                }
+              )
+            } catch (e) {
+              jobs.set(jobId, { status: 'failed', error: "AI provider refused to generate image" });
+              isError = true;
+              return [];
+            }
             return resp.imageURLs[0]
           })
         );
         this.totalCalls++;
         this.totalDuration += (+new Date() - start) / 1000;
-        jobs.set(jobId, { status: 'completed', result: { [fieldName]: images } });
-        return { ok: true };
+        if (!isError) {
+          jobs.set(jobId, { status: 'completed', result: { [fieldName]: images } });
+          return { ok: true };
+        } else {
+          return { ok: false, error: 'Error during image generation' };
+        }
       }
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {

@@ -155,7 +155,7 @@ function fillCarouselSaveImages() {
     const tempItemIndex: any = {};
     for (const [key, value] of Object.entries(item)) {
         if (props.meta.outputImageFields?.includes(key)) {
-          tempItem[key] = "";
+          tempItem[key] = [];
           tempItemIndex[key] = 0;
         }
     }
@@ -496,6 +496,10 @@ async function runAiAction({
         isAtLeastOneInProgress = true;
         // if job is failed - set error
       } else if (jobStatus === 'failed') {
+        const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
+        if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+          responseFlag.value[index] = true;
+        }
         adminforth.alert({
           message: `Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`,
           variant: 'danger',
