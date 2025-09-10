@@ -154,10 +154,10 @@ function fillCarouselSaveImages() {
     const tempItem: any = {};
     const tempItemIndex: any = {};
     for (const [key, value] of Object.entries(item)) {
-        if (props.meta.outputImageFields?.includes(key)) {
-          tempItem[key] = [];
-          tempItemIndex[key] = 0;
-        }
+      if (props.meta.outputImageFields?.includes(key)) {
+        tempItem[key] = [];
+        tempItemIndex[key] = 0;
+      }
     }
     carouselSaveImages.value.push(tempItem);
     carouselImageIndex.value.push(tempItemIndex);
