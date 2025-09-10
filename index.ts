@@ -100,8 +100,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
       } catch (e) {
         isError = true;
-        jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analize images' });
-        return { ok: false, error: 'AI provider refused to analize images' };
+        jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze images' });
+        return { ok: false, error: 'AI provider refused to analyze images' };
       }
       if (!isError) {
         const resp: any = (chatResponse as any).response;
@@ -678,6 +678,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     });
 
-    
+
   }
 }
