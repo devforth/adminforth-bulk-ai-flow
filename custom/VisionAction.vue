@@ -546,6 +546,9 @@ async function runAiAction({
         if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
           responseFlag.value[index] = true;
         }
+        if (index !== -1) {
+          jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
+        }
         adminforth.alert({
           message: `Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`,
           variant: 'danger',
