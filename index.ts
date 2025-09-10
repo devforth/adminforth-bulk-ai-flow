@@ -642,25 +642,25 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
         switch(actionType) {
           case 'generate_images':
-            setTimeout(async () => await this.initialImageGenerate(jobId, recordId, adminUser, headers), 100);
+            this.initialImageGenerate(jobId, recordId, adminUser, headers);
           break;
           case 'analyze_no_images':
-            setTimeout(async () => await this.analyzeNoImages(jobId, recordId, adminUser, headers), 100);
+            this.analyzeNoImages(jobId, recordId, adminUser, headers);
           break;
           case 'analyze':
-            setTimeout(async () => await this.analyze_image(jobId, recordId, adminUser, headers), 100);
+            this.analyze_image(jobId, recordId, adminUser, headers);
           break;
           case 'regenerate_images':
             if (!body.prompt || !body.fieldName) {
               jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
               break;
             }
-            setTimeout(async () => await this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers), 100);
+            this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers);
           break;
           default:
             jobs.set(jobId, { status: "failed", error: "Unknown action type" });
         }
-        setTimeout(() => jobs.delete(jobId), 300_000);
+        setTimeout(() => jobs.delete(jobId), 1_800_000);
         return { ok: true, jobId };
       }
     });

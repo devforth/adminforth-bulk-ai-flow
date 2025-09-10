@@ -9,6 +9,7 @@
     ref="confirmDialog"
     header="Bulk AI Flow"
     class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
+    :beforeCloseFunction="closeDialog"
     :buttons="[
       { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
       { label: 'Cancel', onclick: (dialog) => dialog.hide() },
@@ -91,9 +92,10 @@ const checkedCount = ref(0);
 const isGeneratingImages = ref(false);
 const isAnalizingFields = ref(false);
 const isAnalizingImages = ref(false);
-
+const isDialogOpen = ref(false);
 
 const openDialog = async () => {
+  isDialogOpen.value = true;
   confirmDialog.value.open();
   isFetchingRecords.value = true;
   await getRecords();
@@ -143,6 +145,23 @@ const openDialog = async () => {
   }
 }
  
+const closeDialog = () => {
+  confirmDialog.value.close();
+  isAiResponseReceivedAnalize.value = [];
+  isAiResponseReceivedImage.value = [];
+
+  records.value = [];
+  images.value = [];
+  selected.value = [];
+  tableColumns.value = [];
+  tableColumnsIndexes.value = [];
+  isError.value = false;
+  isCriticalError.value = false;
+  isImageGenerationError.value = false;
+  errorMessage.value = '';
+  isDialogOpen.value = false;
+}
+
 watch(selected, (val) => {
   //console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
@@ -468,7 +487,7 @@ async function runAiAction({
   //polling jobs
   let isInProgress = true;
   //if no jobs were created, skip polling
-  while (isInProgress) {
+  while (isInProgress && isDialogOpen.value) {
     //check if at least one job is still in progress
     let isAtLeastOneInProgress = false;
     //checking status of each job
