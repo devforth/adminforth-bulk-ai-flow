@@ -406,7 +406,35 @@ async function runAiAction({
   let errorMessage = '';
   const jobsIds: { jobId: any; recordId: any; }[] = [];
   responseFlag.value = props.checkboxes.map(() => false);
-
+  let isRateLimitExceeded = false;
+  try {
+    const rateLimitRes = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/update-rate-limits`,
+      method: 'POST',
+      body: {
+        actionType: actionType,
+      },
+    });
+    if (rateLimitRes?.error) {
+      isRateLimitExceeded = true;
+      adminforth.alert({
+      message: `Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`,
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+      return;
+    }
+  } catch (e) {
+    adminforth.alert({
+      message: `Error checking rate limit for "${actionType.replace('_', ' ')}" action.`,
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+    isRateLimitExceeded = true;
+  }
+  if (isRateLimitExceeded) {
+    return;
+  };
   //creating jobs
   const tasks = props.checkboxes.map(async (checkbox, i) => {
     try {

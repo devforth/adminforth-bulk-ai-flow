@@ -70,12 +70,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
     let isError = false;
-    if (typeof(this.options.rateLimits?.fillFieldsFromImages) === 'string'){
-      if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
-        jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-        return { error: "Rate limit exceeded" };
-      }
-    }
+    // if (typeof(this.options.rateLimits?.fillFieldsFromImages) === 'string'){
+    //   if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
+    //     jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //     return { error: "Rate limit exceeded" };
+    //   }
+    // }
     // Fetch the record using the provided ID
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
     const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(primaryKeyColumn.name, selectedId)] );
@@ -121,18 +121,22 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         jobs.set(jobId, { status: 'completed', result });
         return { ok: true };
       }
-    };
+    } else {
+      jobs.set(jobId, { status: 'failed', error: "No attachment files found" });
+      return { ok: false, error: "No attachment files found" };
+    }
+
   }
 
   private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
     let isError = false;
-    if (typeof(this.options.rateLimits?.fillPlainFields) === 'string'){
-      if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
-        jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-        return { error: "Rate limit exceeded" };
-      }
-    }
+    // if (typeof(this.options.rateLimits?.fillPlainFields) === 'string'){
+    //   if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
+    //     jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //     return { error: "Rate limit exceeded" };
+    //   }
+    // }
     if (STUB_MODE) {
       await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
       jobs.set(jobId, { status: 'completed', result: {} });
@@ -173,12 +177,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
     let isError = false;
-    if (typeof(this.options.rateLimits?.generateImages) === 'string'){
-      if (this.checkRateLimit("generateImages", this.options.rateLimits.generateImages, headers)) {
-        jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-        return { error: "Rate limit exceeded" };
-      }
-    }
+    // if (typeof(this.options.rateLimits?.generateImages) === 'string'){
+    //   if (this.checkRateLimit("generateImages", this.options.rateLimits.generateImages, headers)) {
+    //     jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //     return { error: "Rate limit exceeded" };
+    //   }
+    // }
     const start = +new Date();
     const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, selectedId)]);
     let attachmentFiles
@@ -675,6 +679,32 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           return { error: "Job not found" };
         }
         return { ok: true, job };
+      }
+    });
+
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/update-rate-limits`,
+      handler: async ({ body, adminUser, headers }) => {
+        const actionType = body.actionType;
+        if (actionType === 'analyze' && this.options.rateLimits?.fillFieldsFromImages) {
+          if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
+            return {ok: false, error: "Rate limit exceeded for image analyze" };
+          }
+        }
+        if (actionType === 'analyze_no_images' && this.options.rateLimits?.fillPlainFields) {
+          if (this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
+            return {ok: false, error: "Rate limit exceeded for plain field analyze" };
+          }
+        }
+        if (actionType === 'generate_images' && this.options.rateLimits?.generateImages) {
+          if (this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
+            return {ok: false, error: "Rate limit exceeded for image generation" };
+          }
+        }
+
+        return { ok: true };
       }
     });
 
