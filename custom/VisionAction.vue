@@ -549,6 +549,7 @@ async function runAiAction({
         if (index !== -1) {
           jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
         }
+        isAtLeastOneInProgress = true;
         adminforth.alert({
           message: `Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`,
           variant: 'danger',
