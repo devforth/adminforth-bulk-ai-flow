@@ -10,7 +10,7 @@
     header="Bulk AI Flow"
     class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
     :buttons="[
-      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
+      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
       { label: 'Cancel', onclick: (dialog) => dialog.hide() },
     ]"
   >
@@ -33,6 +33,7 @@
           @error="handleTableError"
           :carouselSaveImages="carouselSaveImages"
           :carouselImageIndex="carouselImageIndex"
+          :regenerateImagesRefreshRate="props.meta.refreshRates?.regenerateImages"
         />
       </div>
       <div class="text-red-600 flex items-center w-full">
@@ -88,9 +89,14 @@ const isCriticalError = ref(false);
 const isImageGenerationError = ref(false);
 const errorMessage = ref('');
 const checkedCount = ref(0);
+const isGeneratingImages = ref(false);
+const isAnalizingFields = ref(false);
+const isAnalizingImages = ref(false);
+
 
 const openDialog = async () => {
   confirmDialog.value.open();
+  isFetchingRecords.value = true;
   await getRecords();
   if (props.meta.isAttachFiles) {
     await getImages();
@@ -101,42 +107,41 @@ const openDialog = async () => {
   tableColumnsIndexes.value = result.indexes;
   customFieldNames.value = tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName);
   setSelected();
+  if (props.meta.isImageGeneration) {
+    fillCarouselSaveImages();
+  }
   for (let i = 0; i < selected.value?.length; i++) {
     openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
       acc[key] = false;
       return acc;
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
-  isFetchingRecords.value = true;
-  const tasks = [];
-  if (props.meta.isFieldsForAnalizeFromImages) {
-    tasks.push(runAiAction({
-      endpoint: 'analyze',
-      actionType: 'analyze',
-      responseFlag: isAiResponseReceivedAnalize,
-    }));
-  }
-  if (props.meta.isFieldsForAnalizePlain) {
-    tasks.push(runAiAction({
-      endpoint: 'analyze_no_images',
-      actionType: 'analyze_no_images',
-      responseFlag: isAiResponseReceivedAnalize,
-    }));
-  }
+  isFetchingRecords.value = false;
+  
   if (props.meta.isImageGeneration) {
-    tasks.push(runAiAction({
+    isGeneratingImages.value = true;
+    runAiAction({
       endpoint: 'initial_image_generate',
       actionType: 'generate_images',
       responseFlag: isAiResponseReceivedImage,
-    }));
+    });
   }
-  await Promise.all(tasks);
-
-  if (props.meta.isImageGeneration) {
-    fillCarouselSaveImages();
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    isAnalizingImages.value = true;
+    runAiAction({
+      endpoint: 'analyze',
+      actionType: 'analyze',
+      responseFlag: isAiResponseReceivedAnalize,
+    });
   }
-  
-  isFetchingRecords.value = false;
+  if (props.meta.isFieldsForAnalizePlain) {
+    isAnalizingFields.value = true;
+    runAiAction({
+      endpoint: 'analyze_no_images',
+      actionType: 'analyze_no_images',
+      responseFlag: isAiResponseReceivedAnalize,
+    });
+  }
 }
  
 watch(selected, (val) => {
@@ -149,10 +154,10 @@ function fillCarouselSaveImages() {
     const tempItem: any = {};
     const tempItemIndex: any = {};
     for (const [key, value] of Object.entries(item)) {
-        if (props.meta.outputImageFields?.includes(key)) {
-          tempItem[key] = [value];
-          tempItemIndex[key] = 0;
-        }
+      if (props.meta.outputImageFields?.includes(key)) {
+        tempItem[key] = [];
+        tempItemIndex[key] = 0;
+      }
     }
     carouselSaveImages.value.push(tempItem);
     carouselImageIndex.value.push(tempItemIndex);
@@ -398,38 +403,129 @@ async function runAiAction({
   responseFlag: Ref<boolean[]>;
   updateOnSuccess?: boolean;
 }) {
-  let res: any;
-  let error: any = null;
+  let hasError = false;
+  let errorMessage = '';
+  const jobsIds: { jobId: any; recordId: any; }[] = [];
+  responseFlag.value = props.checkboxes.map(() => false);
 
-  try {
-    responseFlag.value = props.checkboxes.map(() => false);
+  //creating jobs
+  const tasks = props.checkboxes.map(async (checkbox, i) => {
+    try {
+      const res = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
+        method: 'POST',
+        body: {
+          actionType: actionType,
+          recordId: checkbox,
+        },
+      });
 
-    res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/${endpoint}`,
-      method: 'POST',
-      body: {
-        selectedIds: props.checkboxes,
-      },
-    });
+      if (res?.error) {
+        throw new Error(res.error);
+      }
+      
+      if (!res) {
+        throw new Error(`${actionType} request returned empty response.`);
+      }
 
-    if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
-      responseFlag.value = props.checkboxes.map(() => true);
+      jobsIds.push({ jobId: res.jobId, recordId: checkbox });
+    } catch (e) {
+      console.error(`Error during ${actionType} for item ${i}:`, e);
+      hasError = true;
+      errorMessage = `Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`;
+      return { success: false, index: i, error: e };
     }
-  } catch (e) {
-    console.error(`Error during ${actionType}:`, e);
-    error = `Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`;
+  });
+  await Promise.all(tasks);
+
+  //polling jobs
+  let isInProgress = true;
+  //if no jobs were created, skip polling
+  while (isInProgress) {
+    //check if at least one job is still in progress
+    let isAtLeastOneInProgress = false;
+    //checking status of each job
+    for (const { jobId, recordId } of jobsIds) {
+      //check job status
+      const jobResponse = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
+        method: 'POST',
+        body: { jobId },
+      });
+      //check for errors
+      if (jobResponse?.error) {
+        console.error(`Error during ${actionType}:`, jobResponse.error);
+        break;
+      };
+      // extract job status
+      let jobStatus = jobResponse?.job?.status;
+      // check if job is still in progress. If in progress - skip to next job
+      if (jobStatus === 'in_progress') {
+        isAtLeastOneInProgress = true;
+      //if job is completed - update record data
+      } else if (jobStatus === 'completed') {
+        // finding index of the record in selected array
+        const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
+        //if we are generating images - update carouselSaveImages with new image
+        if (actionType === 'generate_images') {
+          for (const [key, value] of Object.entries(carouselSaveImages.value[index])) {
+            if (props.meta.outputImageFields?.includes(key)) {
+              carouselSaveImages.value[index][key] = [jobResponse.job.result[key]];
+            }
+          }
+        }
+        //marking that we received response for this record
+        if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+          responseFlag.value[index] = true;
+        }
+        //updating selected with new data from AI
+        const pk = selected.value[index]?.[primaryKey];
+        if (pk) {
+          selected.value[index] = {
+            ...selected.value[index],
+            ...jobResponse.job.result,
+            isChecked: true,
+            [primaryKey]: pk,
+          };
+        }
+        //removing job from jobsIds
+        if (index !== -1) {
+          jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
+        }
+        // checking one more time if we have in progress jobs
+        isAtLeastOneInProgress = true;
+        // if job is failed - set error
+      } else if (jobStatus === 'failed') {
+        const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
+        if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+          responseFlag.value[index] = true;
+        }
+        adminforth.alert({
+          message: `Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`,
+          variant: 'danger',
+          timeout: 'unlimited',
+        });
+      }
+    }
+    if (!isAtLeastOneInProgress) {
+      isInProgress = false;
+    }
+    if (jobsIds.length > 0) {
+      if (actionType === 'generate_images') {
+        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.generateImages));
+      } else if (actionType === 'analyze') {
+        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillFieldsFromImages));
+      } else if (actionType === 'analyze_no_images') {
+        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
   }
 
-  if (res?.error) {
-    error = res.error;
-  }
-  if (!res && !error) {
-    error = `Error: ${actionType} request returned empty response.`;
-  }
-
-  if (error) {
+  if (hasError) {
     adminforth.alert({
-      message: error,
+      message: errorMessage,
       variant: 'danger',
       timeout: 'unlimited',
     });
@@ -437,25 +533,18 @@ async function runAiAction({
     if (actionType === 'generate_images') {
       isImageGenerationError.value = true;
     }
-    errorMessage.value = error;
+    this.errorMessage.value = errorMessage;
     return;
   }
 
-  if (updateOnSuccess) {
-    res.result.forEach((item: any, idx: number) => {
-      const pk = selected.value[idx]?.[primaryKey];
-      if (pk) {
-        selected.value[idx] = {
-          ...selected.value[idx],
-          ...item,
-          isChecked: true,
-          [primaryKey]: pk,
-        };
-      }
-    });
+  if (actionType === 'generate_images') {
+    isGeneratingImages.value = false;
+  } else if (actionType === 'analyze') {
+    isAnalizingImages.value = false;
+  } else if (actionType === 'analyze_no_images') {
+    isAnalizingFields.value = false;
   }
 }
-
 
 async function uploadImage(imgBlob, id, fieldName) {
   const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type.split('/').pop()}`, { type: imgBlob.type });

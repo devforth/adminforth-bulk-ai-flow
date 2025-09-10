@@ -190,7 +190,7 @@ const { t: $t } = useI18n();
 
 const prompt = ref('');
 const emit = defineEmits(['close', 'selectImage', 'error', 'updateCarouselIndex']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -370,26 +370,24 @@ async function generateImages() {
   let error = null;
   try {
     resp = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/regenerate_images`,
+      path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
       method: 'POST',
       body: {
-        prompt: prompt.value,
+        actionType: 'regenerate_images',
         recordId: props.recordId,
-        fieldName: props.fieldName,
+        prompt: prompt.value,
+        fieldName: props.fieldName
       },
     });
   } catch (e) {
     console.error(e);
-  } finally {
-    clearInterval(ticker);
-    loadingTimer.value = null;
-    loading.value = false;
   }
+
   if (resp?.error) {
     error = resp.error;
   }
   if (!resp) {
-    error = $t('Error generating images, something went wrong');
+    error = $t('Error creating image generation job');
   }
 
   if (error) {
@@ -401,18 +399,49 @@ async function generateImages() {
         variant: 'danger',
         timeout: 'unlimited',
       });
-    emit('error', {
-      isError: true,
-      errorMessage: "Error re-generating images"
-    });
     }
     return;
   }
 
+  const jobId = resp.jobId;
+  let jobStatus = null;
+  let jobResponse = null;
+  while (jobStatus !== 'completed' && jobStatus !== 'failed') {
+    jobResponse = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
+      method: 'POST',
+      body: { jobId },
+    });
+    if (jobResponse?.error) {
+      error = jobResponse.error;
+      break;
+    };
+    jobStatus = jobResponse?.job?.status;
+    if (jobStatus === 'failed') {
+      error = jobResponse?.job?.error || $t('Image generation job failed');
+    }
+    await new Promise((resolve) => setTimeout(resolve, props.regenerateImagesRefreshRate));
+  }
+
+  if (error) {
+      adminforth.alert({
+        message: error,
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+    return;
+  }
+
+  const respImages = jobResponse?.job?.result[props.fieldName] || [];
+
   images.value = [
     ...images.value,
-    ...resp.images,
+    ...respImages,
   ];
+
+  clearInterval(ticker);
+  loadingTimer.value = null;
+  loading.value = false;
 
   await nextTick();
 

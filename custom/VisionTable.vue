@@ -10,7 +10,7 @@
       </template>
       <!-- CHECKBOX CELL TEMPLATE -->
       <template #cell:checkboxes="{ item }">
-        <div class="flex items-center justify-center">
+        <div class="max-w-[100px] flex items-center justify-center">
           <Checkbox
             v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])].isChecked"
           />
@@ -99,6 +99,7 @@
                 :meta="props.meta"
                 :fieldName="n"
                 :carouselImageIndex="carouselImageIndex[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
                 @error="handleError"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
                 @selectImage="updateSelectedImage"
@@ -139,6 +140,7 @@ const props = defineProps<{
   errorMessage: string
   carouselSaveImages: any[]
   carouselImageIndex: any[]
+  regenerateImagesRefreshRate: number
 }>();
 const emit = defineEmits(['error']);
 
