@@ -1,8 +1,8 @@
 
 <template>
   <!-- Main modal -->
-  <div tabindex="-1" class="[scrollbar-gutter:stable] fixed inset-0 z-10 flex justify-center items-center dark:bg-gray-900/50 overflow-y-auto">
-    <div class="relative p-4 w-full max-w-[1600px] max-h-[90vh] ">
+  <div tabindex="-1" class="[scrollbar-gutter:stable] fixed inset-0 z-10 flex justify-center items-center bg-gray-800/50 dark:bg-gray-900/50 overflow-y-auto">
+    <div class="relative p-4 w-full max-w-[1600px]">
         <!-- Modal content -->
         <div class="relative bg-white rounded-lg shadow-xl dark:bg-gray-700">
             <!-- Modal header -->
@@ -107,7 +107,7 @@
               </div>
             </div>
             <!-- Modal footer -->
-            <div class="flex justify-between p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600">
+            <div class="flex justify-between p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600 gap-3">
                 <button type="button" class="px-5 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white"
                   @click="generateImages"
                 >{{ $t('Regenerate') }}</button>

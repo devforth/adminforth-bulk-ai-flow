@@ -1,5 +1,5 @@
 <template>
-  <div class="[scrollbar-gutter:stable] flex items-end justify-start gap-2 cursor-pointer" @click="openDialog">
+  <div class="flex items-end justify-start gap-2 cursor-pointer" @click="openDialog">
     <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
       AI
     </div>
@@ -8,14 +8,15 @@
   <Dialog 
     ref="confirmDialog"
     header="Bulk AI Flow"
-    class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
+    class="[scrollbar-gutter:stable] !max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
     :beforeCloseFunction="closeDialog"
     :buttons="[
       { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit' }, onclick: async (dialog) => { await saveData(); dialog.hide(); } },
       { label: 'Cancel', options: {class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'}, onclick: (dialog) => dialog.hide() },
     ]"
+    :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
+    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
       <div v-if="records && props.checkboxes.length" class="w-full overflow-x-auto">
         <VisionTable
           :checkbox="props.checkboxes"
