@@ -11,8 +11,8 @@
     class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
     :beforeCloseFunction="closeDialog"
     :buttons="[
-      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit sm:w-40' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
-      { label: 'Cancel', onclick: (dialog) => dialog.hide() },
+      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit' }, onclick: (dialog) => { saveData(); dialog.hide(); } },
+      { label: 'Cancel', options: {class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700'}, onclick: (dialog) => dialog.hide() },
     ]"
   >
     <div class="bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
