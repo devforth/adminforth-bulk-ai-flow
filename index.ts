@@ -658,7 +658,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           } 
         }
         setTimeout(() => jobs.delete(jobId), 1_800_000);
-        setTimeout(() => jobs.set(jobId, { status: "failed", error: "Job timed out" }), 300_000);
+        setTimeout(() => jobs.set(jobId, { status: "failed", error: "Job timed out" }), 180_000);
         return { ok: true, jobId };
       }
     });
