@@ -168,15 +168,6 @@ onMounted(async () => {
     template = 'Generate image for field {{field}} in {{resource}}. No text should be on image.';
   }
   prompt.value = template;
-  
-  const recordId = props.record[props.meta.recorPkFieldName];
-  if (!recordId) {
-    emit('error', {
-      isError: true,
-      errorMessage: 'Record ID not found, cannot generate images'
-    });
-    return;
-  }
 });
 
 
@@ -334,7 +325,7 @@ async function generateImages() {
 
   await nextTick();
 
-  sliderRef.value?.slideTo(images.value.length);
+  sliderRef.value?.slideTo(images.value.length-1);
 
   await nextTick();
   

@@ -15,11 +15,25 @@ const props = defineProps<{images: string[]}>()
 let swiperEl: any;
 
 function getActiveIndex() {
-  return swiperEl.swiper.activeIndex
+  if (swiperEl && swiperEl.swiper) {
+    return swiperEl.swiper.activeIndex;
+  }
+  return 0;
 }
 
 function slideTo(index) {
-  swiperEl.swiper.slideTo(index)
+  
+  if (!swiperEl || !swiperEl.swiper) {
+    setTimeout(() => slideTo(index), 50);
+    return;
+  }
+  
+  if (index >= 0 && index < props.images.length) {
+    swiperEl.swiper.update();
+    setTimeout(() => {
+      swiperEl.swiper.slideTo(index, 300);
+    }, 10);
+  }
 }
 
 defineExpose({
@@ -29,7 +43,7 @@ defineExpose({
 
 register()
 onMounted(() => {
-swiperEl = document.querySelector('swiper-container')
+  swiperEl = document.querySelector('swiper-container')
 
   const swiperParams: SwiperOptions = {
     slidesPerView: 1,
@@ -37,16 +51,11 @@ swiperEl = document.querySelector('swiper-container')
     pagination: {
         type: 'fraction',
     },
-    on: {
-      init() {
-        console.log('swiper initialized')
-      },
-    },
+    allowTouchMove: true,
   }
 
   Object.assign(swiperEl, swiperParams)
   swiperEl.initialize()
-  swiperEl.swiper;
 })
 </script>
 

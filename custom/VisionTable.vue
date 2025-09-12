@@ -91,7 +91,7 @@
 
         <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
           <div v-if="isInColumnImage(n)">
-            <div class="mt-2 flex items-center justify-center gap-2">
+            <div class="mt-2 flex items-center justify-start gap-2">
               <img v-if="isValidUrl(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])"
                 :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition"
