@@ -20,7 +20,7 @@
                 </button>
             </div>
             <!-- Modal body -->
-            <div class="p-4 md:p-5 space-y-4">
+            <div class="p-4 md:p-5">
               <!-- PROMPT TEXTAREA -->
               <!-- Textarea -->
               <textarea
@@ -47,7 +47,7 @@
               <!-- Fullscreen Modal -->
               <div
                 v-if="zoomedImage"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80"
+                class="w-full h-full fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80"
                 @click.self="closeZoom"
               >
                 <img
@@ -143,7 +143,7 @@ const sliderRef = ref(null)
 
 const prompt = ref('');
 const emit = defineEmits(['close', 'selectImage', 'error', 'updateCarouselIndex']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate','sourceImage']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -153,6 +153,7 @@ onMounted(async () => {
     images.value.push(img);
   }
   const temp = await getGenerationPrompt() || '';
+  attachmentFiles.value = props.sourceImage || [];
   prompt.value = temp[props.fieldName];
   await nextTick();
 
@@ -176,7 +177,6 @@ onMounted(async () => {
     });
     return;
   }
-
 });
 
 

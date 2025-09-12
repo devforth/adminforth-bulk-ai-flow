@@ -129,6 +129,7 @@
                 :fieldName="n"
                 :carouselImageIndex="carouselImageIndex[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
+                :sourceImage="item.images && item.images.length ? item.images : null"
                 @error="handleError"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
                 @selectImage="updateSelectedImage"
