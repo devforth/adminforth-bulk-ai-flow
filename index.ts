@@ -1,5 +1,6 @@
 import { AdminForthPlugin, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource } from "adminforth";
+import { suggestIfTypo } from "adminforth";
 import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
@@ -459,6 +460,53 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
             Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
           `);
+        }
+      }
+      if (this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) {
+        let matches: string[] = [];
+        const regex = /{{(.*?)}}/g;
+
+        if (this.options.fillFieldsFromImages) {
+          for (const [key, value] of Object.entries((this.options.fillFieldsFromImages ))) {
+            const template = value;
+            const templateMatches = template.match(regex);
+            if (templateMatches) {
+              matches.push(...templateMatches);
+            }
+          }
+        }
+        if (this.options.fillPlainFields) {
+          for (const [key, value] of Object.entries((this.options.fillPlainFields))) {
+            const template = value;
+            const templateMatches = template.match(regex);
+            if (templateMatches) {
+              matches.push(...templateMatches);
+            }
+          }
+        }
+        if (this.options.generateImages) {
+          for (const [key, value] of Object.entries((this.options.generateImages ))) {
+            const template = value.prompt;
+            const templateMatches = template.match(regex);
+            if (templateMatches) {
+              matches.push(...templateMatches);
+            }
+          }
+        }
+
+        if (matches) {
+          matches.forEach((match) => {
+            const field = match.replace(/{{|}}/g, '').trim();
+            if (!resourceConfig.columns.find((column: any) => column.name === field)) {
+              const similar = suggestIfTypo(resourceConfig.columns.map((column: any) => column.name), field);
+              throw new Error(`Field "${field}" specified in generationPrompt not found in resource "${resourceConfig.label}". ${similar ? `Did you mean "${similar}"?` : ''}`);
+            } else {
+              let column = resourceConfig.columns.find((column: any) => column.name === field);
+              if (column.backendOnly === true) {
+                throw new Error(`Field "${field}" specified in generationPrompt is marked as backendOnly in resource "${resourceConfig.label}". Please remove backendOnly or choose another field.`);
+              }
+            }
+          });
         }
       }
     }
