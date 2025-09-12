@@ -8,14 +8,15 @@
   <Dialog 
     ref="confirmDialog"
     header="Bulk AI Flow"
-    class="!max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
+    class="[scrollbar-gutter:stable] !max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
     :beforeCloseFunction="closeDialog"
     :buttons="[
       { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit' }, onclick: async (dialog) => { await saveData(); dialog.hide(); } },
       { label: 'Cancel', options: {class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'}, onclick: (dialog) => dialog.hide() },
     ]"
+    :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
+    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
       <div v-if="records && props.checkboxes.length" class="w-full overflow-x-auto">
         <VisionTable
           :checkbox="props.checkboxes"
@@ -35,6 +36,11 @@
           :carouselSaveImages="carouselSaveImages"
           :carouselImageIndex="carouselImageIndex"
           :regenerateImagesRefreshRate="props.meta.refreshRates?.regenerateImages"
+          :isAiGenerationError="isAiGenerationError"
+          :aiGenerationErrorMessage="aiGenerationErrorMessage"
+          :isAiImageGenerationError="isAiImageGenerationError"
+          :imageGenerationErrorMessage="imageGenerationErrorMessage"
+          @regenerate-images="regenerateImages"
         />
       </div>
       <div class="text-red-600 flex items-center w-full">
@@ -52,6 +58,7 @@ import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
+import { run } from 'node:test';
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -93,6 +100,10 @@ const isGeneratingImages = ref(false);
 const isAnalizingFields = ref(false);
 const isAnalizingImages = ref(false);
 const isDialogOpen = ref(false);
+const isAiGenerationError = ref<boolean[]>([false]);
+const aiGenerationErrorMessage = ref<string[]>([]);
+const isAiImageGenerationError = ref<boolean[]>([false]);
+const imageGenerationErrorMessage = ref<string[]>([]);
 
 const openDialog = async () => {
   isDialogOpen.value = true;
@@ -415,47 +426,59 @@ async function runAiAction({
   actionType,
   responseFlag,
   updateOnSuccess = true,
+  recordsIds = props.checkboxes,
+  disableRateLimitCheck = false,
 }: {
   endpoint: string;
   actionType: 'analyze' | 'analyze_no_images' | 'generate_images';
   responseFlag: Ref<boolean[]>;
   updateOnSuccess?: boolean;
+  recordsIds?: any[];
+  disableRateLimitCheck?: boolean;
 }) {
   let hasError = false;
   let errorMessage = '';
   const jobsIds: { jobId: any; recordId: any; }[] = [];
-  responseFlag.value = props.checkboxes.map(() => false);
-  let isRateLimitExceeded = false;
-  try {
-    const rateLimitRes = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/update-rate-limits`,
-      method: 'POST',
-      body: {
-        actionType: actionType,
-      },
-    });
-    if (rateLimitRes?.error) {
-      isRateLimitExceeded = true;
-      adminforth.alert({
-      message: `Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`,
-      variant: 'danger',
-      timeout: 'unlimited',
-    });
-      return;
+  // responseFlag.value = props.checkboxes.map(() => false);
+  for (let i = 0; i < recordsIds.length; i++) {
+    const index = props.checkboxes.findIndex(item => String(item) === String(recordsIds[i]));
+    if (index !== -1) {
+      responseFlag.value[index] = false;
     }
-  } catch (e) {
-    adminforth.alert({
-      message: `Error checking rate limit for "${actionType.replace('_', ' ')}" action.`,
-      variant: 'danger',
-      timeout: 'unlimited',
-    });
-    isRateLimitExceeded = true;
   }
-  if (isRateLimitExceeded) {
-    return;
-  };
+  let isRateLimitExceeded = false;
+  if (!disableRateLimitCheck){
+    try {
+      const rateLimitRes = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/update-rate-limits`,
+        method: 'POST',
+        body: {
+          actionType: actionType,
+        },
+      });
+      if (rateLimitRes?.error) {
+        isRateLimitExceeded = true;
+        adminforth.alert({
+        message: `Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`,
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+        return;
+      }
+    } catch (e) {
+      adminforth.alert({
+        message: `Error checking rate limit for "${actionType.replace('_', ' ')}" action.`,
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      isRateLimitExceeded = true;
+    }
+    if (isRateLimitExceeded) {
+      return;
+    };
+  }
   //creating jobs
-  const tasks = props.checkboxes.map(async (checkbox, i) => {
+  const tasks = recordsIds.map(async (checkbox, i) => {
     try {
       const res = await callAdminForthApi({
         path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
@@ -548,6 +571,8 @@ async function runAiAction({
         }
         if (index !== -1) {
           jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
+        } else {
+          jobsIds.splice(0, jobsIds.length);
         }
         isAtLeastOneInProgress = true;
         adminforth.alert({
@@ -555,6 +580,13 @@ async function runAiAction({
           variant: 'danger',
           timeout: 'unlimited',
         });
+        if (actionType === 'generate_images') {
+          isAiImageGenerationError.value[index] = true;
+          imageGenerationErrorMessage.value[index] = jobResponse.job?.error || 'Unknown error';
+        } else {
+          isAiGenerationError.value[index] = true;
+          aiGenerationErrorMessage.value[index] = jobResponse.job?.error || 'Unknown error';
+        }
       }
     }
     if (!isAtLeastOneInProgress) {
@@ -665,6 +697,17 @@ async function uploadImage(imgBlob, id, fieldName) {
     errorMessage.value = `Failed to upload images. Please, try to re-run the action.`;
     return null;
   }
+}
+
+function regenerateImages(recordInfo: any) {
+  isGeneratingImages.value = true;
+  runAiAction({
+    endpoint: 'initial_image_generate',
+    actionType: 'generate_images',
+    responseFlag: isAiResponseReceivedImage,
+    recordsIds: [recordInfo.recordInfo],
+    disableRateLimitCheck: true,
+  });
 }
 
 </script>

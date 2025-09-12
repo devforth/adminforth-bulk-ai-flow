@@ -70,12 +70,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
     let isError = false;
-    // if (typeof(this.options.rateLimits?.fillFieldsFromImages) === 'string'){
-    //   if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
-    //     jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-    //     return { error: "Rate limit exceeded" };
-    //   }
-    // }
     // Fetch the record using the provided ID
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
     const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(primaryKeyColumn.name, selectedId)] );
@@ -84,7 +78,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     const attachmentFiles = await this.options.attachFiles({ record: record });
     if (STUB_MODE) {
       await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 8000) + 1000));
-      jobs.set(jobId, { status: 'completed', result: {} });
+      const fakeError = Math.random() < 0.5; // 50% chance of error
+      if (attachmentFiles.length === 0) {
+        jobs.set(jobId, { status: 'failed', error: 'No source images found' });
+      } else if (!fakeError) {
+        jobs.set(jobId, { status: 'completed', result: {} });
+      } else {
+        jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze images' });
+      }
       return {};
     } else if (attachmentFiles.length !== 0) {
       //create prompt for OpenAI
@@ -122,8 +123,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { ok: true };
       }
     } else {
-      jobs.set(jobId, { status: 'failed', error: "No attachment files found" });
-      return { ok: false, error: "No attachment files found" };
+      jobs.set(jobId, { status: 'failed', error: "No source images found" });
+      return { ok: false, error: "No source images found" };
     }
 
   }
@@ -131,12 +132,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
     let isError = false;
-    // if (typeof(this.options.rateLimits?.fillPlainFields) === 'string'){
-    //   if (this.checkRateLimit("fillPlainFields", this.options.rateLimits.fillPlainFields, headers)) {
-    //     jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-    //     return { error: "Rate limit exceeded" };
-    //   }
-    // }
     if (STUB_MODE) {
       await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
       jobs.set(jobId, { status: 'completed', result: {} });
@@ -177,12 +172,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const selectedId = recordId;
     let isError = false;
-    // if (typeof(this.options.rateLimits?.generateImages) === 'string'){
-    //   if (this.checkRateLimit("generateImages", this.options.rateLimits.generateImages, headers)) {
-    //     jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-    //     return { error: "Rate limit exceeded" };
-    //   }
-    // }
     const start = +new Date();
     const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, selectedId)]);
     let attachmentFiles
@@ -195,12 +184,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const prompt = this.compileGenerationFieldTemplates(record)[key];
       let images;
         if (this.options.attachFiles && attachmentFiles.length === 0) {
-          jobs.set(jobId, { status: 'failed', error: "No attachment files found" });
+          isError = true;
+          jobs.set(jobId, { status: 'failed', error: "No source images found" });
           return { key, images: [] };
         } else {
           if (STUB_MODE) {
             await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
-            images = `https://pic.re/image`;
+            const fakeError = Math.random() < 0.5; // 50% chance of error
+            if (!fakeError) {
+              images = `https://pic.re/image`;
+            } else {
+              isError = true;
+              jobs.set(jobId, { status: 'failed', error: 'AI provider refused to generate image' });
+            }
           } else {
             let generationAdapter;
             if (this.options.generateImages[key].adapter) {
@@ -266,7 +262,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     const images = await Promise.all(
       (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
         if (this.options.attachFiles && attachmentFiles.length === 0) {
-          jobs.set(jobId, { status: 'failed', error: "No attachment files found" });
+          isError = true;
+          jobs.set(jobId, { status: 'failed', error: "No source images found" });
           return null;
         }
         if (STUB_MODE) {
@@ -633,34 +630,35 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
         if (!actionType) {
           jobs.set(jobId, { status: "failed", error: "Missing action type" });
-          return { error: "Missing action type" };
+          //return { error: "Missing action type" };
         }
-        if (!recordId) {
+        else if (!recordId) {
           jobs.set(jobId, { status: "failed", error: "Missing record id" });
-          return { error: "Missing record id" };
-        }
-
-        switch(actionType) {
-          case 'generate_images':
-            this.initialImageGenerate(jobId, recordId, adminUser, headers);
-          break;
-          case 'analyze_no_images':
-            this.analyzeNoImages(jobId, recordId, adminUser, headers);
-          break;
-          case 'analyze':
-            this.analyze_image(jobId, recordId, adminUser, headers);
-          break;
-          case 'regenerate_images':
-            if (!body.prompt || !body.fieldName) {
-              jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
-              break;
-            }
-            this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers);
-          break;
-          default:
-            jobs.set(jobId, { status: "failed", error: "Unknown action type" });
+          //return { error: "Missing record id" };
+        } else {
+          switch(actionType) {
+            case 'generate_images':
+              this.initialImageGenerate(jobId, recordId, adminUser, headers);
+            break;
+            case 'analyze_no_images':
+              this.analyzeNoImages(jobId, recordId, adminUser, headers);
+            break;
+            case 'analyze':
+              this.analyze_image(jobId, recordId, adminUser, headers);
+            break;
+            case 'regenerate_images':
+              if (!body.prompt || !body.fieldName) {
+                jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
+                break;
+              }
+              this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers);
+            break;
+            default:
+              jobs.set(jobId, { status: "failed", error: "Unknown action type" });
+          } 
         }
         setTimeout(() => jobs.delete(jobId), 1_800_000);
+        setTimeout(() => jobs.set(jobId, { status: "failed", error: "Job timed out" }), 180_000);
         return { ok: true, jobId };
       }
     });

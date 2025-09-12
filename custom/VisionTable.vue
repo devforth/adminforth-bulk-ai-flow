@@ -19,14 +19,21 @@
       <!-- IMAGE CELL TEMPLATE -->
       <template #cell:images="{item}">
         <div class="flex flex-shrink-0 gap-2">
-          <div v-for="image in item.images" :key="image">
+          <div v-if="item.images.length" v-for="image in item.images" :key="image">
             <div class="mt-2 flex items-center justify-center gap-2">
-              <img 
+              <img
+                  v-if="isValidUrl(image)" 
                   :src="image"  
                   class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
                   @click="zoomImage(image)"
               />
+              <div v-else class="w-20 h-20">
+                <p>Invalid source image</p>
+              </div>
             </div>
+          </div>
+          <div class="flex items-center justify-center text-center w-20 h-20" v-else>
+            <p>No images found</p>
           </div>
           <transition name="fade">
             <div
@@ -84,12 +91,34 @@
 
         <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
           <div v-if="isInColumnImage(n)">
-            <div class="mt-2 flex items-center justify-center gap-2">
-              <img 
-                  :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"  
-                  class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
-                  @click="() => {openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"
+            <div class="mt-2 flex items-center justify-start gap-2">
+              <img v-if="isValidUrl(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])"
+                :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition"
+                @click="() => {openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"
               />
+              <div v-else class="flex items-center justify-center text-center w-20 h-20">
+                <Tooltip v-if="imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] === 'No source images found'">
+                  <p
+                  >
+                    Can't generate image. 
+                  </p>
+                  <template #tooltip>
+                    {{ imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] }}
+                  </template>
+                </Tooltip>
+                <Tooltip v-else>
+                  <div>
+                    <IconRefreshOutline
+                      @click="() => {regenerateImages(item[primaryKey])}"
+                      class="w-20 h-20 hover:text-blue-500 cursor-pointer transition hover:scale-105"
+                    />
+                  </div>
+                  <template #tooltip>
+                    {{ imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] + '. Click to retry.' }}
+                  </template>
+                </Tooltip>
+              </div>
             </div>
             <div>
               <GenerationCarousel
@@ -100,6 +129,7 @@
                 :fieldName="n"
                 :carouselImageIndex="carouselImageIndex[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
+                :sourceImage="item.images && item.images.length ? item.images : null"
                 @error="handleError"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
                 @selectImage="updateSelectedImage"
@@ -122,8 +152,9 @@
 
 <script lang="ts" setup>
 import { ref } from 'vue'
-import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle } from '@/afcl'
+import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle, Tooltip } from '@/afcl'
 import GenerationCarousel from './ImageGenerationCarousel.vue'
+import { IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
 
 const props = defineProps<{
   meta: any,
@@ -141,8 +172,12 @@ const props = defineProps<{
   carouselSaveImages: any[]
   carouselImageIndex: any[]
   regenerateImagesRefreshRate: number
+  isAiGenerationError: boolean[],
+  aiGenerationErrorMessage: string[],
+  isAiImageGenerationError: boolean[],
+  imageGenerationErrorMessage: string[]
 }>();
-const emit = defineEmits(['error']);
+const emit = defineEmits(['error', 'regenerateImages']);
 
 
 const zoomedImage = ref(null)
@@ -188,9 +223,26 @@ function handleError({ isError, errorMessage }) {
   });
 }
 
+function regenerateImages(recordInfo: any) {
+  emit('regenerateImages', {
+    recordInfo
+  });
+}
+
 function updateActiveIndex(newIndex: number, id: any, fieldName: string) {
   props.carouselImageIndex[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = newIndex;
 }
+
+function isValidUrl(str: string): boolean {
+  try {
+    new URL(str);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
 
 </script>
 

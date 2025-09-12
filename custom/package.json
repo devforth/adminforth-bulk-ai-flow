@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "@iconify-prerendered/vue-mdi": "^0.25.1718880438",
-    "medium-zoom": "^1.1.0"
+    "medium-zoom": "^1.1.0",
+    "swiper": "^11.2.10"
   }
 }
