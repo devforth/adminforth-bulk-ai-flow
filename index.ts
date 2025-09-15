@@ -363,7 +363,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       ...(this.options.generateImages || {})
     };
 
-
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
     const pageInjection = {
@@ -462,52 +461,52 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           `);
         }
       }
-      if (this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) {
-        let matches: string[] = [];
-        const regex = /{{(.*?)}}/g;
+    }
+    if (this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) {
+      let matches: string[] = [];
+      const regex = /{{(.*?)}}/g;
 
-        if (this.options.fillFieldsFromImages) {
-          for (const [key, value] of Object.entries((this.options.fillFieldsFromImages ))) {
-            const template = value;
-            const templateMatches = template.match(regex);
-            if (templateMatches) {
-              matches.push(...templateMatches);
-            }
+      if (this.options.fillFieldsFromImages) {
+        for (const [key, value] of Object.entries((this.options.fillFieldsFromImages ))) {
+          const template = value;
+          const templateMatches = template.match(regex);
+          if (templateMatches) {
+            matches.push(...templateMatches);
           }
         }
-        if (this.options.fillPlainFields) {
-          for (const [key, value] of Object.entries((this.options.fillPlainFields))) {
-            const template = value;
-            const templateMatches = template.match(regex);
-            if (templateMatches) {
-              matches.push(...templateMatches);
-            }
+      }
+      if (this.options.fillPlainFields) {
+        for (const [key, value] of Object.entries((this.options.fillPlainFields))) {
+          const template = value;
+          const templateMatches = template.match(regex);
+          if (templateMatches) {
+            matches.push(...templateMatches);
           }
         }
-        if (this.options.generateImages) {
-          for (const [key, value] of Object.entries((this.options.generateImages ))) {
-            const template = value.prompt;
-            const templateMatches = template.match(regex);
-            if (templateMatches) {
-              matches.push(...templateMatches);
-            }
+      }
+      if (this.options.generateImages) {
+        for (const [key, value] of Object.entries((this.options.generateImages ))) {
+          const template = value.prompt;
+          const templateMatches = template.match(regex);
+          if (templateMatches) {
+            matches.push(...templateMatches);
           }
         }
+      }
 
-        if (matches) {
-          matches.forEach((match) => {
-            const field = match.replace(/{{|}}/g, '').trim();
-            if (!resourceConfig.columns.find((column: any) => column.name === field)) {
-              const similar = suggestIfTypo(resourceConfig.columns.map((column: any) => column.name), field);
-              throw new Error(`Field "${field}" specified in generationPrompt not found in resource "${resourceConfig.label}". ${similar ? `Did you mean "${similar}"?` : ''}`);
-            } else {
-              let column = resourceConfig.columns.find((column: any) => column.name === field);
-              if (column.backendOnly === true) {
-                throw new Error(`Field "${field}" specified in generationPrompt is marked as backendOnly in resource "${resourceConfig.label}". Please remove backendOnly or choose another field.`);
-              }
+      if (matches) {
+        matches.forEach((match) => {
+          const field = match.replace(/{{|}}/g, '').trim();
+          if (!resourceConfig.columns.find((column: any) => column.name === field)) {
+            const similar = suggestIfTypo(resourceConfig.columns.map((column: any) => column.name), field);
+            throw new Error(`Field "${field}" specified in generationPrompt not found in resource "${resourceConfig.label}". ${similar ? `Did you mean "${similar}"?` : ''}`);
+          } else {
+            let column = resourceConfig.columns.find((column: any) => column.name === field);
+            if (column.backendOnly === true) {
+              throw new Error(`Field "${field}" specified in generationPrompt is marked as backendOnly in resource "${resourceConfig.label}". Please remove backendOnly or choose another field.`);
             }
-          });
-        }
+          }
+        });
       }
     }
   }
@@ -751,6 +750,37 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
 
         return { ok: true };
+      }
+    });
+
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/compile_old_image_link`,
+      handler: async ({ body, adminUser, headers }) => {
+        const image = body.image;
+        const columnName = body.columnName;
+        if (!image) {
+          return { ok: false, error: "Can't find image url" };
+        }
+        if (!columnName) {
+          return { ok: false, error: "Can't find column name" };
+        }
+        try {
+          if (this.options?.generateImages) {
+            const plugin = this.adminforth.activatedPlugins.find(p =>
+              p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+              p.pluginOptions.pathColumnName === columnName
+            );
+            if (plugin?.pluginOptions?.preview) {
+              const compiledPreviewUrl = plugin.pluginOptions.preview.previewUrl({ filePath: image });
+              return { ok: true, previewUrl: compiledPreviewUrl };
+            }
+            return { ok: false, error: "Can't find plugin for column" };
+          }
+        } catch (e) {
+          return { ok: false, error: "Error compiling preview url" };
+        }
       }
     });
 

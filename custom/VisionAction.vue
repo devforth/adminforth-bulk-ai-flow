@@ -28,10 +28,12 @@
           :customFieldNames="customFieldNames"
           :tableColumnsIndexes="tableColumnsIndexes"
           :selected="selected"
+          :oldData="oldData"
           :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
           :isAiResponseReceivedImage="isAiResponseReceivedImage"
           :primaryKey="primaryKey"
           :openGenerationCarousel="openGenerationCarousel"
+          :openImageCompare="openImageCompare"
           @error="handleTableError"
           :carouselSaveImages="carouselSaveImages"
           :carouselImageIndex="carouselImageIndex"
@@ -41,6 +43,7 @@
           :isAiImageGenerationError="isAiImageGenerationError"
           :imageGenerationErrorMessage="imageGenerationErrorMessage"
           @regenerate-images="regenerateImages"
+          :isImageHasPreviewUrl="isImageHasPreviewUrl"
         />
       </div>
       <div class="text-red-600 flex items-center w-full">
@@ -83,12 +86,14 @@ const tableColumns = ref([]);
 const tableColumnsIndexes = ref([]);
 const customFieldNames = ref([]);
 const selected = ref<any[]>([]);
+const oldData = ref<any[]>([]);
 const carouselSaveImages = ref<any[]>([]);
 const carouselImageIndex = ref<any[]>([]);
 const isAiResponseReceivedAnalize = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
+const openImageCompare = ref([]);
 const isLoading = ref(false);
 const isFetchingRecords = ref(false);
 const isError = ref(false);
@@ -104,6 +109,7 @@ const isAiGenerationError = ref<boolean[]>([false]);
 const aiGenerationErrorMessage = ref<string[]>([]);
 const isAiImageGenerationError = ref<boolean[]>([false]);
 const imageGenerationErrorMessage = ref<string[]>([]);
+const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
 
 const openDialog = async () => {
   isDialogOpen.value = true;
@@ -113,6 +119,7 @@ const openDialog = async () => {
   if (props.meta.isAttachFiles) {
     await getImages();
   }
+  await findPreviewURLForImages();
   tableHeaders.value = generateTableHeaders(props.meta.outputFields);
   const result = generateTableColumns();
   tableColumns.value = result.tableData;
@@ -124,6 +131,10 @@ const openDialog = async () => {
   }
   for (let i = 0; i < selected.value?.length; i++) {
     openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
+      acc[key] = false;
+      return acc;
+    },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
+    openImageCompare.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
       acc[key] = false;
       return acc;
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
@@ -257,7 +268,7 @@ function setSelected() {
     }
     selected.value[index].isChecked = true;
     selected.value[index][primaryKey] = record[primaryKey];
-    isAiResponseReceivedAnalize.value[index] = true;
+    oldData.value[index] = { ...selected.value[index] };
   });
 }
 
@@ -708,6 +719,30 @@ function regenerateImages(recordInfo: any) {
     recordsIds: [recordInfo.recordInfo],
     disableRateLimitCheck: true,
   });
+}
+
+async function findPreviewURLForImages() {
+  if (props.meta.outputImageFields){
+    for (const fieldName of props.meta.outputImageFields) {
+      try {
+        const res = await callAdminForthApi({
+          path: `/plugin/${props.meta.pluginInstanceId}/compile_old_image_link`,
+          method: 'POST',
+          body: {
+          image: "test",
+          columnName: fieldName,
+          },
+        });
+        if (res?.ok) {
+          isImageHasPreviewUrl.value[fieldName] = true;
+        } else {
+          isImageHasPreviewUrl.value[fieldName] = false;
+        }
+      } catch (e) {
+        console.error("Error finding preview URL for field", fieldName, e);
+      }
+    }
+  }
 }
 
 </script>
