@@ -78,6 +78,10 @@ const props = defineProps<{
   }
 }>();
 
+defineExpose({
+  click
+});
+
 const confirmDialog = ref(null);
 const records = ref<any[]>([]);
 const images = ref<any[]>([]);
@@ -743,6 +747,10 @@ async function findPreviewURLForImages() {
       }
     }
   }
+}
+
+function click() {
+  openDialog();
 }
 
 </script>
