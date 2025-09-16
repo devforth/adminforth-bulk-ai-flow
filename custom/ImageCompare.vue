@@ -1,7 +1,7 @@
 <template>
   <!-- Popup Overlay -->
   <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50" @click.self="closePopup">
-    <div class="image-compare-container max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="image-compare-container max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg">
       <!-- Close Button -->
       <div class="flex justify-end mb-4">
         <button type="button" 

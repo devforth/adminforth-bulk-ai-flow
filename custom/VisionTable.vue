@@ -54,7 +54,7 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
+        <div v-if="isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
           <div v-if="isInColumnEnum(n)" class="flex flex-col items-start justify-end min-h-[90px]">
               <Select
                 class="min-w-[150px]"
@@ -65,9 +65,8 @@
               >
               </Select>
               <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500">
-                  <p class="text-sm ">original</p>
-                  <IconScaleBalancedOutline />
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                  <p class="text-sm ">old value</p>
                 </div>
                 <template #tooltip>
                   {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
@@ -82,9 +81,8 @@
             >
             </Textarea>
             <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500">
-                  <p class="text-sm ">original</p>
-                  <IconScaleBalancedOutline />
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                  <p class="text-sm ">old value</p>
                 </div>
               <template #tooltip>
                 <p class="max-w-[200px]">{{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}</p>
@@ -98,9 +96,8 @@
             >
             </Toggle>
             <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500">
-                  <p class="text-sm ">original</p>
-                  <IconScaleBalancedOutline />
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                  <p class="text-sm ">old value</p>
                 </div>
               <template #tooltip>
                 {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
@@ -115,9 +112,8 @@
               :fullWidth="true"
             />
             <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500">
-                  <p class="text-sm ">original</p>
-                  <IconScaleBalancedOutline />
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                  <p class="text-sm ">old value</p>
                 </div>
               <template #tooltip>
                 {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
@@ -126,7 +122,7 @@
           </div>
         </div>
 
-        <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]">
+        <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
           <div v-if="isInColumnImage(n)">
             <div class="mt-2 flex items-center justify-start gap-2">
               <div v-if="isValidUrl(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])" class="flex flex-col items-center">
@@ -138,10 +134,10 @@
               <p
                 v-if="isImageHasPreviewUrl[n]"
                 class="mt-2 text-sm hover:text-blue-500 hover:underline hover:cursor-pointer flex items-center gap-1"
+                :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }"
                 @click="() => {openImageCompare[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"  
               >
                 old image
-                <IconScaleBalancedOutline />
               </p>
               </div>
               <div v-else class="flex items-center justify-center text-center w-20 h-20">
@@ -206,11 +202,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle, Tooltip } from '@/afcl'
 import GenerationCarousel from './ImageGenerationCarousel.vue'
 import ImageCompare from './ImageCompare.vue';
-import { IconRefreshOutline, IconScaleBalancedOutline } from '@iconify-prerendered/vue-flowbite';
+import { IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
 
 const props = defineProps<{
   meta: any,
@@ -240,7 +236,13 @@ const emit = defineEmits(['error', 'regenerateImages']);
 
 
 const zoomedImage = ref(null);
+const hovers = ref<{ [key: string]: boolean }[]>([]);
 
+watch(() => props.tableColumnsIndexes, (newVal) => {
+  if (newVal) {
+    hovers.value = newVal.map(() => ({}));
+  }
+}, { immediate: true });
 
 function zoomImage(img) {
   zoomedImage.value = img
