@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-end justify-start gap-2 cursor-pointer" @click="openDialog">
+  <div class="flex items-end justify-start gap-2 cursor-pointer px-2 px-4" @click="openDialog">
     <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
       AI
     </div>
