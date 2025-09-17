@@ -613,10 +613,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                       await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletation(oldRecord[value]);
                     } catch (e) {
                       // file might be e.g. already deleted, so we catch error
-                      console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`, e);
+                      console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`);
                     }
                   }
-                  if (fieldsToUpdate[idx][key] && fieldsToUpdate[idx][key] !== null) {
+                  if (fieldsToUpdate[idx][value] && fieldsToUpdate[idx][value] !== null) {
                   // remove tag from new file
                   // in this case we let it crash if it fails: this is a new file which just was uploaded. 
                     await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
