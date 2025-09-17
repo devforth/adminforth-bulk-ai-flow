@@ -89,6 +89,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
       return {};
     } else if (attachmentFiles.length !== 0) {
+      try {
+        for (const fileUrl of attachmentFiles) {
+          new URL(fileUrl);
+        }
+      } catch (e) {
+        jobs.set(jobId, { status: 'failed', error: 'One of the image URLs is not valid' });
+        return { ok: false, error: 'One of the image URLs is not valid' };
+      }
       //create prompt for OpenAI
       const compiledOutputFields = this.compileOutputFieldsTemplates(record);
       const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
@@ -118,7 +126,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
 
         //parse response and update record
-        const resData = JSON.parse(textOutput);
+        let resData;
+        try {
+          resData = JSON.parse(textOutput);
+        } catch (e) {
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL' });
+          return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL' };
+        }
         const result = resData;
         jobs.set(jobId, { status: 'completed', result });
         return { ok: true };
@@ -180,6 +194,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       attachmentFiles = [];
     } else {
       attachmentFiles = await this.options.attachFiles({ record });
+      try {
+        for (const fileUrl of attachmentFiles) {
+          new URL(fileUrl);
+        }
+      } catch (e) {
+        jobs.set(jobId, { status: 'failed', error: 'One of the image URLs is not valid' });
+        return { ok: false, error: 'One of the image URLs is not valid' };
+      }
     }
     const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
       const prompt = this.compileGenerationFieldTemplates(record)[key];
