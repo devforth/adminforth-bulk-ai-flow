@@ -257,9 +257,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     const result = recordResult;
     
-    this.totalCalls++;
-    this.totalDuration += (+new Date() - start) / 1000;
     if (!isError) {
+      this.totalCalls++;
+      this.totalDuration += (+new Date() - start) / 1000;
       jobs.set(jobId, { status: 'completed', result });
       return { ok: true }
     } else {
@@ -319,9 +319,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return resp.imageURLs[0]
       })
     );
-    this.totalCalls++;
-    this.totalDuration += (+new Date() - start) / 1000;
+
     if (!isError) {
+      this.totalCalls++;
+      this.totalDuration += (+new Date() - start) / 1000;
       jobs.set(jobId, { status: 'completed', result: { [fieldName]: images } });
       return { ok: true };
     } else {
