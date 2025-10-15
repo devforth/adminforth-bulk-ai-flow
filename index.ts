@@ -57,12 +57,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private checkRateLimit(field: string,fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
     if (fieldNameRateLimit) {
       // rate limit
-      const { error } = RateLimiter.checkRateLimit(
-        field,
-        fieldNameRateLimit,
-        this.adminforth.auth.getClientIp(headers),
-      );
-      if (error) {
+      // const { error } = RateLimiter.checkRateLimit(
+      //   field,
+      //   fieldNameRateLimit,
+      //   this.adminforth.auth.getClientIp(headers),
+      // );
+      const rateLimiter = new RateLimiter(fieldNameRateLimit);
+      if (!rateLimiter.consume(`${field}-${this.adminforth.auth.getClientIp(headers)}`)) {
         return { error: "Rate limit exceeded" };
       }
     }
