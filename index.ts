@@ -13,6 +13,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   uploadPlugin: AdminForthPlugin;
   totalCalls: number;
   totalDuration: number;
+  rateLimiters: Record<string, RateLimiter> = {};
 
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
@@ -54,7 +55,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
   }
 
-  private checkRateLimit(field: string,fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
+  private checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
     if (fieldNameRateLimit) {
       // rate limit
       // const { error } = RateLimiter.checkRateLimit(
@@ -62,8 +63,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       //   fieldNameRateLimit,
       //   this.adminforth.auth.getClientIp(headers),
       // );
-      const rateLimiter = new RateLimiter(fieldNameRateLimit);
-      if (!rateLimiter.consume(`${field}-${this.adminforth.auth.getClientIp(headers)}`)) {
+      if (!this.rateLimiters[field]) {
+        this.rateLimiters[field] = new RateLimiter(fieldNameRateLimit);
+      }
+      if (!await this.rateLimiters[field].consume(`${field}-${this.adminforth.auth.getClientIp(headers)}`)) {
         return { error: "Rate limit exceeded" };
       }
     }
