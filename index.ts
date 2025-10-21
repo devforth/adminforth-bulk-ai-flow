@@ -55,7 +55,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
   }
 
-  private checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
+  private async checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): Promise<void | { error?: string; }> {
     if (fieldNameRateLimit) {
       // rate limit
       // const { error } = RateLimiter.checkRateLimit(
@@ -274,7 +274,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async regenerateImage(jobId: string, recordId: string, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const Id = recordId;
     let isError = false;
-    if (this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
+    if (await this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
       jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
       return { error: "Rate limit exceeded" };
     }
@@ -742,17 +742,17 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ({ body, adminUser, headers }) => {
         const actionType = body.actionType;
         if (actionType === 'analyze' && this.options.rateLimits?.fillFieldsFromImages) {
-          if (this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
+          if (await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
             return {ok: false, error: "Rate limit exceeded for image analyze" };
           }
         }
         if (actionType === 'analyze_no_images' && this.options.rateLimits?.fillPlainFields) {
-          if (this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
+          if (await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
             return {ok: false, error: "Rate limit exceeded for plain field analyze" };
           }
         }
         if (actionType === 'generate_images' && this.options.rateLimits?.generateImages) {
-          if (this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
+          if (await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
             return {ok: false, error: "Rate limit exceeded for image generation" };
           }
         }
