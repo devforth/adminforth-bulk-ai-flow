@@ -55,7 +55,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
   }
 
-  private async checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
+  private checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): { error?: string } | void {
     if (fieldNameRateLimit) {
       // rate limit
       // const { error } = RateLimiter.checkRateLimit(
