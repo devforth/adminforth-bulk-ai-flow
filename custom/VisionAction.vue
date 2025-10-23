@@ -302,7 +302,7 @@ async function getRecords() {
   } catch (error) {
     console.error('Failed to get records:', error);
     isError.value = true;
-    errorMessage.value = `Failed to fetch records. Please, try to re-run the action.`;
+    errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
   }
 }
 
@@ -319,7 +319,7 @@ async function getImages() {
   } catch (error) {
     console.error('Failed to get images:', error);
     isError.value = true;
-    errorMessage.value = `Failed to fetch images. Please, try to re-run the action.`;
+    errorMessage.value = t(`Failed to fetch images. Please, try to re-run the action.`);
   }
 }
 
@@ -375,7 +375,7 @@ async function convertImages(fieldName, img) {
 
 async function saveData() {
   if (!selected.value?.length) {
-    adminforth.alert({ message: 'No items selected', variant: 'warning' });
+    adminforth.alert({ message: t('No items selected'), variant: 'warning' });
     return;
   }
   try {
@@ -420,16 +420,16 @@ async function saveData() {
         timeout: 'unlimited',
       });
       isError.value = true;
-      errorMessage.value = `Failed to save data. You are not allowed to save.`;
+      errorMessage.value = t(`Failed to save data. You are not allowed to save.`);
     } else {
       console.error('Error saving data:', res);
       isError.value = true;
-      errorMessage.value = `Failed to save data. Please, try to re-run the action.`;
+      errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
     }
   } catch (error) {
     console.error('Error saving data:', error);
     isError.value = true;
-    errorMessage.value = `Failed to save data. Please, try to re-run the action.`;
+    errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
   } finally {
     isLoading.value = false;
   }
@@ -474,7 +474,7 @@ async function runAiAction({
       if (rateLimitRes?.error) {
         isRateLimitExceeded = true;
         adminforth.alert({
-        message: `Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`,
+        message: t(`Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`),
         variant: 'danger',
         timeout: 'unlimited',
       });
@@ -482,7 +482,7 @@ async function runAiAction({
       }
     } catch (e) {
       adminforth.alert({
-        message: `Error checking rate limit for "${actionType.replace('_', ' ')}" action.`,
+        message: t(`Error checking rate limit for "${actionType.replace('_', ' ')}" action.`),
         variant: 'danger',
         timeout: 'unlimited',
       });
@@ -516,7 +516,7 @@ async function runAiAction({
     } catch (e) {
       console.error(`Error during ${actionType} for item ${i}:`, e);
       hasError = true;
-      errorMessage = `Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`;
+      errorMessage = t(`Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`);
       return { success: false, index: i, error: e };
     }
   });
@@ -591,7 +591,7 @@ async function runAiAction({
         }
         isAtLeastOneInProgress = true;
         adminforth.alert({
-          message: `Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`,
+          message: t(`Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`),
           variant: 'danger',
           timeout: 'unlimited',
         });

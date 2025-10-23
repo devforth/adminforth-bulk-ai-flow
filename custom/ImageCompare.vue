@@ -10,12 +10,12 @@
             <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
                 <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
             </svg>
-            <span class="sr-only">Close modal</span>
+            <span class="sr-only">{{ $t('Close modal') }}</span>
         </button>
       </div>
       <div class="flex gap-4 items-start justify-between">
-        <h3 class="text-sm font-medium text-gray-700 mb-2">Old Image</h3>
-        <h3 class="text-sm font-medium text-gray-700 mb-2">New Image</h3>
+        <h3 class="text-sm font-medium text-gray-700 mb-2">{{ $t('Old Image') }}</h3>
+        <h3 class="text-sm font-medium text-gray-700 mb-2">{{ $t('New Image') }}</h3>
       </div>
       <div class="flex gap-4 items-center">
         <!-- Old Image -->
@@ -29,7 +29,7 @@
               class="w-full max-w-sm h-auto object-cover rounded-lg cursor-pointer border hover:border-blue-500 transition-colors duration-200"
             />
             <div v-else class="w-full max-w-sm h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-              <p class="text-gray-500">No old image</p>
+              <p class="text-gray-500">{{ $t('No old image') }}</p>
             </div>
           </div>
         </div>
@@ -54,7 +54,7 @@
               class="w-full max-w-sm h-auto object-cover rounded-lg cursor-pointer border hover:border-blue-500 transition-colors duration-200"
             />
             <div v-else class="w-full max-w-sm h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-              <p class="text-gray-500">No new image</p>
+              <p class="text-gray-500">{{ $t('No new image') }}</p>
             </div>
           </div>
         </div>

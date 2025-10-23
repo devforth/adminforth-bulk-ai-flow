@@ -6,7 +6,7 @@
       >
       <!-- HEADER TEMPLATE -->
       <template #header:checkboxes="{ item }">
-        MARK FOR SAVE
+        {{ $t('MARK FOR SAVE') }}
       </template>
       <!-- CHECKBOX CELL TEMPLATE -->
       <template #cell:checkboxes="{ item }">
@@ -28,12 +28,12 @@
                   @click="zoomImage(image)"
               />
               <div v-else class="w-20 h-20">
-                <p>Invalid source image</p>
+                <p>{{ $t('Invalid source image') }}</p>
               </div>
             </div>
           </div>
           <div class="flex items-center justify-center text-center w-20 h-20" v-else>
-            <p>No images found</p>
+            <p>{{ $t('No images found') }}</p>
           </div>
           <transition name="fade">
             <div
@@ -66,7 +66,7 @@
               </Select>
               <Tooltip>
                 <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
-                  <p class="text-sm ">old value</p>
+                  <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
                 <template #tooltip>
                   {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
@@ -82,7 +82,7 @@
             </Textarea>
             <Tooltip>
                 <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
-                  <p class="text-sm ">old value</p>
+                  <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
                 <p class="max-w-[200px]">{{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}</p>
@@ -97,7 +97,7 @@
             </Toggle>
             <Tooltip>
                 <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
-                  <p class="text-sm ">old value</p>
+                  <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
                 {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
@@ -113,7 +113,7 @@
             />
             <Tooltip>
                 <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
-                  <p class="text-sm ">old value</p>
+                  <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
                 {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
@@ -137,14 +137,14 @@
                 :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }"
                 @click="() => {openImageCompare[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"  
               >
-                old image
+                {{ $t('old image') }}
               </p>
               </div>
               <div v-else class="flex items-center justify-center text-center w-20 h-20">
                 <Tooltip v-if="imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] === 'No source images found'">
                   <p
                   >
-                    Can't generate image. 
+                    {{ $t("Can't generate image.") }}
                   </p>
                   <template #tooltip>
                     {{ imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] }}
