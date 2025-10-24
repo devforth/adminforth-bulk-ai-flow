@@ -60,7 +60,7 @@ import { Dialog, Button } from '@/afcl';
 import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
-import { AdminUser, type AdminForthResourceCommon } from '@/types';
+import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { run } from 'node:test';
 
 const { t } = useI18n();
