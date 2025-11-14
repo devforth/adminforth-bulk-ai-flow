@@ -143,7 +143,7 @@ const sliderRef = ref(null)
 
 const prompt = ref('');
 const emit = defineEmits(['close', 'selectImage', 'error', 'updateCarouselIndex']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate','sourceImage']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate','sourceImage', 'imageGenerationPrompts']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -212,12 +212,21 @@ async function getHistoricalAverage() {
 }
 
 async function getGenerationPrompt() {
+  console.log('Getting generation prompts imageGenerationPrompts:', props.imageGenerationPrompts);
+  const [key, ...rest] = props.imageGenerationPrompts.split(":");
+  const value = rest.join(":").trim();
+
+  const json = {
+    [key.trim()]: value
+  };
+
   try{
     const resp = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get_generation_prompts`,
+      path: `/plugin/${props.meta.pluginInstanceId}/get_image_generation_prompts`,
       method: 'POST',
       body: {
         recordId: props.recordId,
+        customPrompt: JSON.stringify(json) || {},
       },
     });
     if(!resp) {

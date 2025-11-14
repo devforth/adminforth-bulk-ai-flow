@@ -117,4 +117,6 @@ export interface PluginOptions {
       adminUser: any;
       resource: any;
     }) => Record<string, any> | Promise<Record<string, any>>;
+
+    askConfirmationBeforeGenerating?: boolean;
 }
