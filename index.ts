@@ -25,11 +25,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   // Compile Handlebars templates in outputFields using record fields as context
-  private compileTemplates<T extends Record<string, any>>(
+  private async compileTemplates<T extends Record<string, any>>(
     source: T,
     record: any,
     valueSelector: (value: T[keyof T]) => string
-  ): Record<string, string> {
+  ): Promise<Record<string, string>> {
+    if (this.options.provideAdditionalContextForRecord) {
+      const additionalFields = await this.options.provideAdditionalContextForRecord({ record, adminUser: null, resource: this.resourceConfig });
+      record = { ...record, ...additionalFields };
+    }
     const compiled: Record<string, string> = {};
     for (const [key, value] of Object.entries(source)) {
       const templateStr = valueSelector(value);
@@ -43,16 +47,16 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
-  private compileOutputFieldsTemplates(record: any) {
-    return this.compileTemplates(this.options.fillFieldsFromImages, record, v => String(v));
+  private async compileOutputFieldsTemplates(record: any) {
+    return await this.compileTemplates(this.options.fillFieldsFromImages, record, v => String(v));
   }
 
-  private compileOutputFieldsTemplatesNoImage(record: any) {
-    return this.compileTemplates(this.options.fillPlainFields, record, v => String(v));
+  private async compileOutputFieldsTemplatesNoImage(record: any) {
+    return await this.compileTemplates(this.options.fillPlainFields, record, v => String(v));
   }
 
-  private compileGenerationFieldTemplates(record: any) {
-    return this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
+  private async compileGenerationFieldTemplates(record: any) {
+    return await this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
   }
 
   private async checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): Promise<void | { error?: string; }> {
@@ -102,7 +106,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { ok: false, error: 'One of the image URLs is not valid' };
       }
       //create prompt for OpenAI
-      const compiledOutputFields = this.compileOutputFieldsTemplates(record);
+      const compiledOutputFields = await this.compileOutputFieldsTemplates(record);
       const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
         Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
         Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
@@ -159,7 +163,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
-      const compiledOutputFields = this.compileOutputFieldsTemplatesNoImage(record);
+      const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record);
       const prompt = `Analyze the following fields and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
         Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
         Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
@@ -208,7 +212,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
     const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-      const prompt = this.compileGenerationFieldTemplates(record)[key];
+      const prompt = (await this.compileGenerationFieldTemplates(record))[key];
       let images;
         if (this.options.attachFiles && attachmentFiles.length === 0) {
           isError = true;
@@ -489,7 +493,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
       }
     }
-    if (this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) {
+    if ((this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) && !this.options.provideAdditionalContextForRecord) {
       let matches: string[] = [];
       const regex = /{{(.*?)}}/g;
 
@@ -656,7 +660,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ({ body, headers }) => {
         const Id = body.recordId || [];
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
-        const compiledGenerationOptions = this.compileGenerationFieldTemplates(record);
+        const compiledGenerationOptions = await this.compileGenerationFieldTemplates(record);
         return { generationOptions: compiledGenerationOptions };
       }
     });

@@ -1,5 +1,4 @@
-import { ImageVisionAdapter, ImageGenerationAdapter, CompletionAdapter } from "adminforth";
-
+import AdminForth, { ImageVisionAdapter, ImageGenerationAdapter, CompletionAdapter } from "adminforth";
 
 export interface PluginOptions {
     /**
@@ -109,4 +108,13 @@ export interface PluginOptions {
       ok: boolean;
       error?: undefined;
     }>
+
+    /**
+     * Custom message for the context shown to the user when performing the action
+     */
+    provideAdditionalContextForRecord?: ({record, adminUser, resource}: {
+      record: any;
+      adminUser: any;
+      resource: any;
+    }) => Record<string, any> | Promise<Record<string, any>>;
 }
