@@ -154,7 +154,7 @@ onMounted(async () => {
   }
   const temp = await getGenerationPrompt() || '';
   attachmentFiles.value = props.sourceImage || [];
-  prompt.value = temp[props.fieldName];
+  prompt.value = Object.keys(JSON.parse(temp))[0];
   await nextTick();
 
   const currentIndex = props.carouselImageIndex || 0;
@@ -212,7 +212,6 @@ async function getHistoricalAverage() {
 }
 
 async function getGenerationPrompt() {
-  console.log('Getting generation prompts imageGenerationPrompts:', props.imageGenerationPrompts);
   const [key, ...rest] = props.imageGenerationPrompts.split(":");
   const value = rest.join(":").trim();
 
@@ -220,7 +219,7 @@ async function getGenerationPrompt() {
     [key.trim()]: value
   };
 
-  try{
+  try {
     const resp = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/get_image_generation_prompts`,
       method: 'POST',
@@ -235,7 +234,7 @@ async function getGenerationPrompt() {
         errorMessage: "Error getting generation prompts."
     });
     }
-    return resp?.generationOptions || null;
+    return resp?.prompt || null;
   } catch (e) {
     emit('error', {
       isError: true,

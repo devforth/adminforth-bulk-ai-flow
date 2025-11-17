@@ -6,7 +6,7 @@ import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
 import { randomUUID } from "crypto";
 
-const STUB_MODE = true;
+const STUB_MODE = false;
 const jobs = new Map();
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
@@ -676,9 +676,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const Id = body.recordId || [];
         const customPrompt = body.customPrompt || null;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
-        const compiledGenerationOptions = await this.compileGenerationFieldTemplates(record, customPrompt);
-        console.log('Compiled generation options:', compiledGenerationOptions);
-        return { generationOptions: compiledGenerationOptions };
+        const compiledGenerationOptions = await this.compileGenerationFieldTemplates(record, JSON.stringify({"prompt": customPrompt}));
+        return compiledGenerationOptions;
       }
     });
 
@@ -726,7 +725,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
                 break;
               }
-              this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers, customPrompt);
+              this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers);
             break;
             default:
               jobs.set(jobId, { status: "failed", error: "Unknown action type" });

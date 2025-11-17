@@ -38,10 +38,18 @@
             onclick: (dialog) => { saveSettings(); }
           },
         ] : 
-          []"
+          [
+            {
+              label: 'Edit prompts',
+              options: {
+                class: 'w-fit ml-auto'
+              },
+              onclick: (dialog) => { clickSettingsButton(); }
+            },
+          ]"
     :click-to-close-outside="false"
   >
-    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
+    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[75vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
       <div v-if="records && props.checkboxes.length && popupMode === 'generation'" class="w-full overflow-x-auto">
         <VisionTable
           :checkbox="props.checkboxes"
@@ -71,6 +79,9 @@
           :isImageHasPreviewUrl="isImageHasPreviewUrl"
           :imageGenerationPrompts="generationPrompts.generateImages"
         />
+        <div class="text-red-600 flex items-center w-full">
+          <p v-if="isError === true">{{ errorMessage }}</p>
+        </div>
       </div>
       <div 
         v-else-if="popupMode === 'settings'" 
@@ -78,28 +89,24 @@
         :key="key" 
         class="w-full"
       >
-        <div v-if="Object.keys(promptsCategory).length > 0" class="flex flex-col gap-4 mb-6">
+        <div v-if="Object.keys(promptsCategory).length > 0" class="gap-4 mb-6">
           <p class="text-start w-full text-xl font-bold">{{ formatKey(key) }}</p>
-          <div v-for="(prompt, promptKey) in promptsCategory" :key="promptKey">
-            {{ formatLabel(promptKey) }} prompt:
-            <Textarea 
-              v-model="generationPrompts[key][promptKey]" 
-              class="w-full h-24 p-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
-            ></Textarea>
-            <p class="text-red-500 hover:underline hover:cursor-pointer" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div v-for="(prompt, promptKey) in promptsCategory" :key="promptKey">
+              {{ formatLabel(promptKey) }} prompt:
+              <Textarea 
+                v-model="generationPrompts[key][promptKey]" 
+                class="w-full h-32 p-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 ml-1"
+              ></Textarea>
+              <p class="text-red-500 hover:underline hover:cursor-pointer mt-2" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
+            </div>
           </div>
         </div>
       </div>
       <div v-else class="flex flex-col gap-2">
-        <Button @click="clickSettingsButton">
-          Edit generation prompts
-        </Button>
-        <Button @click="runAiActions">
+        <Button @click="runAiActions" class="px-5 py-2.5 my-20 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none">
           Start generation
         </Button>
-      </div>
-      <div class="text-red-600 flex items-center w-full">
-        <p v-if="isError === true">{{ errorMessage }}</p>
       </div>
     </div>
   </Dialog>
@@ -835,12 +842,6 @@ function saveSettings() {
 async function getGenerationPrompts() {
   const calculatedGenerationPrompts: any = {};
   const savedPrompts = localStorage.getItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`);
-  if (savedPrompts) {
-    generationPrompts
-    generationPrompts.value = JSON.parse(savedPrompts);
-    
-    return;;
-  }
   if (props.meta.generationPrompts.plainFieldsPrompts) {
     calculatedGenerationPrompts.plainFieldsPrompts = props.meta.generationPrompts.plainFieldsPrompts;
   }
@@ -855,7 +856,12 @@ async function getGenerationPrompts() {
     }
     calculatedGenerationPrompts.generateImages = imageFields;
   }
-  console.log('calculatedGenerationPrompts', calculatedGenerationPrompts);
+  if (savedPrompts) {
+    
+    generationPrompts.value = checkAndAddNewFieldsToPrompts(JSON.parse(savedPrompts), calculatedGenerationPrompts);
+    
+    return;;
+  }
   generationPrompts.value = calculatedGenerationPrompts;
 }
 
@@ -879,6 +885,33 @@ function formatKey(str) {
     .split(' ')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function checkAndAddNewFieldsToPrompts(savedPrompts, defaultPrompts) {
+  for (const categoryKey in defaultPrompts) {
+    if (!savedPrompts.hasOwnProperty(categoryKey)) {
+      savedPrompts[categoryKey] = defaultPrompts[categoryKey];
+    } else {
+      for (const promptKey in defaultPrompts[categoryKey]) {
+        if (!savedPrompts[categoryKey].hasOwnProperty(promptKey)) {
+          savedPrompts[categoryKey][promptKey] = defaultPrompts[categoryKey][promptKey];
+        }
+      }
+    }
+  }
+  //remove deprecated fields
+  for (const categoryKey in savedPrompts) {
+    if (!defaultPrompts.hasOwnProperty(categoryKey)) {
+      delete savedPrompts[categoryKey];
+    } else {
+      for (const promptKey in savedPrompts[categoryKey]) {
+        if (!defaultPrompts[categoryKey].hasOwnProperty(promptKey)) {
+          delete savedPrompts[categoryKey][promptKey];
+        }
+      }
+    }
+  }
+  return savedPrompts;
 }
 
 </script>
