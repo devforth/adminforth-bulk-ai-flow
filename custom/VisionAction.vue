@@ -864,7 +864,7 @@ async function getGenerationPrompts() {
     
     generationPrompts.value = checkAndAddNewFieldsToPrompts(JSON.parse(savedPrompts), calculatedGenerationPrompts);
     
-    return;;
+    return;
   }
   generationPrompts.value = calculatedGenerationPrompts;
 }

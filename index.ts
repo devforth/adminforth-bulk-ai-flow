@@ -56,8 +56,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async compileGenerationFieldTemplates(record: any, customPrompt? : string) {
-    console.log('compileGenerationFieldTemplates customPrompt:', JSON.parse(customPrompt));
-    console.log('TEST RECORD', record)
     return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.generateImages, record, v => String(customPrompt ? v : v.prompt));
   }
 
@@ -109,7 +107,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
       //create prompt for OpenAI
       const compiledOutputFields = await this.compileOutputFieldsTemplates(record, customPrompt);
-      console.log('Compiled output fields for analysis:', compiledOutputFields);
       const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
         Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
         Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
@@ -167,7 +164,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
       const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, customPrompt);
-      console.log('Compiled output fields for analysis:', compiledOutputFields);
       const prompt = `Analyze the following fields and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
         Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
         Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
@@ -217,7 +213,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
     const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
       const prompt = (await this.compileGenerationFieldTemplates(record, customPrompt))[key];
-      console.log('Compiled output fields for analysis:', prompt);
       let images;
         if (this.options.attachFiles && attachmentFiles.length === 0) {
           isError = true;
@@ -400,11 +395,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     };
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    const test1 = {customPrompt: "Generate me an anime girl driving tank. Test field: {{user.email}}"}
-    const test2 = {email: "Aboba"};
-    const re2323s = await this.compileTemplates(test1, test2, v => String(test1 ? v : v.prompt));
-    console.log('Test compileTemplates result:', re2323s);
-
+    
     const pageInjection = {
       file: this.componentPath('VisionAction.vue'),
       meta: {
