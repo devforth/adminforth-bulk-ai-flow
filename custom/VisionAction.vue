@@ -860,7 +860,7 @@ async function getGenerationPrompts() {
     }
     calculatedGenerationPrompts.generateImages = imageFields;
   }
-  if (savedPrompts) {
+  if (savedPrompts && props.meta.askConfirmationBeforeGenerating) {
     
     generationPrompts.value = checkAndAddNewFieldsToPrompts(JSON.parse(savedPrompts), calculatedGenerationPrompts);
     
