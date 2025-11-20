@@ -8,16 +8,49 @@
   <Dialog 
     ref="confirmDialog"
     header="Bulk AI Flow"
-    class="[scrollbar-gutter:stable] !max-w-full w-full lg:w-[1600px] !lg:max-w-[1600px]"
+    class="[scrollbar-gutter:stable] !max-w-full w-fit h-fit"
+    :class="popupMode === 'generation' ? 'lg:w-[1600px] !lg:max-w-[1600px]' 
+      : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
+        : 'lg:w-[500px] !lg:max-w-[500px]'"
     :beforeCloseFunction="closeDialog"
-    :buttons="[
-      { label: checkedCount > 1 ? 'Save fields' : 'Save field', options: { disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, loader: isLoading, class: 'w-fit' }, onclick: async (dialog) => { await saveData(); dialog.hide(); } },
-      { label: 'Cancel', options: {class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'}, onclick: (dialog) => dialog.hide() },
-    ]"
+    :buttons="popupMode === 'generation' ? [
+        { 
+          label: checkedCount > 1 ? 'Save fields' : 'Save field', 
+          options: { 
+            disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, 
+            loader: isLoading, class: 'w-fit' 
+          }, 
+          onclick: async (dialog) => { await saveData(); dialog.hide(); } 
+        },
+        { 
+          label: 'Cancel', 
+          options: {
+            class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'
+          }, 
+          onclick: (dialog) => dialog.hide() 
+        },
+      ] : popupMode === 'settings' ? [
+          {
+            label: 'Save settings',
+            options: {
+              class: 'w-fit'
+            },
+            onclick: (dialog) => { saveSettings(); }
+          },
+        ] : 
+          [
+            {
+              label: 'Edit prompts',
+              options: {
+                class: 'w-fit ml-auto'
+              },
+              onclick: (dialog) => { clickSettingsButton(); }
+            },
+          ]"
     :click-to-close-outside="false"
   >
-    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[90vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
-      <div v-if="records && props.checkboxes.length" class="w-full overflow-x-auto">
+    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[75vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
+      <div v-if="records && props.checkboxes.length && popupMode === 'generation'" class="w-full overflow-x-auto">
         <VisionTable
           :checkbox="props.checkboxes"
           :records="records"
@@ -44,10 +77,40 @@
           :imageGenerationErrorMessage="imageGenerationErrorMessage"
           @regenerate-images="regenerateImages"
           :isImageHasPreviewUrl="isImageHasPreviewUrl"
+          :imageGenerationPrompts="generationPrompts.generateImages"
         />
+        <div class="text-red-600 flex items-center w-full">
+          <p v-if="isError === true">{{ errorMessage }}</p>
+        </div>
       </div>
-      <div class="text-red-600 flex items-center w-full">
-        <p v-if="isError === true">{{ errorMessage }}</p>
+      <div 
+        v-else-if="popupMode === 'settings'" 
+        v-for="(promptsCategory, key) in generationPrompts" 
+        :key="key" 
+        class="w-full"
+      >
+        <div v-if="Object.keys(promptsCategory).length > 0" class="gap-4 mb-6 ml-1">
+          <p class="text-start w-full text-xl font-bold mb-2">{{
+           key === "plainFieldsPrompts" ? "Prompts for non-image fields" 
+            : key === "generateImages" ? "Prompts for image fields" 
+              : "Prompts for image analysis"
+          }}</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div v-for="(prompt, promptKey) in promptsCategory" :key="promptKey">
+              {{ formatLabel(promptKey) }} prompt:
+              <Textarea 
+                v-model="generationPrompts[key][promptKey]" 
+                class="w-full h-32 p-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+              ></Textarea>
+              <p class="text-red-500 hover:underline hover:cursor-pointer mt-2" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="flex flex-col gap-2">
+        <Button @click="runAiActions" class="px-5 py-2.5 my-20 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none">
+          Start generation
+        </Button>
       </div>
     </div>
   </Dialog>
@@ -56,7 +119,7 @@
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
 import { Ref, ref, watch } from 'vue'
-import { Dialog, Button } from '@/afcl';
+import { Dialog, Button, Textarea } from '@/afcl';
 import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
@@ -114,6 +177,8 @@ const aiGenerationErrorMessage = ref<string[]>([]);
 const isAiImageGenerationError = ref<boolean[]>([false]);
 const imageGenerationErrorMessage = ref<string[]>([]);
 const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
+const popupMode = ref<'generation' | 'confirmation' | 'settings'>('confirmation');
+const generationPrompts = ref<any>({});
 
 const openDialog = async () => {
   isDialogOpen.value = true;
@@ -144,8 +209,19 @@ const openDialog = async () => {
     },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
   }
   isFetchingRecords.value = false;
-  
-  if (props.meta.isImageGeneration) {
+  // Ensure prompts are loaded before any automatic AI action run
+  if (!generationPrompts.value || Object.keys(generationPrompts.value).length === 0) {
+    await getGenerationPrompts();
+  }
+  if (!props.meta.askConfirmationBeforeGenerating) {
+    runAiActions();
+  }
+}
+ 
+
+function runAiActions() {
+    popupMode.value = 'generation';
+    if (props.meta.isImageGeneration) {
     isGeneratingImages.value = true;
     runAiAction({
       endpoint: 'initial_image_generate',
@@ -170,9 +246,8 @@ const openDialog = async () => {
     });
   }
 }
- 
+
 const closeDialog = () => {
-  confirmDialog.value.close();
   isAiResponseReceivedAnalize.value = [];
   isAiResponseReceivedImage.value = [];
 
@@ -186,10 +261,10 @@ const closeDialog = () => {
   isImageGenerationError.value = false;
   errorMessage.value = '';
   isDialogOpen.value = false;
+  popupMode.value = 'confirmation';
 }
 
 watch(selected, (val) => {
-  //console.log('Selected changed:', val);
   checkedCount.value = val.filter(item => item.isChecked === true).length;
 }, { deep: true });
 
@@ -492,6 +567,15 @@ async function runAiAction({
       return;
     };
   }
+
+  let customPrompt;
+  if (actionType === 'generate_images') {
+    customPrompt = generationPrompts.value.imageGenerationPrompts || generationPrompts.value.generateImages;
+  } else if (actionType === 'analyze') {
+    customPrompt = generationPrompts.value.imageFieldsPrompts;
+  } else if (actionType === 'analyze_no_images') {
+    customPrompt = generationPrompts.value.plainFieldsPrompts;
+  }
   //creating jobs
   const tasks = recordsIds.map(async (checkbox, i) => {
     try {
@@ -501,6 +585,7 @@ async function runAiAction({
         body: {
           actionType: actionType,
           recordId: checkbox,
+          ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
         },
       });
 
@@ -751,6 +836,78 @@ async function findPreviewURLForImages() {
 
 function click() {
   openDialog();
+}
+
+function saveSettings() {
+  popupMode.value = 'confirmation';
+  localStorage.setItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`, JSON.stringify(generationPrompts.value));
+}
+
+async function getGenerationPrompts() {
+  const calculatedGenerationPrompts: any = {};
+  const savedPrompts = localStorage.getItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`);
+  if (props.meta.generationPrompts.plainFieldsPrompts) {
+    calculatedGenerationPrompts.plainFieldsPrompts = props.meta.generationPrompts.plainFieldsPrompts;
+  }
+  if (props.meta.generationPrompts.imageFieldsPrompts) {
+    calculatedGenerationPrompts.imageFieldsPrompts = props.meta.generationPrompts.imageFieldsPrompts;
+  }
+  if (props.meta.generationPrompts.imageGenerationPrompts) {
+    let imageFields = {};
+    for (const [key, value] of Object.entries(props.meta.generationPrompts.imageGenerationPrompts)) {
+      // value might be typed as unknown; cast to any to access prompt safely
+      imageFields[key] = (value as any).prompt;
+    }
+    calculatedGenerationPrompts.generateImages = imageFields;
+  }
+  if (savedPrompts && props.meta.askConfirmationBeforeGenerating) {
+    
+    generationPrompts.value = checkAndAddNewFieldsToPrompts(JSON.parse(savedPrompts), calculatedGenerationPrompts);
+    
+    return;
+  }
+  generationPrompts.value = calculatedGenerationPrompts;
+}
+
+function resetPromptToDefault(categoryKey, promptKey) {
+  if (categoryKey === 'generateImages') {
+    generationPrompts.value[categoryKey][promptKey] = props.meta.generationPrompts.imageGenerationPrompts[promptKey].prompt;
+    return;
+  }
+  generationPrompts.value[categoryKey][promptKey] = props.meta.generationPrompts[categoryKey][promptKey];
+}
+
+function clickSettingsButton() {
+  getGenerationPrompts();
+  popupMode.value = 'settings';
+}
+
+
+function checkAndAddNewFieldsToPrompts(savedPrompts, defaultPrompts) {
+  for (const categoryKey in defaultPrompts) {
+    if (!savedPrompts.hasOwnProperty(categoryKey)) {
+      savedPrompts[categoryKey] = defaultPrompts[categoryKey];
+    } else {
+      for (const promptKey in defaultPrompts[categoryKey]) {
+        if (!savedPrompts[categoryKey].hasOwnProperty(promptKey)) {
+          savedPrompts[categoryKey][promptKey] = defaultPrompts[categoryKey][promptKey];
+        }
+      }
+    }
+  }
+  //remove deprecated fields
+  for (const categoryKey in savedPrompts) {
+    if (!defaultPrompts.hasOwnProperty(categoryKey)) {
+      delete savedPrompts[categoryKey];
+    } else {
+      for (const promptKey in savedPrompts[categoryKey]) {
+        if (!defaultPrompts[categoryKey].hasOwnProperty(promptKey)) {
+          delete savedPrompts[categoryKey][promptKey];
+        }
+      }
+    }
+  }
+  return savedPrompts;
 }
 
 </script>

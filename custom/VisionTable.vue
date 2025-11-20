@@ -173,6 +173,7 @@
                 :carouselImageIndex="carouselImageIndex[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
                 :sourceImage="item.images && item.images.length ? item.images : null"
+                :imageGenerationPrompts="imageGenerationPrompts[n]"
                 @error="handleError"
                 @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
                 @selectImage="updateSelectedImage"
@@ -231,6 +232,7 @@ const props = defineProps<{
   imageGenerationErrorMessage: string[],
   oldData: any[],
   isImageHasPreviewUrl: Record<string, boolean>
+  imageGenerationPrompts: Record<string, any>
 }>();
 const emit = defineEmits(['error', 'regenerateImages']);
 

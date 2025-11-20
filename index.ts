@@ -25,11 +25,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   // Compile Handlebars templates in outputFields using record fields as context
-  private compileTemplates<T extends Record<string, any>>(
+  private async compileTemplates<T extends Record<string, any>>(
     source: T,
     record: any,
     valueSelector: (value: T[keyof T]) => string
-  ): Record<string, string> {
+  ): Promise<Record<string, string>> {
+    if (this.options.provideAdditionalContextForRecord) {
+      const additionalFields = await this.options.provideAdditionalContextForRecord({ record, adminUser: null, resource: this.resourceConfig });
+      record = { ...record, ...additionalFields };
+    }
     const compiled: Record<string, string> = {};
     for (const [key, value] of Object.entries(source)) {
       const templateStr = valueSelector(value);
@@ -43,16 +47,16 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
-  private compileOutputFieldsTemplates(record: any) {
-    return this.compileTemplates(this.options.fillFieldsFromImages, record, v => String(v));
+  private async compileOutputFieldsTemplates(record: any, customPrompt? : string) {
+    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) :this.options.fillFieldsFromImages, record, v => String(v));
   }
 
-  private compileOutputFieldsTemplatesNoImage(record: any) {
-    return this.compileTemplates(this.options.fillPlainFields, record, v => String(v));
+  private async compileOutputFieldsTemplatesNoImage(record: any, customPrompt? : string) {
+    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.fillPlainFields, record, v => String(v));
   }
 
-  private compileGenerationFieldTemplates(record: any) {
-    return this.compileTemplates(this.options.generateImages, record, v => String(v.prompt));
+  private async compileGenerationFieldTemplates(record: any, customPrompt? : string) {
+    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.generateImages, record, v => String(customPrompt ? v : v.prompt));
   }
 
   private async checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): Promise<void | { error?: string; }> {
@@ -72,7 +76,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
+  private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
     const selectedId = recordId;
     let isError = false;
     // Fetch the record using the provided ID
@@ -102,7 +106,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { ok: false, error: 'One of the image URLs is not valid' };
       }
       //create prompt for OpenAI
-      const compiledOutputFields = this.compileOutputFieldsTemplates(record);
+      const compiledOutputFields = await this.compileOutputFieldsTemplates(record, customPrompt);
       const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
         Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
         Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
@@ -148,7 +152,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   }
 
-  private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
+  private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
     const selectedId = recordId;
     let isError = false;
     if (STUB_MODE) {
@@ -159,7 +163,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
-      const compiledOutputFields = this.compileOutputFieldsTemplatesNoImage(record);
+      const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, customPrompt);
       const prompt = `Analyze the following fields and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
         Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
         Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
@@ -188,7 +192,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
+  private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
     const selectedId = recordId;
     let isError = false;
     const start = +new Date();
@@ -208,7 +212,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
     const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
-      const prompt = this.compileGenerationFieldTemplates(record)[key];
+      const prompt = (await this.compileGenerationFieldTemplates(record, customPrompt))[key];
       let images;
         if (this.options.attachFiles && attachmentFiles.length === 0) {
           isError = true;
@@ -391,7 +395,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     };
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-
+    
     const pageInjection = {
       file: this.componentPath('VisionAction.vue'),
       meta: {
@@ -413,6 +417,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           fillPlainFields: this.options.refreshRates?.fillPlainFields || 1_000,
           generateImages: this.options.refreshRates?.generateImages || 5_000,
           regenerateImages: this.options.refreshRates?.regenerateImages || 5_000,
+        },
+        askConfirmationBeforeGenerating: this.options.askConfirmationBeforeGenerating || false,
+        generationPrompts: {
+          plainFieldsPrompts: this.options.fillPlainFields || {},
+          imageFieldsPrompts: this.options.fillFieldsFromImages || {},
+          imageGenerationPrompts: this.options.generateImages || {},
         }
       }
     }
@@ -489,7 +499,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
       }
     }
-    if (this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) {
+    if ((this.options.fillFieldsFromImages || this.options.fillPlainFields || this.options.generateImages) && !this.options.provideAdditionalContextForRecord) {
       let matches: string[] = [];
       const regex = /{{(.*?)}}/g;
 
@@ -652,12 +662,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     server.endpoint({
       method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/get_generation_prompts`,
+      path: `/plugin/${this.pluginInstanceId}/get_image_generation_prompts`,
       handler: async ({ body, headers }) => {
         const Id = body.recordId || [];
+        const customPrompt = body.customPrompt || null;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
-        const compiledGenerationOptions = this.compileGenerationFieldTemplates(record);
-        return { generationOptions: compiledGenerationOptions };
+        const compiledGenerationOptions = await this.compileGenerationFieldTemplates(record, JSON.stringify({"prompt": customPrompt}));
+        return compiledGenerationOptions;
       }
     });
 
@@ -679,10 +690,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
       handler: async ({ body, adminUser, headers }) => {
-        const { actionType, recordId } = body;
+        const { actionType, recordId, customPrompt } = body;
         const jobId = randomUUID();
         jobs.set(jobId, { status: "in_progress" });
-
         if (!actionType) {
           jobs.set(jobId, { status: "failed", error: "Missing action type" });
           //return { error: "Missing action type" };
@@ -693,13 +703,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         } else {
           switch(actionType) {
             case 'generate_images':
-              this.initialImageGenerate(jobId, recordId, adminUser, headers);
+              this.initialImageGenerate(jobId, recordId, adminUser, headers, customPrompt);
             break;
             case 'analyze_no_images':
-              this.analyzeNoImages(jobId, recordId, adminUser, headers);
+              this.analyzeNoImages(jobId, recordId, adminUser, headers, customPrompt);
             break;
             case 'analyze':
-              this.analyze_image(jobId, recordId, adminUser, headers);
+              this.analyze_image(jobId, recordId, adminUser, headers, customPrompt);
             break;
             case 'regenerate_images':
               if (!body.prompt || !body.fieldName) {

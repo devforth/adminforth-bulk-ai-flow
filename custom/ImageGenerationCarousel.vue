@@ -143,7 +143,7 @@ const sliderRef = ref(null)
 
 const prompt = ref('');
 const emit = defineEmits(['close', 'selectImage', 'error', 'updateCarouselIndex']);
-const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate','sourceImage']);
+const props = defineProps(['meta', 'record', 'images', 'recordId', 'prompt', 'fieldName', 'isError', 'errorMessage', 'carouselImageIndex', 'regenerateImagesRefreshRate','sourceImage', 'imageGenerationPrompts']);
 const images = ref([]);
 const loading = ref(false);
 const attachmentFiles = ref<string[]>([])
@@ -154,7 +154,7 @@ onMounted(async () => {
   }
   const temp = await getGenerationPrompt() || '';
   attachmentFiles.value = props.sourceImage || [];
-  prompt.value = temp[props.fieldName];
+  prompt.value = Object.keys(JSON.parse(temp))[0];
   await nextTick();
 
   const currentIndex = props.carouselImageIndex || 0;
@@ -212,12 +212,20 @@ async function getHistoricalAverage() {
 }
 
 async function getGenerationPrompt() {
-  try{
+  const [key, ...rest] = props.imageGenerationPrompts.split(":");
+  const value = rest.join(":").trim();
+
+  const json = {
+    [key.trim()]: value
+  };
+
+  try {
     const resp = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get_generation_prompts`,
+      path: `/plugin/${props.meta.pluginInstanceId}/get_image_generation_prompts`,
       method: 'POST',
       body: {
         recordId: props.recordId,
+        customPrompt: JSON.stringify(json) || {},
       },
     });
     if(!resp) {
@@ -226,7 +234,7 @@ async function getGenerationPrompt() {
         errorMessage: "Error getting generation prompts."
     });
     }
-    return resp?.generationOptions || null;
+    return resp?.prompt || null;
   } catch (e) {
     emit('error', {
       isError: true,
