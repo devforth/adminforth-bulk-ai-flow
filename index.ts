@@ -625,7 +625,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   if (oldRecord[value]) {
                     // put tag to delete old file
                     try {
-                      await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletation(oldRecord[value]);
+                      if (columnPlugin.pluginOptions.storageAdapter.markKeyForDeletion !== undefined) {
+                        await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletion(oldRecord[value]);
+                      } else {
+                        await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletation(oldRecord[value]);
+                      }
                     } catch (e) {
                       // file might be e.g. already deleted, so we catch error
                       console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`);
@@ -634,7 +638,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   if (fieldsToUpdate[idx][value] && fieldsToUpdate[idx][value] !== null) {
                   // remove tag from new file
                   // in this case we let it crash if it fails: this is a new file which just was uploaded. 
-                    await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
+                    if (columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletion !== undefined) {
+                      await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletion(fieldsToUpdate[idx][value]);
+                    } else {
+                      await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
+                    }
                   }
                 }
               }
