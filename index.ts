@@ -248,7 +248,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               )
               if (resp.error) {
                 isError = true;
-                jobs.set(jobId, { status: 'failed', error: `AI provider refused to generate image: ${JSON.stringify(resp.error.message)}` });
+                jobs.set(jobId, { status: 'failed', error: `AI provider refused to generate image: ${JSON.stringify(resp.error)}` });
                 return { key, images: [] };
               }
             } catch (e) {
@@ -327,8 +327,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           )
           if (resp.error) {
             isError = true;
-            jobs.set(jobId, { status: 'failed', error: `AI provider refused to generate image: ${JSON.stringify(resp.error.message)}` });
-            return { key, images: [] };
+            jobs.set(jobId, { status: 'failed', error: `AI provider refused to generate image: ${JSON.stringify(resp.error)}` });
+            return [];
           }
         } catch (e) {
           jobs.set(jobId, { status: 'failed', error: "AI provider refused to generate image" });
