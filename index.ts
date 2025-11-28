@@ -125,7 +125,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const resp: any = (chatResponse as any).response;
         const topLevelError = (chatResponse as any).error;
         if (topLevelError || resp?.error) {
-          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError || resp?.error)}` });
+          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` });
+          return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
         }
 
         const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
@@ -172,12 +173,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
       let resp: any;
       try {
-        const { content: chatResponse } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
-        resp = (chatResponse as any).response;
-        const topLevelError = (chatResponse as any).error;
+        const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
+        // resp = (chatResponse as any).response;
         if (topLevelError || resp?.error) {
           isError = true;
-          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError || resp?.error)}` });
+          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError)}` });
+          return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError)}` };
         }
         resp = chatResponse
       } catch (e) {
@@ -245,6 +246,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   size: this.options.generateImages[key].outputSize,
                 }
               )
+              if (resp.error) {
+                isError = true;
+                jobs.set(jobId, { status: 'failed', error: `AI provider refused to generate image: ${JSON.stringify(resp.error.message)}` });
+                return { key, images: [] };
+              }
             } catch (e) {
               jobs.set(jobId, { status: 'failed', error: "AI provider refused to generate image" });
               isError = true;
@@ -319,6 +325,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               size: this.options.generateImages[fieldName].outputSize,
             }
           )
+          if (resp.error) {
+            isError = true;
+            jobs.set(jobId, { status: 'failed', error: `AI provider refused to generate image: ${JSON.stringify(resp.error.message)}` });
+            return { key, images: [] };
+          }
         } catch (e) {
           jobs.set(jobId, { status: 'failed', error: "AI provider refused to generate image" });
           isError = true;
