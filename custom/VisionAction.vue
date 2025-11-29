@@ -181,6 +181,11 @@ const popupMode = ref<'generation' | 'confirmation' | 'settings'>('confirmation'
 const generationPrompts = ref<any>({});
 
 const openDialog = async () => {
+  if (props.meta.askConfirmationBeforeGenerating) {
+    popupMode.value = 'confirmation';
+  } else {
+    popupMode.value = 'generation';
+  }
   isDialogOpen.value = true;
   confirmDialog.value.open();
   isFetchingRecords.value = true;
