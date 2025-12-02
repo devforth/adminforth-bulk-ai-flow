@@ -165,10 +165,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
       const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, customPrompt);
-      const prompt = `Analyze the following fields and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
-        Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-        Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. 
-        If it's number field - return only number.`;
+      const prompt = `Generate the values of fields in object by using next prompts (key is field name, value is prompt): 
+        ${JSON.stringify(compiledOutputFields)} In output object use the same field names (keys) as in input.
+        Return a single valid passable JSON object in format like: {'meta_title': 'generated_value'}.
+        Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON.`;
       //send prompt to OpenAI and get response
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
       let resp: any;
