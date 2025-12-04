@@ -13,6 +13,9 @@
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
     :beforeCloseFunction="closeDialog"
+    :closable="false"
+    :askForCloseConfirmation="true"
+    closeConfirmationText="Are you sure you want to close without saving?"
     :buttons="popupMode === 'generation' ? [
         { 
           label: checkedCount > 1 ? 'Save fields' : 'Save field', 
