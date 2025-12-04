@@ -186,7 +186,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         jobs.set(jobId, { status: 'failed', error: 'AI provider refused to fill fields' });
         return { ok: false, error: 'AI provider refused to fill fields' };
       }
-      const resData = JSON.parse(resp);
+      let resData;
+        try {
+          resData = JSON.parse(resp);
+        } catch (e) {
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON' });
+          return { ok: false, error: 'AI response is not valid JSON' };
+        }
       const result = resData;
       jobs.set(jobId, { status: 'completed', result });
       return { ok: true };
