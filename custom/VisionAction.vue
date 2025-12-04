@@ -13,8 +13,8 @@
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
     :beforeCloseFunction="closeDialog"
-    :closable="false"
-    :askForCloseConfirmation="true"
+    :closable="popupMode === 'generation' ? false : true"
+    :askForCloseConfirmation="popupMode === 'generation' ? true : false"
     closeConfirmationText="Are you sure you want to close without saving?"
     :buttons="popupMode === 'generation' ? [
         { 
@@ -30,7 +30,7 @@
           options: {
             class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'
           }, 
-          onclick: (dialog) => dialog.hide() 
+          onclick: (dialog) => confirmDialog.tryToHideModal() 
         },
       ] : popupMode === 'settings' ? [
           {
