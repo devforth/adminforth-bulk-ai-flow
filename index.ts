@@ -401,6 +401,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
           p.pluginOptions.pathColumnName === key
         );
+        if (!plugin) {
+          throw new Error(`Plugin for attachment field '${key}' not found in resource '${this.resourceConfig.resourceId}', please check if Upload Plugin is installed on the field ${key}`);
+        }
+        if (!plugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
+          throw new Error(`Upload Plugin for attachment field '${key}' in resource '${this.resourceConfig.resourceId}' 
+            uses adapter which is not configured to store objects in public way, so it will produce only signed private URLs which can not be used in HTML text of blog posts.
+            Please configure adapter in such way that it will store objects publicly (e.g.  for S3 use 'public-read' ACL).  
+          `);
+        }
           outputImagesPluginInstanceIds[key] = plugin.pluginInstanceId;
       }
     }

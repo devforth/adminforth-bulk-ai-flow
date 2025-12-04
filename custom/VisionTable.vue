@@ -24,7 +24,7 @@
               <img
                   v-if="isValidUrl(image)" 
                   :src="image"  
-                  class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition" 
+                  class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition my-2" 
                   @click="zoomImage(image)"
               />
               <div v-else class="w-20 h-20">
@@ -124,8 +124,8 @@
 
         <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
           <div v-if="isInColumnImage(n)">
-            <div class="mt-2 flex items-center justify-start gap-2">
-              <div v-if="isValidUrl(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])" class="flex flex-col items-center">
+            <div class="mt-2 mb-2 flex items-center justify-start gap-2">
+              <div v-if="isValidUrl(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])" class="flex flex-col items-center relative">
               <img 
                 :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
                 class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition"
@@ -133,7 +133,7 @@
               />
               <p
                 v-if="isImageHasPreviewUrl[n]"
-                class="mt-2 text-sm hover:text-blue-500 hover:underline hover:cursor-pointer flex items-center gap-1"
+                class="absolute mt-20 text-sm hover:text-blue-500 hover:underline hover:cursor-pointer flex items-center gap-1"
                 :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }"
                 @click="() => {openImageCompare[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"  
               >
