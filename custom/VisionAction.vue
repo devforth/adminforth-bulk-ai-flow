@@ -200,10 +200,12 @@ const imageGenerationErrorMessage = ref<string[]>([]);
 const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
 const popupMode = ref<'generation' | 'confirmation' | 'settings'>('confirmation');
 const generationPrompts = ref<any>({});
+const isDataSaved = ref(false);
 
 const regeneratingFieldsStatus = ref<Record<string, Record<string, boolean>>>({});
 
 const openDialog = async () => {
+  window.addEventListener('beforeunload', beforeUnloadHandler);
   if (props.meta.askConfirmationBeforeGenerating) {
     popupMode.value = 'confirmation';
   } else {
@@ -277,6 +279,7 @@ function runAiActions() {
 }
 
 const closeDialog = () => {
+  window.removeEventListener('beforeunload', beforeUnloadHandler);
   isAiResponseReceivedAnalizeImage.value = [];
   isAiResponseReceivedAnalizeNoImage.value = [];
   isAiResponseReceivedImage.value = [];
@@ -292,6 +295,7 @@ const closeDialog = () => {
   errorMessage.value = '';
   isDialogOpen.value = false;
   popupMode.value = 'confirmation';
+  isDataSaved.value = false;
 }
 
 watch(selected, (val) => {
@@ -537,6 +541,8 @@ async function saveData() {
     errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
   } finally {
     isLoading.value = false;
+    isDataSaved.value = true;
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
   }
 }
 
@@ -944,7 +950,6 @@ function checkAndAddNewFieldsToPrompts(savedPrompts, defaultPrompts) {
 }
 
 async function regenerateCell(recordInfo: any) {
-  console.log('Regenerating cell for record:', recordInfo.recordId, 'field:', recordInfo.fieldName);
   if (!regeneratingFieldsStatus.value[recordInfo.recordId]) {
     regeneratingFieldsStatus.value[recordInfo.recordId] = {};
   }
@@ -965,7 +970,6 @@ async function regenerateCell(recordInfo: any) {
   } else if (actionType === 'analyze_no_images') {
     generationPromptsForField = generationPrompts.value.plainFieldsPrompts || {};
   }
-  console.log('Using generation prompts for field regeneration:', generationPromptsForField);
   
   let res;
   try {
@@ -991,12 +995,9 @@ async function regenerateCell(recordInfo: any) {
     errorMessage.value = t(`Failed to regenerate field. You are not allowed to regenerate.`);
     return;
   }
-  console.log('Regeneration response:', res);
   const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
-  console.log('Found index in selected array:', index);
 
   const pk = selected.value[index]?.[primaryKey];
-  console.log('Primary key for the record:', pk);
   if (pk) {
     selected.value[index] = {
       ...selected.value[index],
@@ -1007,4 +1008,11 @@ async function regenerateCell(recordInfo: any) {
   }
   regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
 }
+
+const beforeUnloadHandler = (event) => {
+  if (isDataSaved.value) return;
+  event.preventDefault();
+  event.returnValue = '';
+};
+
 </script>
