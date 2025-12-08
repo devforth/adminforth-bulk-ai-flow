@@ -869,7 +869,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const fieldToRegenerate = body.fieldToRegenerate;
         let prompt = body.prompt;
         const actionType = body.actionType;
-        console.log('Regenerate cell called with:', { recordId, fieldToRegenerate, actionType, prompt });
         if (!fieldToRegenerate || !recordId || !actionType ) {
           return { ok: false, error: "Missing parameters" };
         }

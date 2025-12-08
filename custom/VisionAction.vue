@@ -984,6 +984,7 @@ async function regenerateCell(recordInfo: any) {
       },
     });
   } catch (e) {
+    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
     console.error(`Error during cell regeneration for record ${recordInfo.recordId}, field ${recordInfo.fieldName}:`, e);
   }
   if ( res.ok === false) {
@@ -992,7 +993,8 @@ async function regenerateCell(recordInfo: any) {
       variant: 'danger',
     });
     isError.value = true;
-    errorMessage.value = t(`Failed to regenerate field. You are not allowed to regenerate.`);
+    errorMessage.value = t(`Failed to regenerate field`);
+    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
     return;
   }
   const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
