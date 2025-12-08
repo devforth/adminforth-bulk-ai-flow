@@ -113,7 +113,7 @@
               {{ formatLabel(promptKey) }} prompt:
               <Textarea 
                 v-model="generationPrompts[key][promptKey]" 
-                class="w-full h-32 p-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+                class="w-full h-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               ></Textarea>
               <p class="text-red-500 hover:underline hover:cursor-pointer mt-2" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
             </div>
