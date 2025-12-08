@@ -65,7 +65,8 @@
           :tableColumnsIndexes="tableColumnsIndexes"
           :selected="selected"
           :oldData="oldData"
-          :isAiResponseReceivedAnalize="isAiResponseReceivedAnalize"
+          :isAiResponseReceivedAnalizeImage="isAiResponseReceivedAnalizeImage"
+          :isAiResponseReceivedAnalizeNoImage="isAiResponseReceivedAnalizeNoImage"
           :isAiResponseReceivedImage="isAiResponseReceivedImage"
           :primaryKey="primaryKey"
           :openGenerationCarousel="openGenerationCarousel"
@@ -81,6 +82,15 @@
           @regenerate-images="regenerateImages"
           :isImageHasPreviewUrl="isImageHasPreviewUrl"
           :imageGenerationPrompts="generationPrompts.generateImages"
+          :isImageToTextGenerationError="isImageToTextGenerationError"
+          :imageToTextErrorMessages="imageToTextErrorMessages"
+          :isTextToTextGenerationError="isTextToTextGenerationError"
+          :textToTextErrorMessages="textToTextErrorMessages"
+          :outputImageFields="props.meta.outputImageFields"
+          :outputFieldsForAnalizeFromImages="props.meta.outputFieldsForAnalizeFromImages"
+          :outputPlainFields="props.meta.outputPlainFields"
+          :regeneratingFieldsStatus="regeneratingFieldsStatus"
+          @regenerate-cell="regenerateCell"
         />
         <div class="text-red-600 flex items-center w-full">
           <p v-if="isError === true">{{ errorMessage }}</p>
@@ -159,7 +169,8 @@ const selected = ref<any[]>([]);
 const oldData = ref<any[]>([]);
 const carouselSaveImages = ref<any[]>([]);
 const carouselImageIndex = ref<any[]>([]);
-const isAiResponseReceivedAnalize = ref([]);
+const isAiResponseReceivedAnalizeImage = ref([]);
+const isAiResponseReceivedAnalizeNoImage = ref([]);
 const isAiResponseReceivedImage = ref([]);
 const primaryKey = props.meta.primaryKey;
 const openGenerationCarousel = ref([]);
@@ -178,10 +189,19 @@ const isDialogOpen = ref(false);
 const isAiGenerationError = ref<boolean[]>([false]);
 const aiGenerationErrorMessage = ref<string[]>([]);
 const isAiImageGenerationError = ref<boolean[]>([false]);
+
+const isImageToTextGenerationError = ref<boolean[]>([false]);
+const imageToTextErrorMessages = ref<string[]>([]);
+
+const isTextToTextGenerationError = ref<boolean[]>([false]);
+const textToTextErrorMessages = ref<string[]>([]);
+
 const imageGenerationErrorMessage = ref<string[]>([]);
 const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
 const popupMode = ref<'generation' | 'confirmation' | 'settings'>('confirmation');
 const generationPrompts = ref<any>({});
+
+const regeneratingFieldsStatus = ref<Record<string, Record<string, boolean>>>({});
 
 const openDialog = async () => {
   if (props.meta.askConfirmationBeforeGenerating) {
@@ -228,8 +248,9 @@ const openDialog = async () => {
  
 
 function runAiActions() {
-    popupMode.value = 'generation';
-    if (props.meta.isImageGeneration) {
+  popupMode.value = 'generation';
+
+  if (props.meta.isImageGeneration) {
     isGeneratingImages.value = true;
     runAiAction({
       endpoint: 'initial_image_generate',
@@ -242,7 +263,7 @@ function runAiActions() {
     runAiAction({
       endpoint: 'analyze',
       actionType: 'analyze',
-      responseFlag: isAiResponseReceivedAnalize,
+      responseFlag: isAiResponseReceivedAnalizeImage,
     });
   }
   if (props.meta.isFieldsForAnalizePlain) {
@@ -250,13 +271,14 @@ function runAiActions() {
     runAiAction({
       endpoint: 'analyze_no_images',
       actionType: 'analyze_no_images',
-      responseFlag: isAiResponseReceivedAnalize,
+      responseFlag: isAiResponseReceivedAnalizeNoImage,
     });
   }
 }
 
 const closeDialog = () => {
-  isAiResponseReceivedAnalize.value = [];
+  isAiResponseReceivedAnalizeImage.value = [];
+  isAiResponseReceivedAnalizeNoImage.value = [];
   isAiResponseReceivedImage.value = [];
 
   records.value = [];
@@ -652,9 +674,9 @@ async function runAiAction({
           }
         }
         //marking that we received response for this record
-        if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+        //if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
           responseFlag.value[index] = true;
-        }
+        //}
         //updating selected with new data from AI
         const pk = selected.value[index]?.[primaryKey];
         if (pk) {
@@ -674,9 +696,9 @@ async function runAiAction({
         // if job is failed - set error
       } else if (jobStatus === 'failed') {
         const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
-        if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
+        //if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
           responseFlag.value[index] = true;
-        }
+        //}
         if (index !== -1) {
           jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
         } else {
@@ -691,9 +713,12 @@ async function runAiAction({
         if (actionType === 'generate_images') {
           isAiImageGenerationError.value[index] = true;
           imageGenerationErrorMessage.value[index] = jobResponse.job?.error || 'Unknown error';
-        } else {
-          isAiGenerationError.value[index] = true;
-          aiGenerationErrorMessage.value[index] = jobResponse.job?.error || 'Unknown error';
+        } else if (actionType === 'analyze') {
+          isImageToTextGenerationError.value[index] = true;
+          imageToTextErrorMessages.value[index] = jobResponse.job?.error || 'Unknown error';
+        } else if (actionType === 'analyze_no_images') {
+          isTextToTextGenerationError.value[index] = true;
+          textToTextErrorMessages.value[index] = jobResponse.job?.error || 'Unknown error';
         }
       }
     }
@@ -918,4 +943,68 @@ function checkAndAddNewFieldsToPrompts(savedPrompts, defaultPrompts) {
   return savedPrompts;
 }
 
+async function regenerateCell(recordInfo: any) {
+  console.log('Regenerating cell for record:', recordInfo.recordId, 'field:', recordInfo.fieldName);
+  if (!regeneratingFieldsStatus.value[recordInfo.recordId]) {
+    regeneratingFieldsStatus.value[recordInfo.recordId] = {};
+  }
+  regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = true;
+  const actionType = props.meta.outputFieldsForAnalizeFromImages?.includes(recordInfo.fieldName)
+    ? 'analyze'
+    : props.meta.outputPlainFields?.includes(recordInfo.fieldName)
+      ? 'analyze_no_images'
+      : null;
+  if (!actionType) {
+    console.error(`Field ${recordInfo.fieldName} is not configured for analysis.`);
+    return;
+  }
+  
+  let generationPromptsForField = {};
+  if (actionType === 'analyze') {
+    generationPromptsForField = generationPrompts.value.imageFieldsPrompts || {};
+  } else if (actionType === 'analyze_no_images') {
+    generationPromptsForField = generationPrompts.value.plainFieldsPrompts || {};
+  }
+  console.log('Using generation prompts for field regeneration:', generationPromptsForField);
+  
+  let res;
+  try {
+    res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/regenerate-cell`,
+      method: 'POST',
+      body: {
+        fieldToRegenerate: recordInfo.fieldName,
+        recordId: recordInfo.recordId,
+        actionType: actionType,
+        prompt: generationPromptsForField[recordInfo.fieldName] || null,
+      },
+    });
+  } catch (e) {
+    console.error(`Error during cell regeneration for record ${recordInfo.recordId}, field ${recordInfo.fieldName}:`, e);
+  }
+  if ( res.ok === false) {
+    adminforth.alert({
+      message: res.error,
+      variant: 'danger',
+    });
+    isError.value = true;
+    errorMessage.value = t(`Failed to regenerate field. You are not allowed to regenerate.`);
+    return;
+  }
+  console.log('Regeneration response:', res);
+  const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
+  console.log('Found index in selected array:', index);
+
+  const pk = selected.value[index]?.[primaryKey];
+  console.log('Primary key for the record:', pk);
+  if (pk) {
+    selected.value[index] = {
+      ...selected.value[index],
+      ...res.result,
+      isChecked: true,
+      [primaryKey]: pk,
+    };
+  }
+  regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
+}
 </script>

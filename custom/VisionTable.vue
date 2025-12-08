@@ -54,7 +54,21 @@
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
       <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
+        <div v-if="(isAnalyzing(item, n) && !(props.regeneratingFieldsStatus[item[props.primaryKey]] && props.regeneratingFieldsStatus[item[props.primaryKey]][n])) && !isInColumnImage(n)" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
+          <div class="flex gap-1 justify-end">
+            <Tooltip v-if="checkForError(item, n)">
+              <IconExclamationCircleSolid class="my-2 w-5 h-5 text-red-500" />
+              <template #tooltip> 
+                {{ checkForError(item, n) }}
+              </template>
+            </Tooltip>
+            <Tooltip>
+              <IconRefreshOutline class="my-2 w-5 h-5 hover:text-blue-500" :class="{ 'opacity-50 cursor-not-allowed hover': shouldDisableRegenerateFieldIcon(item, n) }" @click="regerenerateFieldIconClick(item, n)"/>
+              <template #tooltip> 
+                {{ shouldDisableRegenerateFieldIcon(item, n) ? $t("Can't analyze image without source image") : $t('Regenerate') }}
+              </template>
+            </Tooltip>
+          </div>
           <div v-if="isInColumnEnum(n)" class="flex flex-col items-start justify-end min-h-[90px]">
               <Select
                 class="min-w-[150px]"
@@ -89,7 +103,7 @@
               </template>
             </Tooltip>
             </div>
-          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'boolean'" class="flex flex-col items-start justify-end min-h-[90px]">
+          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'boolean'" class="flex flex-col items-center justify-end min-h-[90px]">
             <Toggle
               class="p-2"
               v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
@@ -195,7 +209,7 @@
             <Skeleton type="image" class="w-20 h-20" />
         </div>
 
-        <div v-if="!isAiResponseReceivedAnalize[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && !isInColumnImage(n)">
+        <div v-if="(!isAnalyzing(item, n) || (props.regeneratingFieldsStatus[item[props.primaryKey]] && props.regeneratingFieldsStatus[item[props.primaryKey]][n])) && !isInColumnImage(n)">
           <Skeleton class="w-full h-6" />
         </div>
       </template>
@@ -203,11 +217,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle, Tooltip } from '@/afcl'
 import GenerationCarousel from './ImageGenerationCarousel.vue'
 import ImageCompare from './ImageCompare.vue';
-import { IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
+import { IconRefreshOutline, IconExclamationCircleSolid } from '@iconify-prerendered/vue-flowbite';
 
 const props = defineProps<{
   meta: any,
@@ -216,7 +230,8 @@ const props = defineProps<{
   customFieldNames: any,
   tableColumnsIndexes: any,
   selected: any,
-  isAiResponseReceivedAnalize: boolean[],
+  isAiResponseReceivedAnalizeImage: boolean[],
+  isAiResponseReceivedAnalizeNoImage: boolean[],
   isAiResponseReceivedImage: boolean[],
   primaryKey: any,
   openGenerationCarousel: any,
@@ -233,8 +248,16 @@ const props = defineProps<{
   oldData: any[],
   isImageHasPreviewUrl: Record<string, boolean>
   imageGenerationPrompts: Record<string, any>
+  isImageToTextGenerationError: boolean[],
+  imageToTextErrorMessages: string[],
+  isTextToTextGenerationError: boolean[],
+  textToTextErrorMessages: string[],
+  outputImageFields: string[],
+  outputFieldsForAnalizeFromImages: string[],
+  outputPlainFields: string[],
+  regeneratingFieldsStatus: Record<string, Record<string, boolean>>
 }>();
-const emit = defineEmits(['error', 'regenerateImages']);
+const emit = defineEmits(['error', 'regenerateImages', 'regenerateCell']);
 
 
 const zoomedImage = ref(null);
@@ -303,6 +326,61 @@ function isValidUrl(str: string): boolean {
   } catch {
     return false;
   }
+}
+
+function regerenerateFieldIconClick(item, name) {
+  if (shouldDisableRegenerateFieldIcon(item, name)) {
+    return;
+  }
+  emit('regenerateCell', {
+    recordId: item[props.primaryKey],
+    fieldName: name
+  });
+};
+
+function shouldDisableRegenerateFieldIcon(item, name) {
+  if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1 &&
+      props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])] === 'No source images found') {
+    return true;
+  }
+  return false;
+}
+
+function checkForError(item, name) {
+  if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1) {
+    const errorMessage = props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])];
+    if (errorMessage) {
+      return errorMessage;
+    }
+  }
+  if (props.outputPlainFields.findIndex( el => el === name) !== -1) {
+    const errorMessage = props.textToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])];
+    if (errorMessage) {
+      return errorMessage;
+    }
+  }
+  return false;
+}
+
+function isAnalyzing(item, name) {
+  if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1) {
+    return isImagesAnalyzing(item);
+  }
+  if (props.outputPlainFields.findIndex( el => el === name) !== -1) {
+    return isNoImageAnalyzing(item);
+  }
+
+  return false;
+}
+
+function isImagesAnalyzing(item) {
+  const isImagesAnalyzing = props.isAiResponseReceivedAnalizeImage[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]
+  return isImagesAnalyzing;
+}
+
+function isNoImageAnalyzing(item) {
+  const isNoImageAnalyzing = props.isAiResponseReceivedAnalizeNoImage[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]
+  return isNoImageAnalyzing;
 }
 
 

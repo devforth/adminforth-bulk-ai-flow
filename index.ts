@@ -76,6 +76,22 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
+  private getPromptForImageAnalysis(compiledOutputFields: Record<string, string>) {
+    const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
+      Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
+      Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
+      Image URLs:`;
+    return prompt;
+  }
+
+  private getPromptForPlainFields(compiledOutputFields: Record<string, string>){
+    const prompt = `Generate the values of fields in object by using next prompts (key is field name, value is prompt): 
+      ${JSON.stringify(compiledOutputFields)} In output object use the same field names (keys) as in input.
+      Return a single valid passable JSON object in format like: {"meta_title": "generated_value"}.
+      Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON.`;
+    return prompt;
+  }
+
   private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
     const selectedId = recordId;
     let isError = false;
@@ -107,10 +123,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
       //create prompt for OpenAI
       const compiledOutputFields = await this.compileOutputFieldsTemplates(record, customPrompt);
-      const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
-        Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
-        Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
-        Image URLs:`;
+      const prompt = this.getPromptForImageAnalysis(compiledOutputFields);
         
       //send prompt to OpenAI and get response
       let chatResponse;
@@ -159,16 +172,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     if (STUB_MODE) {
       await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
       jobs.set(jobId, { status: 'completed', result: {} });
-      return {};
+      jobs.set(jobId, { status: 'failed', error: `ERROR: test error` });
+      return { ok: false, error: 'test error' };
     } else {
       const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
       const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, customPrompt);
-      const prompt = `Generate the values of fields in object by using next prompts (key is field name, value is prompt): 
-        ${JSON.stringify(compiledOutputFields)} In output object use the same field names (keys) as in input.
-        Return a single valid passable JSON object in format like: {"meta_title": "generated_value"}.
-        Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON.`;
+      const prompt = this.getPromptForPlainFields(compiledOutputFields);
       //send prompt to OpenAI and get response
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
       let resp: any;
@@ -393,6 +404,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         outputImageFields.push(key);
       }
     }
+    const outputPlainFields = [];
+    if (this.options.fillPlainFields) {
+      for (const [key, value] of Object.entries(this.options.fillPlainFields)) {
+        outputPlainFields.push(key);
+      }
+    }
+    const outputFieldsForAnalizeFromImages = [];
+    if (this.options.fillFieldsFromImages) {
+      for (const [key, value] of Object.entries(this.options.fillFieldsFromImages)) {
+        outputFieldsForAnalizeFromImages.push(key);
+      }
+    }
+
     const outputImagesPluginInstanceIds = {};
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
@@ -430,7 +454,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         actionName: this.options.actionName,
         columnEnums: columnEnums,
         outputImageFields: outputImageFields,
-        outputPlainFields: this.options.fillPlainFields,
+        outputFieldsForAnalizeFromImages: outputFieldsForAnalizeFromImages,
+        outputPlainFields: outputPlainFields,
         primaryKey: primaryKeyColumn.name,
         outputImagesPluginInstanceIds: outputImagesPluginInstanceIds,
         isFieldsForAnalizeFromImages: this.options.fillFieldsFromImages ? Object.keys(this.options.fillFieldsFromImages).length > 0 : false,
@@ -836,6 +861,91 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     });
 
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/regenerate-cell`,
+      handler: async ({ body, adminUser, headers }) => {
+        const recordId = body.recordId;
+        const fieldToRegenerate = body.fieldToRegenerate;
+        let prompt = body.prompt;
+        const actionType = body.actionType;
+        console.log('Regenerate cell called with:', { recordId, fieldToRegenerate, actionType, prompt });
+        if (!fieldToRegenerate || !recordId || !actionType ) {
+          return { ok: false, error: "Missing parameters" };
+        }
+        if ( !prompt ) {
+          if (actionType === 'analyze') {
+            prompt = this.options.fillFieldsFromImages ? (this.options.fillFieldsFromImages as any)[fieldToRegenerate] : null;
+          } else if (actionType === 'analyze_no_images') {
+            prompt = this.options.fillPlainFields ? (this.options.fillPlainFields as any)[fieldToRegenerate] : null;
+          }
+        }
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, recordId)] );
 
+        let promptToPass = JSON.stringify({[fieldToRegenerate]: prompt});
+        if (STUB_MODE) {
+          await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
+          return { ok: true, result: {[fieldToRegenerate]: "stub value"} };
+        } else {
+          if ( actionType === 'analyze') {
+            const compiledPropmt = await this.compileOutputFieldsTemplates(record, promptToPass);
+            const finalPrompt = this.getPromptForImageAnalysis(compiledPropmt);
+            const attachmentFiles = await this.options.attachFiles({ record: record });
+            if (attachmentFiles.length === 0) {
+              return { ok: false, error: "No source images found" };
+            }
+            let visionAdapterResponse;
+            try {
+              visionAdapterResponse = await this.options.visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
+            } catch (e) {
+              return { ok: false, error: 'AI provider refused to analyze images' };
+            }
+            const resp: any = (visionAdapterResponse as any).response;
+            const topLevelError = (visionAdapterResponse as any).error;
+            if (topLevelError || resp?.error) {
+              return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
+            }
+
+            const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+            if (!textOutput || typeof textOutput !== 'string') {
+              return { ok: false, error: 'AI response is not valid text' };
+            }
+
+            let resData;
+            try {
+              resData = JSON.parse(textOutput);
+            } catch (e) {
+              return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL' };
+            }
+            return { ok: true, result: resData };
+
+
+
+          } else if ( actionType === 'analyze_no_images') {
+            const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, promptToPass);
+            const finalPrompt = this.getPromptForPlainFields(compiledPropmt);
+            const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
+            let resp;
+            try {
+              const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(finalPrompt, [], numberOfTokens);
+              if (topLevelError) {
+                return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError)}` };
+              }
+              resp = chatResponse;
+            } catch (e) {
+              return { ok: false, error: 'AI provider refused to analyze plain fields' };
+            }
+            let resData;
+            try {
+              resData = JSON.parse(resp);
+            } catch (e) {
+              return { ok: false, error: 'AI response is not valid JSON' };
+            }
+            return { ok: true, result: resData };
+          }
+        }
+      }
+    });
   }
 }
