@@ -137,7 +137,9 @@ import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
-import { run } from 'node:test';
+import { useCoreStore } from '@/stores/core';
+
+const coreStore = useCoreStore();
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -658,6 +660,10 @@ async function runAiAction({
         body: { jobId },
       });
       //check for errors
+      if (!jobResponse) {
+        isAtLeastOneInProgress = true;
+        continue;
+      }
       if (jobResponse?.error) {
         console.error(`Error during ${actionType}:`, jobResponse.error);
         break;
@@ -839,6 +845,14 @@ async function uploadImage(imgBlob, id, fieldName) {
 }
 
 function regenerateImages(recordInfo: any) {
+  if (coreStore.isInternetError) {
+    adminforth.alert({
+      message: t('Cannot regenerate images while internet connection is lost. Please check your connection and try again.'),
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+    return;
+  }
   isGeneratingImages.value = true;
   runAiAction({
     endpoint: 'initial_image_generate',
@@ -950,6 +964,14 @@ function checkAndAddNewFieldsToPrompts(savedPrompts, defaultPrompts) {
 }
 
 async function regenerateCell(recordInfo: any) {
+  if (coreStore.isInternetError) {
+    adminforth.alert({
+      message: t('Cannot regenerate column while internet connection is lost. Please check your connection and try again.'),
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+    return;
+  }
   if (!regeneratingFieldsStatus.value[recordInfo.recordId]) {
     regeneratingFieldsStatus.value[recordInfo.recordId] = {};
   }
