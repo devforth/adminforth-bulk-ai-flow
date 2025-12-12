@@ -7,7 +7,7 @@ import { RateLimiter } from "adminforth";
 import { randomUUID } from "crypto";
 
 const STUB_MODE = false;
-const jobs = new Map();
+const jobs = new Map(); 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
   uploadPlugin: AdminForthPlugin;
