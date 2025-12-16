@@ -894,8 +894,34 @@ function click() {
 }
 
 function saveSettings() {
+  const promptsToSaveGenerateImages = Object.fromEntries(
+    Object.entries(generationPrompts.value.generateImages).filter(
+      ([key, value]) => value !== props.meta.generationPrompts.imageGenerationPrompts[key].prompt
+    )
+  );
+
+  const promptsToSaveAnalyzeImages = Object.fromEntries(
+    Object.entries(generationPrompts.value.imageFieldsPrompts).filter(
+      ([key, value]) => value !== props.meta.generationPrompts.imageFieldsPrompts[key]
+    )
+  );
+
+  const promptsToSaveAnalyzeNoImages = Object.fromEntries(
+    Object.entries(generationPrompts.value.plainFieldsPrompts).filter(
+      ([key, value]) => value !== props.meta.generationPrompts.plainFieldsPrompts[key]
+    )
+  );
+
+  const promptsToSave = {
+    ...(Object.keys(promptsToSaveAnalyzeNoImages).length > 0 ? { plainFieldsPrompts: promptsToSaveAnalyzeNoImages } : {}),
+    ...(Object.keys(promptsToSaveAnalyzeImages).length > 0 ? { imageFieldsPrompts: promptsToSaveAnalyzeImages } : {}),
+    ...(Object.keys(promptsToSaveGenerateImages).length > 0 ? { generateImages: promptsToSaveGenerateImages } : {}),
+  };
+
+  console.log('Saving prompts:', promptsToSave);
+
+  localStorage.setItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`, JSON.stringify(promptsToSave));
   popupMode.value = 'confirmation';
-  localStorage.setItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`, JSON.stringify(generationPrompts.value));
 }
 
 async function getGenerationPrompts() {
@@ -925,10 +951,13 @@ async function getGenerationPrompts() {
 }
 
 function resetPromptToDefault(categoryKey, promptKey) {
+  console.log('Resetting prompt:', categoryKey, promptKey);
+  console.log('Default prompt:', props.meta.generationPrompts);
   if (categoryKey === 'generateImages') {
     generationPrompts.value[categoryKey][promptKey] = props.meta.generationPrompts.imageGenerationPrompts[promptKey].prompt;
     return;
   }
+  console.log('Resetting prompt to the:', props.meta.generationPrompts[categoryKey][promptKey]);
   generationPrompts.value[categoryKey][promptKey] = props.meta.generationPrompts[categoryKey][promptKey];
 }
 
