@@ -625,6 +625,7 @@ async function runAiAction({
           recordId: checkbox,
           ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
         },
+        silentError: true,
       });
 
       if (res?.error) {
@@ -658,6 +659,7 @@ async function runAiAction({
         path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
         method: 'POST',
         body: { jobId },
+        silentError: true,
       });
       //check for errors
       if (!jobResponse) {
@@ -1004,6 +1006,7 @@ async function regenerateCell(recordInfo: any) {
         actionType: actionType,
         prompt: generationPromptsForField[recordInfo.fieldName] || null,
       },
+      silentError: true,
     });
   } catch (e) {
     regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
