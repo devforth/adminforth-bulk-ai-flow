@@ -159,19 +159,19 @@ watch([() => props.oldImage, () => props.newImage, () => compiledOldImage.value]
 })
 </script>
 
-<style>
+<style scoped>
 .medium-zoom-image {
-  z-index: 999999 !important;
+  z-index: 999999;
   background: rgba(0, 0, 0, 0.8);
-  border: none !important;
-  border-radius: 0 !important;
+  border: none;
+  border-radius: 0;
 }
 .medium-zoom-overlay {
-  z-index: 99999 !important;
-  background: rgba(0, 0, 0, 0.8) !important;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.8);
 }
 html.dark .medium-zoom-overlay {
-  background: rgba(17, 24, 39, 0.8) !important;
+  background: rgba(17, 24, 39, 0.8);
 }
 body.medium-zoom--opened aside {
   filter: grayscale(1);
