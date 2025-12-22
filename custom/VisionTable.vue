@@ -249,9 +249,9 @@ const props = defineProps<{
   isImageHasPreviewUrl: Record<string, boolean>
   imageGenerationPrompts: Record<string, any>
   isImageToTextGenerationError: boolean[],
-  imageToTextErrorMessages: string[],
+  imageToTextErrorMessages: Record<string, string>[],
   isTextToTextGenerationError: boolean[],
-  textToTextErrorMessages: string[],
+  textToTextErrorMessages: Record<string, string>[],
   outputImageFields: string[],
   outputFieldsForAnalizeFromImages: string[],
   outputPlainFields: string[],
@@ -340,7 +340,7 @@ function regerenerateFieldIconClick(item, name) {
 
 function shouldDisableRegenerateFieldIcon(item, name) {
   if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1 &&
-      props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])] === 'No source images found') {
+      props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])][name] === 'No source images found') {
     return true;
   }
   return false;
@@ -348,13 +348,13 @@ function shouldDisableRegenerateFieldIcon(item, name) {
 
 function checkForError(item, name) {
   if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1) {
-    const errorMessage = props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])];
+    const errorMessage = props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])][name];
     if (errorMessage) {
       return errorMessage;
     }
   }
   if (props.outputPlainFields.findIndex( el => el === name) !== -1) {
-    const errorMessage = props.textToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])];
+    const errorMessage = props.textToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])][name];
     if (errorMessage) {
       return errorMessage;
     }

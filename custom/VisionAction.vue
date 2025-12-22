@@ -193,10 +193,10 @@ const aiGenerationErrorMessage = ref<string[]>([]);
 const isAiImageGenerationError = ref<boolean[]>([false]);
 
 const isImageToTextGenerationError = ref<boolean[]>([false]);
-const imageToTextErrorMessages = ref<string[]>([]);
+const imageToTextErrorMessages = ref<Record<string, string>[]>([]);
 
 const isTextToTextGenerationError = ref<boolean[]>([false]);
-const textToTextErrorMessages = ref<string[]>([]);
+const textToTextErrorMessages = ref<Record<string, string>[]>([]);
 
 const imageGenerationErrorMessage = ref<string[]>([]);
 const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
@@ -728,11 +728,19 @@ async function runAiAction({
           isAiImageGenerationError.value[index] = true;
           imageGenerationErrorMessage.value[index] = jobResponse.job?.error || 'Unknown error';
         } else if (actionType === 'analyze') {
-          isImageToTextGenerationError.value[index] = true;
-          imageToTextErrorMessages.value[index] = jobResponse.job?.error || 'Unknown error';
+          for (const field of Object.keys(props.meta.outputFieldsForAnalizeFromImages ) ) {
+            if (!imageToTextErrorMessages.value[index]) {
+              imageToTextErrorMessages.value[index] = {};
+            }
+            imageToTextErrorMessages.value[index][props.meta.outputFieldsForAnalizeFromImages[field]] = jobResponse.job?.error || 'Unknown error';
+          }
         } else if (actionType === 'analyze_no_images') {
-          isTextToTextGenerationError.value[index] = true;
-          textToTextErrorMessages.value[index] = jobResponse.job?.error || 'Unknown error';
+          for( const field of Object.keys(props.meta.outputPlainFields ) ) {
+            if (!textToTextErrorMessages.value[index]) {
+              textToTextErrorMessages.value[index] = {};
+            }
+            textToTextErrorMessages.value[index][props.meta.outputPlainFields[field]] = jobResponse.job?.error || 'Unknown error';
+          }
         }
       }
     }
@@ -1061,6 +1069,11 @@ async function regenerateCell(recordInfo: any) {
       isChecked: true,
       [primaryKey]: pk,
     };
+  }
+  if (actionType === 'analyze') {
+    imageToTextErrorMessages.value[index][recordInfo.fieldName] = '';
+  } else if (actionType === 'analyze_no_images') {
+    textToTextErrorMessages.value[index][recordInfo.fieldName] = '';
   }
   regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
 }
