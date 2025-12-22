@@ -1078,8 +1078,7 @@ async function regenerateCell(recordInfo: any) {
       await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
     }
   } while (res.job?.status === 'in_progress');
-
-  if (res.job?.status === 'failed' || !res.ok) {
+  if (res.job?.status === 'failed' || !res.ok || !res) {
     adminforth.alert({
       message: t(`Regeneration action failed for record: ${recordInfo.recordId}. Error: ${res.job?.error || 'Unknown error'}`),
       variant: 'danger',
@@ -1094,28 +1093,31 @@ async function regenerateCell(recordInfo: any) {
     }
     regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
     return;
-  }
+  } else if (res.job?.status === 'completed') {
+    const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
 
-
-  const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
-
-  const pk = selected.value[index]?.[primaryKey];
-  if (pk) {
-    selected.value[index] = {
-      ...selected.value[index],
-      ...res.job.result,
-      isChecked: true,
-      [primaryKey]: pk,
-    };
+    const pk = selected.value[index]?.[primaryKey];
+    if (pk) {
+      selected.value[index] = {
+        ...selected.value[index],
+        ...res.job.result,
+        isChecked: true,
+        [primaryKey]: pk,
+      };
+    }
+    if (actionType === 'analyze') {
+      if (imageToTextErrorMessages.value[index]) {
+        imageToTextErrorMessages.value[index][recordInfo.fieldName] = '';
+      }
+      isAnalizingFields.value = false;
+    } else if (actionType === 'analyze_no_images') {
+      if (textToTextErrorMessages.value[index]) {
+        textToTextErrorMessages.value[index][recordInfo.fieldName] = '';
+      }
+      isAnalizingImages.value = false;
+    }
+    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
   }
-  if (actionType === 'analyze') {
-    imageToTextErrorMessages.value[index][recordInfo.fieldName] = '';
-    isAnalizingFields.value = false;
-  } else if (actionType === 'analyze_no_images') {
-    textToTextErrorMessages.value[index][recordInfo.fieldName] = '';
-    isAnalizingImages.value = false;
-  }
-  regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
 }
 
 const beforeUnloadHandler = (event) => {
