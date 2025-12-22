@@ -366,6 +366,94 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
+  private async regenerateCell(jobId, fieldToRegenerate, recordId, actionType, prompt) {
+    if (!fieldToRegenerate || !recordId || !actionType ) {
+      jobs.set(jobId, { status: 'failed', error: 'Missing parameters' });
+      //return { ok: false, error: "Missing parameters" };
+    }
+    if ( !prompt ) {
+      if (actionType === 'analyze') {
+        prompt = this.options.fillFieldsFromImages ? (this.options.fillFieldsFromImages as any)[fieldToRegenerate] : null;
+      } else if (actionType === 'analyze_no_images') {
+        prompt = this.options.fillPlainFields ? (this.options.fillPlainFields as any)[fieldToRegenerate] : null;
+      }
+    }
+    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+    const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, recordId)] );
+
+    let promptToPass = JSON.stringify({[fieldToRegenerate]: prompt});
+    if (STUB_MODE) {
+      await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
+      // return { ok: true, result: {[fieldToRegenerate]: "stub value"} };
+      jobs.set(jobId, { status: 'completed', result: {[fieldToRegenerate]: "stub value"} });
+    } else {
+      if ( actionType === 'analyze') {
+        const compiledPropmt = await this.compileOutputFieldsTemplates(record, promptToPass);
+        const finalPrompt = this.getPromptForImageAnalysis(compiledPropmt);
+        const attachmentFiles = await this.options.attachFiles({ record: record });
+        if (attachmentFiles.length === 0) {
+          // return { ok: false, error: "No source images found" };
+          jobs.set(jobId, { status: 'failed', error: "No source images found" });
+        }
+        let visionAdapterResponse;
+        try {
+          visionAdapterResponse = await this.options.visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
+        } catch (e) {
+          // return { ok: false, error: 'AI provider refused to analyze images' };
+          jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze images' });
+        }
+        const resp: any = (visionAdapterResponse as any).response;
+        const topLevelError = (visionAdapterResponse as any).error;
+        if (topLevelError || resp?.error) {
+          // return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
+          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` });
+        }
+
+        const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+        if (!textOutput || typeof textOutput !== 'string') {
+          // return { ok: false, error: 'AI response is not valid text' };
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid text' });
+        }
+
+        let resData;
+        try {
+          resData = JSON.parse(textOutput);
+        } catch (e) {
+          // return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL' };
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL' });
+        }
+        // return { ok: true, result: resData };
+        jobs.set(jobId, { status: 'completed', result: resData });
+
+      } else if ( actionType === 'analyze_no_images') {
+        const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, promptToPass);
+        const finalPrompt = this.getPromptForPlainFields(compiledPropmt);
+        const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
+        let resp;
+        try {
+          const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(finalPrompt, [], numberOfTokens);
+          if (topLevelError) {
+            // return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError)}` };
+            jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError)}` });
+          }
+          resp = chatResponse;
+        } catch (e) {
+          // return { ok: false, error: 'AI provider refused to analyze plain fields' };
+          jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze plain fields' });
+        }
+        let resData;
+        try {
+          resData = JSON.parse(resp);
+        } catch (e) {
+          // return { ok: false, error: 'AI response is not valid JSON' };
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON' });
+        }
+        // return { ok: true, result: resData };
+        jobs.set(jobId, { status: 'completed', result: resData });
+      }
+    }
+  }
+
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
 
@@ -777,6 +865,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               }
               this.regenerateImage(jobId, recordId, body.fieldName, body.prompt, adminUser, headers);
             break;
+            case 'regenerate_cell':
+              const fieldToRegenerate = body.fieldToRegenerate;
+              this.regenerateCell(jobId, fieldToRegenerate, recordId, body.action, body.prompt);
+            break;
             default:
               jobs.set(jobId, { status: "failed", error: "Unknown action type" });
           } 
@@ -857,92 +949,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           }
         } catch (e) {
           return { ok: false, error: "Error compiling preview url" };
-        }
-      }
-    });
-
-    server.endpoint({
-      method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/regenerate-cell`,
-      handler: async ({ body, adminUser, headers }) => {
-        const recordId = body.recordId;
-        const fieldToRegenerate = body.fieldToRegenerate;
-        let prompt = body.prompt;
-        const actionType = body.actionType;
-        if (!fieldToRegenerate || !recordId || !actionType ) {
-          return { ok: false, error: "Missing parameters" };
-        }
-        if ( !prompt ) {
-          if (actionType === 'analyze') {
-            prompt = this.options.fillFieldsFromImages ? (this.options.fillFieldsFromImages as any)[fieldToRegenerate] : null;
-          } else if (actionType === 'analyze_no_images') {
-            prompt = this.options.fillPlainFields ? (this.options.fillPlainFields as any)[fieldToRegenerate] : null;
-          }
-        }
-        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, recordId)] );
-
-        let promptToPass = JSON.stringify({[fieldToRegenerate]: prompt});
-        if (STUB_MODE) {
-          await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
-          return { ok: true, result: {[fieldToRegenerate]: "stub value"} };
-        } else {
-          if ( actionType === 'analyze') {
-            const compiledPropmt = await this.compileOutputFieldsTemplates(record, promptToPass);
-            const finalPrompt = this.getPromptForImageAnalysis(compiledPropmt);
-            const attachmentFiles = await this.options.attachFiles({ record: record });
-            if (attachmentFiles.length === 0) {
-              return { ok: false, error: "No source images found" };
-            }
-            let visionAdapterResponse;
-            try {
-              visionAdapterResponse = await this.options.visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
-            } catch (e) {
-              return { ok: false, error: 'AI provider refused to analyze images' };
-            }
-            const resp: any = (visionAdapterResponse as any).response;
-            const topLevelError = (visionAdapterResponse as any).error;
-            if (topLevelError || resp?.error) {
-              return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
-            }
-
-            const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
-            if (!textOutput || typeof textOutput !== 'string') {
-              return { ok: false, error: 'AI response is not valid text' };
-            }
-
-            let resData;
-            try {
-              resData = JSON.parse(textOutput);
-            } catch (e) {
-              return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL' };
-            }
-            return { ok: true, result: resData };
-
-
-
-          } else if ( actionType === 'analyze_no_images') {
-            const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, promptToPass);
-            const finalPrompt = this.getPromptForPlainFields(compiledPropmt);
-            const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
-            let resp;
-            try {
-              const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(finalPrompt, [], numberOfTokens);
-              if (topLevelError) {
-                return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError)}` };
-              }
-              resp = chatResponse;
-            } catch (e) {
-              return { ok: false, error: 'AI provider refused to analyze plain fields' };
-            }
-            let resData;
-            try {
-              resData = JSON.parse(resp);
-            } catch (e) {
-              return { ok: false, error: 'AI response is not valid JSON' };
-            }
-            return { ok: true, result: resData };
-          }
         }
       }
     });
