@@ -348,13 +348,13 @@ function shouldDisableRegenerateFieldIcon(item, name) {
 
 function checkForError(item, name) {
   if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1) {
-    const errorMessage = props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])][name];
+    const errorMessage = props.imageToTextErrorMessages?.[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]?.[name];
     if (errorMessage) {
       return errorMessage;
     }
   }
   if (props.outputPlainFields.findIndex( el => el === name) !== -1) {
-    const errorMessage = props.textToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])][name];
+    const errorMessage = props.textToTextErrorMessages?.[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]?.[name];
     if (errorMessage) {
       return errorMessage;
     }
