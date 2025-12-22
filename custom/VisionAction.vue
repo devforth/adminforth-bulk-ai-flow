@@ -1028,19 +1028,23 @@ async function regenerateCell(recordInfo: any) {
   let generationPromptsForField = {};
   if (actionType === 'analyze') {
     generationPromptsForField = generationPrompts.value.imageFieldsPrompts || {};
+    isAnalizingFields.value = true;
   } else if (actionType === 'analyze_no_images') {
     generationPromptsForField = generationPrompts.value.plainFieldsPrompts || {};
+    isAnalizingImages.value = true;
   }
   
+  let jobId;
   let res;
   try {
     res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/regenerate-cell`,
+      path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
       method: 'POST',
       body: {
         fieldToRegenerate: recordInfo.fieldName,
         recordId: recordInfo.recordId,
-        actionType: actionType,
+        action: actionType,
+        actionType: "regenerate_cell",
         prompt: generationPromptsForField[recordInfo.fieldName] || null,
       },
       silentError: true,
@@ -1059,21 +1063,57 @@ async function regenerateCell(recordInfo: any) {
     regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
     return;
   }
+  jobId = res.jobId;
+  res = {}
+  do {
+    res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
+      method: 'POST',
+      body: { jobId },
+      silentError: true,
+    });
+    if (actionType === 'analyze') {
+      await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillFieldsFromImages));
+    } else if (actionType === 'analyze_no_images') {
+      await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
+    }
+  } while (res.job?.status === 'in_progress');
+
+  if (res.job?.status === 'failed' || !res.ok) {
+    adminforth.alert({
+      message: t(`Regeneration action failed for record: ${recordInfo.recordId}. Error: ${res.job?.error || 'Unknown error'}`),
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+    if (actionType === 'analyze') {
+      imageToTextErrorMessages.value[recordInfo.recordId][recordInfo.fieldName] = res.job?.error || 'Unknown error';
+      isAnalizingFields.value = false;
+    } else if (actionType === 'analyze_no_images') {
+      textToTextErrorMessages.value[recordInfo.recordId][recordInfo.fieldName] = res.job?.error || 'Unknown error';
+      isAnalizingImages.value = false;
+    }
+    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
+    return;
+  }
+
+
   const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
 
   const pk = selected.value[index]?.[primaryKey];
   if (pk) {
     selected.value[index] = {
       ...selected.value[index],
-      ...res.result,
+      ...res.job.result,
       isChecked: true,
       [primaryKey]: pk,
     };
   }
   if (actionType === 'analyze') {
     imageToTextErrorMessages.value[index][recordInfo.fieldName] = '';
+    isAnalizingFields.value = false;
   } else if (actionType === 'analyze_no_images') {
     textToTextErrorMessages.value[index][recordInfo.fieldName] = '';
+    isAnalizingImages.value = false;
   }
   regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
 }
