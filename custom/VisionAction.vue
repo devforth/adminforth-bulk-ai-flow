@@ -286,6 +286,11 @@ const closeDialog = () => {
   isAiResponseReceivedAnalizeNoImage.value = [];
   isAiResponseReceivedImage.value = [];
 
+  imageToTextErrorMessages.value = [];
+  textToTextErrorMessages.value = [];
+  imageGenerationErrorMessage.value = [];
+  regeneratingFieldsStatus.value = {};
+
   records.value = [];
   images.value = [];
   selected.value = [];
