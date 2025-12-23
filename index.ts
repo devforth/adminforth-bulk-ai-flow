@@ -152,8 +152,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         try {
           resData = JSON.parse(textOutput);
         } catch (e) {
-          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL' });
-          return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL' };
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL', aiResponse: textOutput });
+          return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL', aiResponse: textOutput };
         }
         const result = resData;
         jobs.set(jobId, { status: 'completed', result });
@@ -201,8 +201,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         try {
           resData = JSON.parse(resp);
         } catch (e) {
-          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON' });
-          return { ok: false, error: 'AI response is not valid JSON' };
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON', aiResponse: resp });
+          return { ok: false, error: 'AI response is not valid JSON', aiResponse: resp };
         }
       const result = resData;
       jobs.set(jobId, { status: 'completed', result });
@@ -419,8 +419,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         try {
           resData = JSON.parse(textOutput);
         } catch (e) {
-          // return { ok: false, error: 'AI response is not valid JSON. Probably attached invalid image URL' };
-          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL' });
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL', aiResponse: textOutput });
         }
         // return { ok: true, result: resData };
         jobs.set(jobId, { status: 'completed', result: resData });
@@ -445,8 +444,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         try {
           resData = JSON.parse(resp);
         } catch (e) {
-          // return { ok: false, error: 'AI response is not valid JSON' };
-          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON' });
+          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON', aiResponse: resp });
         }
         // return { ok: true, result: resData };
         jobs.set(jobId, { status: 'completed', result: resData });
