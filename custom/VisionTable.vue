@@ -340,7 +340,7 @@ function regerenerateFieldIconClick(item, name) {
 
 function shouldDisableRegenerateFieldIcon(item, name) {
   if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1 &&
-      props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])][name] === 'No source images found') {
+      props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]?.[name] === 'No source images found') {
     return true;
   }
   return false;
