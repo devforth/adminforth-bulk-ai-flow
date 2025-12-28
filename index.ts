@@ -79,6 +79,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private getPromptForImageAnalysis(compiledOutputFields: Record<string, string>) {
     const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
       Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
+      Only return valid JSON. Do NOT wrap in \`\`\` or \`\`\`json. Do not add any extra text. Do not return prompt in response 
       Each object must contain the following fields: ${JSON.stringify(compiledOutputFields)} Use the exact field names. If it's number field - return only number.
       Image URLs:`;
     return prompt;
@@ -88,7 +89,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     const prompt = `Generate the values of fields in object by using next prompts (key is field name, value is prompt): 
       ${JSON.stringify(compiledOutputFields)} In output object use the same field names (keys) as in input.
       Return a single valid passable JSON object in format like: {"meta_title": "generated_value"}.
-      Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON.`;
+      Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
+      Do NOT wrap in \`\`\` or \`\`\`json. Do not add any extra text. Do not return prompt in response`;
     return prompt;
   }
 
