@@ -65,6 +65,8 @@
           :tableColumnsIndexes="tableColumnsIndexes"
           :selected="selected"
           :oldData="oldData"
+          :isError="isError"
+          :errorMessage="errorMessage"
           :isAiResponseReceivedAnalizeImage="isAiResponseReceivedAnalizeImage"
           :isAiResponseReceivedAnalizeNoImage="isAiResponseReceivedAnalizeNoImage"
           :isAiResponseReceivedImage="isAiResponseReceivedImage"
@@ -147,13 +149,8 @@ const props = defineProps<{
   meta: any,
   resource: AdminForthResourceCommon,
   adminUser: AdminUser,
-  updateList: {
-    type: Function,
-    required: true
-  },
-  clearCheckboxes: {
-    type: Function
-  }
+  updateList: () => any,
+  clearCheckboxes?: () => any,
 }>();
 
 defineExpose({
@@ -326,6 +323,13 @@ function fillCarouselSaveImages() {
 
 
 function formatLabel(str) {
+  const labelsMap = props.meta?.columnLabels || {};
+  let labelFromMeta = labelsMap[str];
+  if (!labelFromMeta) {
+    const match = Object.keys(labelsMap).find(k => k.toLowerCase() === String(str).toLowerCase());
+    if (match) labelFromMeta = labelsMap[match];
+  }
+  if (labelFromMeta) return labelFromMeta;
   return str
     .split('_')                   
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
