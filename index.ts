@@ -59,6 +59,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.generateImages, record, v => String(customPrompt ? v : v.prompt));
   }
 
+  private removeFromPromptFilledFields(compiledOutputFields: Record<string, string>, record: Record<string, any>): Record<string, string> {
+    const newCompiledOutputFields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(record)) {
+      if (compiledOutputFields[key]) {
+        if (value !== null && value !== undefined && value !== '') {
+          continue;
+        }
+        newCompiledOutputFields[key] = compiledOutputFields[key];
+      }
+    }
+    return newCompiledOutputFields;
+  }
+
   private async checkRateLimit(field: string, fieldNameRateLimit: string | undefined, headers: Record<string, string | string[] | undefined>): Promise<void | { error?: string; }> {
     if (fieldNameRateLimit) {
       // rate limit
@@ -94,7 +107,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return prompt;
   }
 
-  private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
+  private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     const selectedId = recordId;
     let isError = false;
     // Fetch the record using the provided ID
@@ -125,8 +138,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
       //create prompt for OpenAI
       const compiledOutputFields = await this.compileOutputFieldsTemplates(record, customPrompt);
-      const prompt = this.getPromptForImageAnalysis(compiledOutputFields);
+      const filteredCompiledOutputFields = filterFilledFields ? this.removeFromPromptFilledFields(compiledOutputFields, record) : compiledOutputFields;
+      
+      if (Object.keys(filteredCompiledOutputFields).length === 0) {
+        jobs.set(jobId, { status: 'completed', result: {} });
+        return { ok: true };
+      }
         
+      const prompt = this.getPromptForImageAnalysis(filteredCompiledOutputFields);
+
       //send prompt to OpenAI and get response
       let chatResponse;
       try {
@@ -168,7 +188,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   }
 
-  private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
+  private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     const selectedId = recordId;
     let isError = false;
     if (STUB_MODE) {
@@ -181,7 +201,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
       const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, customPrompt);
-      const prompt = this.getPromptForPlainFields(compiledOutputFields);
+
+      const filteredCompiledOutputFields = filterFilledFields ? this.removeFromPromptFilledFields(compiledOutputFields, record) : compiledOutputFields;
+
+      if (Object.keys(filteredCompiledOutputFields).length === 0) {
+        jobs.set(jobId, { status: 'completed', result: {} });
+        return { ok: true };
+      }
+      const prompt = this.getPromptForPlainFields(filteredCompiledOutputFields);
       //send prompt to OpenAI and get response
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
       let resp: any;
@@ -212,7 +239,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string) {
+  private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     const selectedId = recordId;
     let isError = false;
     const start = +new Date();
@@ -232,6 +259,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
     const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
+      if ( record[key] && filterFilledFields ) {
+        return { key, images: [] };
+      }
       const prompt = (await this.compileGenerationFieldTemplates(record, customPrompt))[key];
       let images;
         if (this.options.attachFiles && attachmentFiles.length === 0) {
@@ -837,7 +867,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
       handler: async ({ body, adminUser, headers }) => {
-        const { actionType, recordId, customPrompt } = body;
+        const { actionType, recordId, customPrompt, filterFilledFields } = body;
         const jobId = randomUUID();
         jobs.set(jobId, { status: "in_progress" });
         if (!actionType) {
@@ -850,13 +880,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         } else {
           switch(actionType) {
             case 'generate_images':
-              this.initialImageGenerate(jobId, recordId, adminUser, headers, customPrompt);
+              this.initialImageGenerate(jobId, recordId, adminUser, headers, customPrompt, filterFilledFields);
             break;
             case 'analyze_no_images':
-              this.analyzeNoImages(jobId, recordId, adminUser, headers, customPrompt);
+              this.analyzeNoImages(jobId, recordId, adminUser, headers, customPrompt, filterFilledFields);
             break;
             case 'analyze':
-              this.analyze_image(jobId, recordId, adminUser, headers, customPrompt);
+              this.analyze_image(jobId, recordId, adminUser, headers, customPrompt, filterFilledFields);
             break;
             case 'regenerate_images':
               if (!body.prompt || !body.fieldName) {

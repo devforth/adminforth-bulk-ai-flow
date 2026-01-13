@@ -1,13 +1,13 @@
 <template>
   <div class="flex items-end justify-start gap-2 cursor-pointer">
     <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
-      AI
+      {{t('AI')}}
     </div>
     <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
   </div>
   <Dialog 
     ref="confirmDialog"
-    header="Bulk AI Flow"
+    header="Bulk AI Generation"
     class="[scrollbar-gutter:stable] !max-w-full w-fit h-fit"
     :class="popupMode === 'generation' ? 'lg:w-[1600px] !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
@@ -15,10 +15,10 @@
     :beforeCloseFunction="closeDialog"
     :closable="false"
     :askForCloseConfirmation="popupMode === 'generation' ? true : false"
-    closeConfirmationText="Are you sure you want to close without saving?"
+    :closeConfirmationText="t('Are you sure you want to close without saving?')"
     :buttons="popupMode === 'generation' ? [
         { 
-          label: checkedCount > 1 ? 'Save fields' : 'Save field', 
+          label: checkedCount > 1 ? t('Save fields') : t('Save field'), 
           options: { 
             disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, 
             loader: isLoading, class: 'w-fit' 
@@ -26,7 +26,7 @@
           onclick: async (dialog) => { await saveData(); dialog.hide(); } 
         },
         { 
-          label: 'Cancel', 
+          label: t('Cancel'), 
           options: {
             class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'
           }, 
@@ -34,7 +34,7 @@
         },
       ] : popupMode === 'settings' ? [
           {
-            label: 'Save settings',
+            label: t('Save settings'),
             options: {
               class: 'w-fit'
             },
@@ -42,18 +42,32 @@
           },
         ] : 
           [
+            // {
+            //   label: t('Edit prompts'),
+            //   options: {
+            //     class: 'w-fit ml-auto'
+            //   },
+            //   onclick: (dialog) => { clickSettingsButton(); }
+            // },
             {
-              label: 'Edit prompts',
+              label: t('Cancel'),
               options: {
-                class: 'w-fit ml-auto'
+                class: 'w-2/5 bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'
               },
-              onclick: (dialog) => { clickSettingsButton(); }
+              onclick: (dialog) => confirmDialog.tryToHideModal()
             },
+            {
+              label: t('Start generation'),
+              options: {
+                class: 'w-3/5 px-5 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none'
+              },
+              onclick: (dialog) => { runAiActions(); }
+            }
           ]"
     :click-to-close-outside="false"
   >
-    <div class="[scrollbar-gutter:stable] bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[75vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
-      <div v-if="records && props.checkboxes.length && popupMode === 'generation'" class="w-full overflow-x-auto">
+    <div class="bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[75vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
+      <div v-if="records && props.checkboxes.length && popupMode === 'generation'" class="[scrollbar-gutter:stable] w-full overflow-x-auto">
         <VisionTable
           :checkbox="props.checkboxes"
           :records="records"
@@ -110,7 +124,7 @@
           }}</p>
           <div class="grid grid-cols-2 gap-4">
             <div v-for="(prompt, promptKey) in promptsCategory" :key="promptKey">
-              {{ formatLabel(promptKey) }} prompt:
+              {{ formatLabel(promptKey) }} {{ t('prompt') }}:
               <Textarea 
                 v-model="generationPrompts[key][promptKey]" 
                 class="w-full h-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -120,10 +134,27 @@
           </div>
         </div>
       </div>
-      <div v-else class="flex flex-col gap-2">
-        <Button @click="runAiActions" class="px-5 py-2.5 my-20 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none">
-          Start generation
-        </Button>
+      <div v-else class="flex flex-col gap-2 mt-2 w-full h-full">
+        <div class="flex items-center justify-between mb-2 w-full">
+          <div class="flex items-center justify-center gap-2">
+            <IconShieldSolid class="w-6 h-6 text-lightPrimary dark:text-darkPrimary" />
+            <p class="sm:text-base text-sm">{{ t('Do not overwrite existing values') }}</p>
+            <Tooltip>
+                <IconInfoCircleSolid class="w-5 h-5 me-2 text-lightPrimary dark:text-darkPrimary"/>
+                <template #tooltip>
+                  <p class="max-w-64">{{ t('When enabled, the AI will skip generating content for fields that already have data. This helps to preserve existing information and avoid overwriting valuable content.') }}</p>
+                </template>
+            </Tooltip>
+          </div>
+          <Toggle
+            v-model="skipFilledFieldsForGeneration"
+          />
+        </div>
+        <div :class="skipFilledFieldsForGeneration === false ? 'opacity-100' : 'opacity-0'" class="flex items-center text-yellow-800 bg-yellow-100 p-2 rounded-md border border-yellow-300">
+          <IconExclamationTriangle class="w-6 h-6 me-2"/>
+          <p class="sm:text-base text-sm">{{ t('Warning: Existing values will be overwritten.') }}</p>
+        </div>
+        <p class="w-fit flex justify-start text-lightPrimary dark:text-lightPrimary hover:underline cursor-pointer" @click="clickSettingsButton()">{{ t('Configure prompts') }}</p>
       </div>
     </div>
   </Dialog>
@@ -132,12 +163,15 @@
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
 import { Ref, ref, watch } from 'vue'
-import { Dialog, Button, Textarea } from '@/afcl';
+import { Dialog, Button, Textarea, Toggle, Tooltip } from '@/afcl';
 import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { useCoreStore } from '@/stores/core';
+import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
+import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
+
 
 const coreStore = useCoreStore();
 
@@ -205,6 +239,7 @@ const generationPrompts = ref<any>({});
 const isDataSaved = ref(false);
 
 const regeneratingFieldsStatus = ref<Record<string, Record<string, boolean>>>({});
+const skipFilledFieldsForGeneration = ref<boolean>(true);
 
 const openDialog = async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler);
@@ -629,6 +664,7 @@ async function runAiAction({
           actionType: actionType,
           recordId: checkbox,
           ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
+          filterFilledFields: skipFilledFieldsForGeneration.value,
         },
         silentError: true,
       });
