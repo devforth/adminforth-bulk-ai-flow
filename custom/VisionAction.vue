@@ -140,19 +140,19 @@
         <div class="flex items-center justify-between mb-2 w-full">
           <div class="flex items-center justify-center gap-2">
             <IconShieldSolid class="w-6 h-6 text-lightPrimary dark:text-darkPrimary" />
-            <p class="sm:text-base text-sm">{{ t('Do not overwrite existing values') }}</p>
+            <p class="sm:text-base text-sm">{{ t('Overwrite existing values') }}</p>
             <Tooltip>
                 <IconInfoCircleSolid class="w-5 h-5 me-2 text-lightPrimary dark:text-darkPrimary"/>
                 <template #tooltip>
-                  <p class="max-w-64">{{ t('When enabled, the AI will skip generating content for fields that already have data. This helps to preserve existing information and avoid overwriting valuable content.') }}</p>
+                  <p class="max-w-64">{{ t('When enabled, the AI will overwrite content for fields that already have data. When off - this helps to preserve existing information and avoid overwriting valuable content.') }}</p>
                 </template>
             </Tooltip>
           </div>
           <Toggle
-            v-model="skipFilledFieldsForGeneration"
+            v-model="overwriteExistingValues"
           />
         </div>
-        <div :class="skipFilledFieldsForGeneration === false ? 'opacity-100' : 'opacity-0'" class="flex items-center text-yellow-800 bg-yellow-100 p-2 rounded-md border border-yellow-300">
+        <div :class="overwriteExistingValues === true ? 'opacity-100' : 'opacity-0'" class="flex items-center text-yellow-800 bg-yellow-100 p-2 rounded-md border border-yellow-300">
           <IconExclamationTriangle class="w-6 h-6 me-2"/>
           <p class="sm:text-base text-sm">{{ t('Warning: Existing values will be overwritten.') }}</p>
         </div>
@@ -236,7 +236,7 @@ const generationPrompts = ref<any>({});
 const isDataSaved = ref(false);
 
 const regeneratingFieldsStatus = ref<Record<string, Record<string, boolean>>>({});
-const skipFilledFieldsForGeneration = ref<boolean>(true);
+const overwriteExistingValues = ref<boolean>(false);
 
 const openDialog = async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler);
@@ -668,7 +668,7 @@ async function runAiAction({
           actionType: actionType,
           recordId: checkbox,
           ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
-          filterFilledFields: skipFilledFieldsForGeneration.value,
+          filterFilledFields: !overwriteExistingValues.value,
         },
         silentError: true,
       });
