@@ -563,6 +563,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     };
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+    // Map of column technical names to their display labels from resource config
+    const columnLabels: Record<string, string> = Object.fromEntries(
+      (this.resourceConfig.columns || []).map((c: any) => [c.name, c.label || c.name])
+    );
     
     const pageInjection = {
       file: this.componentPath('VisionAction.vue'),
@@ -571,6 +575,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         outputFields: outputFields,
         actionName: this.options.actionName,
         columnEnums: columnEnums,
+        columnLabels: columnLabels,
         outputImageFields: outputImageFields,
         outputFieldsForAnalizeFromImages: outputFieldsForAnalizeFromImages,
         outputPlainFields: outputPlainFields,
