@@ -238,6 +238,8 @@ const isDataSaved = ref(false);
 const regeneratingFieldsStatus = ref<Record<string, Record<string, boolean>>>({});
 const overwriteExistingValues = ref<boolean>(false);
 
+const listOfImageThatWasNotGeneratedPerRecord = ref<Record<string, string[]>>({});
+
 const openDialog = async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler);
   if (props.meta.askConfirmationBeforeGenerating) {
@@ -544,6 +546,14 @@ async function saveData() {
             if (!value) {
               continue;
             }
+            if (!overwriteExistingValues.value) {
+              const imageURL = selected.value.find(rec => rec[primaryKey] === item[primaryKey])[key];
+              const originalImageUrl = listOfImageThatWasNotGeneratedPerRecord.value[item[primaryKey]][key].originalImage;
+              if (originalImageUrl === imageURL) {
+                reqData.find(rec => rec[primaryKey] === item[primaryKey])[key] = undefined;
+                continue;
+              }
+            }
             const p = uploadImage(value, item[primaryKey], key).then(result => {
               item[key] = result;
             });
@@ -553,7 +563,6 @@ async function saveData() {
       }
       await Promise.all(imagesToUpload);
     }
-
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
       method: 'POST',
@@ -729,7 +738,14 @@ async function runAiAction({
           for (const [key, value] of Object.entries(carouselSaveImages.value[index])) {
             if (props.meta.outputImageFields?.includes(key)) {
               carouselSaveImages.value[index][key] = [jobResponse.job.result[key]];
-            }
+              if (jobResponse.job.recordMeta?.[`${key}_meta`]) {
+                carouselSaveImages.value[index][key] = [jobResponse.job.recordMeta[`${key}_meta`].originalImage];
+                if (!listOfImageThatWasNotGeneratedPerRecord.value[recordId]) {
+                  listOfImageThatWasNotGeneratedPerRecord.value[recordId] = [];
+                }
+                listOfImageThatWasNotGeneratedPerRecord.value[recordId][key] = jobResponse.job.recordMeta[`${key}_meta`];
+              }
+            } 
           }
         }
         //marking that we received response for this record

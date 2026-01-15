@@ -260,7 +260,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
     const fieldTasks = Object.keys(this.options?.generateImages || {}).map(async (key) => {
       if ( record[key] && filterFilledFields ) {
-        return { key, images: [] };
+        const plugin = this.adminforth.activatedPlugins.find(p => 
+          p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+          p.pluginOptions.pathColumnName === key
+        );
+        const image_url = await plugin.pluginOptions.storageAdapter.getDownloadUrl(record[key]);
+        return { 
+          key,
+          images: [image_url], 
+          meta: {
+            skippedToNotOverwrite: true,
+            originalImage: image_url,
+          } 
+        };
       }
       const prompt = (await this.compileGenerationFieldTemplates(record, customPrompt))[key];
       let images;
@@ -312,10 +324,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     });
 
     const fieldResults = await Promise.all(fieldTasks);
-    const recordResult: Record<string, string[]> = {};
+    const recordResult: Record<string, any> = {};
+    const recordMeta: Record<string, any> = {};
 
-    fieldResults.forEach(({ key, images }) => {
+    fieldResults.forEach(({ key, images, meta }) => {
       recordResult[key] = images;
+      if (meta) {
+        recordMeta[`${key}_meta`] = meta;
+      }
     });
 
     const result = recordResult;
@@ -323,7 +339,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     if (!isError) {
       this.totalCalls++;
       this.totalDuration += (+new Date() - start) / 1000;
-      jobs.set(jobId, { status: 'completed', result });
+      jobs.set(jobId, { status: 'completed', result, recordMeta });
       return { ok: true }
     } else {
       return { ok: false, error: 'Error during image generation' };
