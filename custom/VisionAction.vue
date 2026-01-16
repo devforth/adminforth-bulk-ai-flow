@@ -156,7 +156,7 @@
           <IconExclamationTriangle class="w-6 h-6 me-2"/>
           <p class="sm:text-base text-sm">{{ t('Warning: Existing values will be overwritten.') }}</p>
         </div>
-        <p class="w-fit flex justify-start text-lightPrimary dark:text-lightPrimary hover:underline cursor-pointer" @click="clickSettingsButton()">{{ t('Configure prompts') }}</p>
+        <p class="w-fit flex justify-start text-lightPrimary dark:text-white hover:underline cursor-pointer" @click="clickSettingsButton()">{{ t('Configure prompts') }}</p>
       </div>
     </div>
   </Dialog>
