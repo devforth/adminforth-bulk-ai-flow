@@ -548,7 +548,12 @@ async function saveData() {
             }
             if (!overwriteExistingValues.value) {
               const imageURL = selected.value.find(rec => rec[primaryKey] === item[primaryKey])[key];
-              const originalImageUrl = listOfImageThatWasNotGeneratedPerRecord.value[item[primaryKey]][key].originalImage;
+              let originalImageUrl = ''
+              try {
+                originalImageUrl = listOfImageThatWasNotGeneratedPerRecord.value[item[primaryKey]][key].originalImage;
+              } catch (error) {
+                originalImageUrl = '';
+              }
               if (originalImageUrl === imageURL) {
                 reqData.find(rec => rec[primaryKey] === item[primaryKey])[key] = undefined;
                 continue;
