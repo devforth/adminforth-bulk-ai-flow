@@ -83,7 +83,7 @@
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
                 <template #tooltip>
-                  {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
+                  {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}
                 </template>
               </Tooltip>
           </div>
@@ -99,7 +99,7 @@
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
-                <p class="max-w-[200px]">{{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}</p>
+                <p class="max-w-[200px]">{{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}</p>
               </template>
             </Tooltip>
             </div>
@@ -114,7 +114,7 @@
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
-                {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
+                {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}
               </template>
             </Tooltip>
           </div>
@@ -130,7 +130,7 @@
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
-                {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }}
+                {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}
               </template>
             </Tooltip>
           </div>
