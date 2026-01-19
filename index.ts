@@ -803,6 +803,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             }
           }
           const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+          const decimalFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'decimal').map(c => c.name);
           const updates = selectedIds.map(async (ID, idx) => {
             const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
             for (const [key, value] of Object.entries(outputImageFields)) {
@@ -834,6 +835,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                       await  columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletation(fieldsToUpdate[idx][value]);
                     }
                   }
+                }
+              }
+            }
+
+            // Convert decimal fields to numbers
+            if (decimalFieldsArray.length > 0) {
+              for (const fieldName of decimalFieldsArray) {
+                if (fieldsToUpdate[idx].hasOwnProperty(fieldName)) {
+                  fieldsToUpdate[idx][fieldName] = `${fieldsToUpdate[idx][fieldName]}`;
                 }
               }
             }
