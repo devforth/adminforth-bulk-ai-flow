@@ -3,6 +3,8 @@
       :columns="tableHeaders"
       :data="tableColumns"
       :pageSize="6"
+      makeHeaderSticky
+      makePaginationSticky
       >
       <!-- HEADER TEMPLATE -->
       <template #header:checkboxes="{ item }">

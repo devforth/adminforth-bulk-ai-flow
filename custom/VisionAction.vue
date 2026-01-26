@@ -66,9 +66,10 @@
           ]"
     :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col items-center max-w-[1560px] md:max-h-[75vh] gap-3 md:gap-4 w-full h-full overflow-y-auto">
-      <div v-if="records && props.checkboxes.length && popupMode === 'generation'" class="[scrollbar-gutter:stable] w-full overflow-x-auto">
+    <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
+      <template v-if="records && props.checkboxes.length && popupMode === 'generation'" >
         <VisionTable
+        class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
           :checkbox="props.checkboxes"
           :records="records"
           :meta="props.meta"
@@ -111,7 +112,7 @@
         <div class="text-red-600 flex items-center w-full">
           <p v-if="isError === true">{{ errorMessage }}</p>
         </div>
-      </div>
+      </template>
       <div 
         v-else-if="popupMode === 'settings'" 
         v-for="(promptsCategory, key) in generationPrompts" 
