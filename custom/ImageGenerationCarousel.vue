@@ -1,7 +1,7 @@
 
 <template>
   <!-- Main modal -->
-  <div tabindex="-1" class="[scrollbar-gutter:stable] fixed inset-0 z-20 flex justify-center items-center bg-gray-800/50 dark:bg-gray-900/50 overflow-y-auto">
+  <div tabindex="-1" class="[scrollbar-gutter:stable] fixed inset-0 z-40 flex justify-center items-center bg-gray-800/50 dark:bg-gray-900/50 overflow-y-auto">
     <div class="relative p-4 w-full max-w-[1600px]">
         <!-- Modal content -->
         <div class="relative bg-white rounded-lg shadow-xl dark:bg-gray-700">
