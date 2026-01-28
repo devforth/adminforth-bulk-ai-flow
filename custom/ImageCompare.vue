@@ -1,7 +1,7 @@
 <template>
   <!-- Popup Overlay -->
   <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50" @click.self="closePopup">
-    <div class="image-compare-container max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg">
+    <div class="image-compare-container border-white dark:border-black max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg bg-white dark:bg-gray-800">
       <!-- Close Button -->
       <div class="flex justify-end mb-4">
         <button type="button" 
@@ -14,8 +14,8 @@
         </button>
       </div>
       <div class="flex gap-4 items-start justify-between">
-        <h3 class="text-sm font-medium text-gray-700 mb-2">{{ $t('Old Image') }}</h3>
-        <h3 class="text-sm font-medium text-gray-700 mb-2">{{ $t('New Image') }}</h3>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-white mb-2">{{ $t('Old Image') }}</h3>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-white mb-2">{{ $t('New Image') }}</h3>
       </div>
       <div class="flex gap-4 items-center">
         <!-- Old Image -->
@@ -36,8 +36,8 @@
 
         <!-- Comparison Arrow -->
         <div class="flex items-center justify-center">
-          <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center dark:bg-gray-500">
+            <svg class="w-4 h-4 text-blue-600 dark:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
           </div>
@@ -181,9 +181,9 @@ body.medium-zoom--opened aside {
 <style scoped>
 .image-compare-container {
   padding: 1rem;
-  background-color: white;
+  /* background-color: white; */
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  border: 1px solid #e5e7eb;
+  /* border: 1px solid #e5e7eb; */
 }
 
 .fade-enter-active, .fade-leave-active {
