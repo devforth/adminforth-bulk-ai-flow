@@ -63,7 +63,7 @@
               </template>
             </Tooltip>
             <Tooltip>
-              <IconRefreshOutline class="my-2 w-5 h-5 hover:text-blue-500 cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed hover': shouldDisableRegenerateFieldIcon(item, n) }" @click="regerenerateFieldIconClick(item, n)"/>
+              <IconRefreshOutline class="my-2 w-5 h-5 hover:text-blue-500" :class="{ 'opacity-50 cursor-not-allowed hover': shouldDisableRegenerateFieldIcon(item, n) }" @click="regerenerateFieldIconClick(item, n)"/>
               <template #tooltip> 
                 {{ shouldDisableRegenerateFieldIcon(item, n) ? $t("Can't analyze image without source image") : $t('Regenerate') }}
               </template>
