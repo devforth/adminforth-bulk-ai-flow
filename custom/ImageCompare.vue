@@ -1,7 +1,7 @@
 <template>
   <!-- Popup Overlay -->
   <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50" @click.self="closePopup">
-    <div class="image-compare-container border-white dark:border-black max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg bg-white dark:bg-gray-800">
+    <div class="image-compare-container shadow-sm p-4 border-white dark:border-black max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg bg-white dark:bg-gray-800">
       <!-- Close Button -->
       <div class="flex justify-end mb-4">
         <button type="button" 
@@ -176,20 +176,9 @@ html.dark .medium-zoom-overlay {
 body.medium-zoom--opened aside {
   filter: grayscale(1);
 }
-</style>
-
-<style scoped>
-.image-compare-container {
-  padding: 1rem;
-  /* background-color: white; */
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  /* border: 1px solid #e5e7eb; */
-}
-
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.3s ease;
 }
-
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
