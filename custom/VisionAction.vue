@@ -67,7 +67,7 @@
     :click-to-close-outside="false"
   >
     <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
-      <template v-if="globalState.records.length && props.checkboxes.length && popupMode === 'generation'" >
+      <template v-if="globalState.records.length && popupMode === 'generation'" >
         <VisionTable
           class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
           :records="globalState.records"
@@ -152,9 +152,11 @@ import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { useCoreStore } from '@/stores/core';
 import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
+import { useFiltersStore } from '@/stores/filters';
 
 
 const coreStore = useCoreStore();
+const filtersStore = useFiltersStore();
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -232,7 +234,7 @@ const openDialog = async () => {
   isDialogOpen.value = true;
   confirmDialog.value.open();
   isFetchingRecords.value = true;
-  initializeGlobalState();
+  await initializeGlobalState();
   await findPreviewURLForImages();
   isFetchingRecords.value = false;
   if (!generationPrompts.value || Object.keys(generationPrompts.value).length === 0) {
@@ -240,6 +242,35 @@ const openDialog = async () => {
   }
   if (!props.meta.askConfirmationBeforeGenerating) {
     runAiActions();
+  }
+}
+
+async function getListOfIds() {
+  if ( props.meta.recordSelector === 'filtered' ) {
+    const filters = filtersStore.getFilters(props.resource.resourceId);
+    let res;
+    try {
+      res = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/get_filtered_ids`,
+        method: 'POST',
+        body: { filters },
+        silentError: true,
+      });
+    } catch (e) {
+      console.error('Failed to get records for filtered selector:', e);
+      isError.value = true;
+      errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+      return [];
+    }
+    if (!res?.ok || !res?.recordIds) {
+      console.error('Failed to get records for filtered selector, response error:', res);
+      isError.value = true;
+      errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+      return [];
+    }
+    return res.recordIds;
+  } else {
+   return props.checkboxes;
   }
 }
  
@@ -267,8 +298,9 @@ const closeDialog = () => {
   isDataSaved.value = false;
 }
 
-function initializeGlobalState() {
-  const records = props.checkboxes.map((recordId: any) => createEmptyRecord(recordId));
+async function initializeGlobalState() {
+  const ids = await getListOfIds();
+  const records = ids.map((recordId: any) => createEmptyRecord(recordId));
   globalState.records.splice(0, globalState.records.length, ...records);
   globalState.recordsById = Object.fromEntries(records.map(record => [String(record.id), record]));
 }

@@ -124,4 +124,16 @@ export interface PluginOptions {
    * Maximum number of records processed concurrently on the frontend.
    */
   concurrencyLimit?: number;
+
+  /**
+   * Defines the way how records are selected for the action. 
+   * 
+   * 'checkbox' means that user will select records manually by checkboxes, 
+   * 
+   * 'filtered' means that action will be applied to all records matching current 
+   *  filters without showing any checkboxes (use with caution). 
+   * 
+   * Default is 'checkbox'.
+   */
+  recordSelector?: 'checkbox' | 'filtered';
 }
