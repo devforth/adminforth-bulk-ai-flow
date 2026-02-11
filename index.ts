@@ -877,7 +877,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               resource: this.resourceConfig,
               recordId: ID,
               oldRecord: oldRecord,
-              record: newRecord,
+              updates: newRecord,
               adminUser: adminUser,
             })
           });
