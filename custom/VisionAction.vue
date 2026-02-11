@@ -730,9 +730,8 @@ function handleTableError(errorData) {
 }
 async function prepareDataForSave() {
   const checkedRecords = recordIds.value
-    .filter(id => !uncheckedRecordIds.has(String(id)))
-    .map(id => recordsById.get(String(id)))
-    .filter((record): record is RecordState => Boolean(record));
+    .map(id => getOrCreateRecord(id))
+    .filter(record => record.isChecked === true);
   const checkedItems = checkedRecords.map(record => ({
     ...record.data,
     [primaryKey]: record.id,
@@ -779,13 +778,13 @@ async function convertImages(fieldName, img) {
 
 
 async function saveData() {
-  if (checkedCount.value < 1) {
-    adminforth.alert({ message: t('No items selected'), variant: 'warning' });
-    return;
-  }
   try {
     isLoading.value = true;
   const [reqData, checkedRecords] = await prepareDataForSave();
+    if (checkedRecords.length < 1) {
+      adminforth.alert({ message: t('No items selected'), variant: 'warning' });
+      return;
+    }
     if (!checkedRecords.some(record => record.imageGenerationFailed)) {
       const imagesToUpload = [];
       for (let index = 0; index < reqData.length; index++) {
