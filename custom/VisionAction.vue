@@ -228,6 +228,10 @@ const recordsList = computed(() => {
   return recordIds.value.map(id => getOrCreateRecord(id));
 });
 
+function checkIfDialogOpen() {
+  return isDialogOpen.value === true;
+}
+
 const openDialog = async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler);
   if (props.meta.askConfirmationBeforeGenerating) {
@@ -366,6 +370,9 @@ function createEmptyRecord(recordId: string | number): RecordState {
 }
 
 async function processOneRecord(recordId: string) {
+  if (!checkIfDialogOpen()) {
+    return;
+  }
   const record = getOrCreateRecord(recordId);
   if (!record || !record.isChecked) {
     return;
@@ -381,6 +388,9 @@ async function processOneRecord(recordId: string) {
   record.aiStatus.analyzedNoImages = !props.meta.isFieldsForAnalizePlain;
 
   const oldDataResult = await fetchOldData(recordId);
+  if (!checkIfDialogOpen()) {
+    return;
+  }
   if (!oldDataResult) {
     record.status = 'failed';
     record.aiStatus.generatedImages = true;
@@ -393,6 +403,9 @@ async function processOneRecord(recordId: string) {
   initializeRecordData(record, oldDataResult);
   if (props.meta.isAttachFiles) {
     await fetchImages(record, oldDataResult);
+    if (!checkIfDialogOpen()) {
+      return;
+    }
   }
 
   const actions: Array<'generate_images' | 'analyze' | 'analyze_no_images'> = [];
@@ -407,6 +420,9 @@ async function processOneRecord(recordId: string) {
   }
 
   const results = await Promise.allSettled(actions.map(actionType => runActionForRecord(record, actionType)));
+  if (!checkIfDialogOpen()) {
+    return;
+  }
   const hasError = results.some(result => result.status === 'rejected');
   record.status = hasError ? 'failed' : 'completed';
   touchRecords();
@@ -451,6 +467,9 @@ async function checkRateLimits() {
 }
 
 async function runActionForRecord(record: RecordState, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+  if (!checkIfDialogOpen()) {
+    return;
+  }
   const responseFlag = actionType === 'generate_images'
     ? 'generatedImages'
     : actionType === 'analyze'
@@ -469,6 +488,9 @@ async function runActionForRecord(record: RecordState, actionType: 'analyze' | '
 
   let createJobResponse;
   try {
+    if (!checkIfDialogOpen()) {
+      return;
+    }
     createJobResponse = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
       method: 'POST',
@@ -483,6 +505,10 @@ async function runActionForRecord(record: RecordState, actionType: 'analyze' | '
   } catch (e) {
     record.aiStatus[responseFlag] = true;
     throw e;
+  }
+
+  if (!checkIfDialogOpen()) {
+    return;
   }
 
   if (createJobResponse?.error || !createJobResponse?.jobId) {
