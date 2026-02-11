@@ -119,4 +119,9 @@ export interface PluginOptions {
     }) => Record<string, any> | Promise<Record<string, any>>;
 
     askConfirmationBeforeGenerating?: boolean;
+
+  /**
+   * Maximum number of records processed concurrently on the frontend.
+   */
+  concurrencyLimit?: number;
 }

@@ -1,8 +1,8 @@
 <template>
     <Table
       :columns="tableHeaders"
-      :data="tableColumns"
-      :pageSize="6"
+      :data="tableDataProvider"
+      :pageSize="pageSize"
       makeHeaderSticky
       makePaginationSticky
       >
@@ -14,7 +14,7 @@
       <template #cell:checkboxes="{ item }">
         <div class="max-w-[100px] flex items-center justify-center">
           <Checkbox
-            v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])].isChecked"
+            v-model="item.isChecked"
           />
         </div>
       </template>
@@ -55,8 +55,8 @@
         </div>
       </template>
       <!-- CUSTOM FIELD TEMPLATES -->
-      <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item, column }">
-        <div v-if="(isAnalyzing(item, n) && !(props.regeneratingFieldsStatus[item[props.primaryKey]] && props.regeneratingFieldsStatus[item[props.primaryKey]][n])) && !isInColumnImage(n)" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
+      <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item }">
+        <div v-if="(isAnalyzing(item, n) && !item.regeneratingFieldsStatus?.[n]) && !isInColumnImage(n)" @mouseenter="(() => { setHover(item.id, n, true) })" @mouseleave="(() => { setHover(item.id, n, false) })">
           <div class="flex gap-1 justify-end">
             <Tooltip v-if="checkForError(item, n)">
               <IconExclamationCircleSolid class="my-2 w-5 h-5 text-red-500" />
@@ -75,143 +75,143 @@
               <Select
                 class="min-w-[150px]"
                 :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
-                v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                v-model="item.data[n]"
                 :teleportToTop="true"
                 :teleportToBody="false"
               >
               </Select>
               <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
                 <template #tooltip>
-                  {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}
+                  {{  item.oldData?.[n] ?? "No old value" }}
                 </template>
               </Tooltip>
           </div>
-            <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'string' || typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'object'" class="flex flex-col items-start justify-end min-h-[90px]">
+            <div v-else-if="typeof item.data?.[n] === 'string' || typeof item.data?.[n] === 'object'" class="flex flex-col items-start justify-end min-h-[90px]">
             <Textarea
               class="min-w-[150px] h-full"
               type="text"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+              v-model="item.data[n]"
             >
             </Textarea>
             <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
-                <p class="max-w-[200px]">{{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}</p>
+                <p class="max-w-[200px]">{{  item.oldData?.[n] ?? "No old value" }}</p>
               </template>
             </Tooltip>
             </div>
-          <div v-else-if="typeof selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] === 'boolean'" class="flex flex-col items-center justify-end min-h-[90px]">
+          <div v-else-if="typeof item.data?.[n] === 'boolean'" class="flex flex-col items-center justify-end min-h-[90px]">
             <Toggle
               class="p-2"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+              v-model="item.data[n]"
             >
             </Toggle>
             <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
-                {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}
+                {{  item.oldData?.[n] ?? "No old value" }}
               </template>
             </Tooltip>
           </div>
           <div v-else class="flex flex-col items-start justify-end min-h-[90px]">
             <Input
               type="number"
-              v-model="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+              v-model="item.data[n]"
               class="w-full min-w-[80px]"
               :fullWidth="true"
             />
             <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }">
+                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
                   <p class="text-sm ">{{ $t('old value') }}</p>
                 </div>
               <template #tooltip>
-                {{  oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] ?? "No old value" }}
+                {{  item.oldData?.[n] ?? "No old value" }}
               </template>
             </Tooltip>
           </div>
         </div>
 
-        <div v-if="isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])]" @mouseenter="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true})" @mouseleave="(() => { hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false})">
+        <div v-if="item.aiStatus.generatedImages" @mouseenter="(() => { setHover(item.id, n, true) })" @mouseleave="(() => { setHover(item.id, n, false) })">
           <div v-if="isInColumnImage(n)">
             <div class="mt-2 mb-2 flex items-center justify-start gap-2">
-              <div v-if="isValidUrl(selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n])" class="flex flex-col items-center relative">
+              <div v-if="isValidUrl(item.data?.[n])" class="flex flex-col items-center relative">
               <img 
-                :src="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :src="item.data?.[n]"
                 class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition"
-                @click="() => {openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"
+                @click="() => {item.openGenerationCarousel[n] = true}"
               />
               <p
                 v-if="isImageHasPreviewUrl[n]"
                 class="absolute mt-20 text-sm hover:text-blue-500 hover:underline hover:cursor-pointer flex items-center gap-1"
-                :class="{ 'opacity-0': !hovers[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] }"
-                @click="() => {openImageCompare[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = true}"  
+                :class="{ 'opacity-0': !isHovered(item.id, n) }"
+                @click="() => {item.openImageCompare[n] = true}"  
               >
                 {{ $t('old image') }}
               </p>
               </div>
               <div v-else class="flex items-center justify-center text-center w-20 h-20">
-                <Tooltip v-if="imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] === 'No source images found'">
+                <Tooltip v-if="item.imageGenerationErrorMessage === 'No source images found'">
                   <p
                   >
                     {{ $t("Can't generate image.") }}
                   </p>
                   <template #tooltip>
-                    {{ imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] }}
+                    {{ item.imageGenerationErrorMessage }}
                   </template>
                 </Tooltip>
                 <Tooltip v-else>
                   <div>
                     <IconRefreshOutline
-                      @click="() => {regenerateImages(item[primaryKey])}"
+                      @click="() => {regenerateImages(item.id)}"
                       class="w-20 h-20 hover:text-blue-500 cursor-pointer transition hover:scale-105"
                     />
                   </div>
                   <template #tooltip>
-                    {{ imageGenerationErrorMessage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] + '. Click to retry.' }}
+                    {{ item.imageGenerationErrorMessage + '. Click to retry.' }}
                   </template>
                 </Tooltip>
               </div>
             </div>
             <div>
               <GenerationCarousel
-                v-if="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-                :images="carouselSaveImages[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-                :recordId="item[primaryKey]"
+                v-if="item.openGenerationCarousel[n]"
+                :images="item.carouselSaveImages[n]"
+                :recordId="item.id"
                 :meta="props.meta"
                 :fieldName="n"
-                :carouselImageIndex="carouselImageIndex[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                :carouselImageIndex="item.carouselImageIndex[n]"
                 :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
                 :sourceImage="item.images && item.images.length ? item.images : null"
                 :imageGenerationPrompts="imageGenerationPrompts[n]"
                 @error="handleError"
-                @close="openGenerationCarousel[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
+                @close="item.openGenerationCarousel[n] = false"
                 @selectImage="updateSelectedImage"
                 @updateCarouselIndex="updateActiveIndex"
               />
               <ImageCompare
-                v-if="openImageCompare[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
+                v-if="item.openImageCompare[n]"
                 :meta="props.meta"
                 :columnName="n"
-                :oldImage="oldData[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-                :newImage="selected[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n]"
-                @close="openImageCompare[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])][n] = false"
+                :oldImage="item.oldData?.[n]"
+                :newImage="item.data?.[n]"
+                @close="item.openImageCompare[n] = false"
               />
             </div>
           </div>
         </div>
 
-        <div v-if="!isAiResponseReceivedImage[tableColumnsIndexes.findIndex(el => el[primaryKey] === item[primaryKey])] && isInColumnImage(n)">
+        <div v-if="!item.aiStatus.generatedImages && isInColumnImage(n)">
             <Skeleton type="image" class="w-20 h-20" />
         </div>
 
-        <div v-if="(!isAnalyzing(item, n) || (props.regeneratingFieldsStatus[item[props.primaryKey]] && props.regeneratingFieldsStatus[item[props.primaryKey]][n])) && !isInColumnImage(n)">
+        <div v-if="(!isAnalyzing(item, n) || item.regeneratingFieldsStatus?.[n]) && !isInColumnImage(n)">
           <Skeleton class="w-full h-6" />
         </div>
       </template>
@@ -219,7 +219,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, reactive } from 'vue'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle, Tooltip } from '@/afcl'
 import GenerationCarousel from './ImageGenerationCarousel.vue'
 import ImageCompare from './ImageCompare.vue';
@@ -228,48 +228,38 @@ import { IconRefreshOutline, IconExclamationCircleSolid } from '@iconify-prerend
 const props = defineProps<{
   meta: any,
   tableHeaders: any,
-  tableColumns: any,
+  records: any[],
   customFieldNames: any,
-  tableColumnsIndexes: any,
-  selected: any,
-  isAiResponseReceivedAnalizeImage: boolean[],
-  isAiResponseReceivedAnalizeNoImage: boolean[],
-  isAiResponseReceivedImage: boolean[],
-  primaryKey: any,
-  openGenerationCarousel: any,
-  openImageCompare: any,
   isError: boolean,
   errorMessage: string
-  carouselSaveImages: any[]
-  carouselImageIndex: any[]
   regenerateImagesRefreshRate: number
-  isAiGenerationError: boolean[],
-  aiGenerationErrorMessage: string[],
-  isAiImageGenerationError: boolean[],
-  imageGenerationErrorMessage: string[],
-  oldData: any[],
   isImageHasPreviewUrl: Record<string, boolean>
   imageGenerationPrompts: Record<string, any>
-  isImageToTextGenerationError: boolean[],
-  imageToTextErrorMessages: Record<string, string>[],
-  isTextToTextGenerationError: boolean[],
-  textToTextErrorMessages: Record<string, string>[],
   outputImageFields: string[],
   outputFieldsForAnalizeFromImages: string[],
   outputPlainFields: string[],
-  regeneratingFieldsStatus: Record<string, Record<string, boolean>>
 }>();
 const emit = defineEmits(['error', 'regenerateImages', 'regenerateCell']);
 
-
+const pageSize = 6;
+const pagination = reactive({ offset: 0, limit: pageSize });
 const zoomedImage = ref(null);
-const hovers = ref<{ [key: string]: boolean }[]>([]);
+const hovers = ref<Record<string, Record<string, boolean>>>({});
 
-watch(() => props.tableColumnsIndexes, (newVal) => {
-  if (newVal) {
-    hovers.value = newVal.map(() => ({}));
-  }
-}, { immediate: true });
+const paginatedRecords = computed(() => props.records.slice(pagination.offset, pagination.offset + pagination.limit));
+
+const tableDataProvider = async ({ offset, limit }) => {
+  pagination.offset = offset;
+  pagination.limit = limit;
+  return {
+    data: paginatedRecords.value,
+    total: props.records.length,
+  };
+};
+
+watch(() => props.records, (newVal) => {
+  hovers.value = Object.fromEntries((newVal || []).map(record => [String(record.id), {}]));
+}, { immediate: true, deep: true });
 
 function zoomImage(img) {
   zoomedImage.value = img
@@ -301,7 +291,10 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
 }
 
 function updateSelectedImage(image: string, id: any, fieldName: string) {
-  props.selected[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = image;
+  const record = props.records.find(rec => String(rec.id) === String(id));
+  if (record) {
+    record.data[fieldName] = image;
+  }
 }
 
 function handleError({ isError, errorMessage }) {
@@ -311,14 +304,15 @@ function handleError({ isError, errorMessage }) {
   });
 }
 
-function regenerateImages(recordInfo: any) {
-  emit('regenerateImages', {
-    recordInfo
-  });
+function regenerateImages(recordId: any) {
+  emit('regenerateImages', { recordId });
 }
 
 function updateActiveIndex(newIndex: number, id: any, fieldName: string) {
-  props.carouselImageIndex[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === id)][fieldName] = newIndex;
+  const record = props.records.find(rec => String(rec.id) === String(id));
+  if (record) {
+    record.carouselImageIndex[fieldName] = newIndex;
+  }
 }
 
 function isValidUrl(str: string): boolean {
@@ -335,14 +329,14 @@ function regerenerateFieldIconClick(item, name) {
     return;
   }
   emit('regenerateCell', {
-    recordId: item[props.primaryKey],
+    recordId: item.id,
     fieldName: name
   });
 };
 
 function shouldDisableRegenerateFieldIcon(item, name) {
   if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1 &&
-      props.imageToTextErrorMessages[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]?.[name] === 'No source images found') {
+      item.imageToTextErrorMessages?.[name] === 'No source images found') {
     return true;
   }
   return false;
@@ -350,13 +344,13 @@ function shouldDisableRegenerateFieldIcon(item, name) {
 
 function checkForError(item, name) {
   if (props.outputFieldsForAnalizeFromImages.findIndex( el => el === name) !== -1) {
-    const errorMessage = props.imageToTextErrorMessages?.[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]?.[name];
+    const errorMessage = item.imageToTextErrorMessages?.[name];
     if (errorMessage) {
       return errorMessage;
     }
   }
   if (props.outputPlainFields.findIndex( el => el === name) !== -1) {
-    const errorMessage = props.textToTextErrorMessages?.[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]?.[name];
+    const errorMessage = item.textToTextErrorMessages?.[name];
     if (errorMessage) {
       return errorMessage;
     }
@@ -376,13 +370,23 @@ function isAnalyzing(item, name) {
 }
 
 function isImagesAnalyzing(item) {
-  const isImagesAnalyzing = props.isAiResponseReceivedAnalizeImage[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]
-  return isImagesAnalyzing;
+  return item.aiStatus.analyzedImages;
 }
 
 function isNoImageAnalyzing(item) {
-  const isNoImageAnalyzing = props.isAiResponseReceivedAnalizeNoImage[props.tableColumnsIndexes.findIndex(el => el[props.primaryKey] === item[props.primaryKey])]
-  return isNoImageAnalyzing;
+  return item.aiStatus.analyzedNoImages;
+}
+
+function setHover(recordId: string | number, field: string, value: boolean) {
+  const key = String(recordId);
+  if (!hovers.value[key]) {
+    hovers.value[key] = {};
+  }
+  hovers.value[key][field] = value;
+}
+
+function isHovered(recordId: string | number, field: string) {
+  return Boolean(hovers.value?.[String(recordId)]?.[field]);
 }
 
 

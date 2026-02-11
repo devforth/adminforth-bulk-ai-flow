@@ -609,6 +609,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           regenerateImages: this.options.refreshRates?.regenerateImages || 5_000,
         },
         askConfirmationBeforeGenerating: this.options.askConfirmationBeforeGenerating || false,
+        concurrencyLimit: this.options.concurrencyLimit || 10,
         generationPrompts: {
           plainFieldsPrompts: this.options.fillPlainFields || {},
           imageFieldsPrompts: this.options.fillFieldsFromImages || {},
@@ -767,6 +768,26 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     server.endpoint({
       method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/get_old_data`,
+      handler: async ({ body }) => {
+        const recordId = body.recordId;
+        if (recordId === undefined || recordId === null) {
+          return { ok: false, error: "Missing recordId" };
+        }
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId)
+          .get([Filters.EQ(primaryKeyColumn.name, recordId)]);
+        if (!record) {
+          return { ok: false, error: "Record not found" };
+        }
+        record._label = this.resourceConfig.recordLabel(record);
+        return { ok: true, record };
+      }
+    });
+
+
+    server.endpoint({
+      method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
       handler: async ( body ) => {
         let images = [];
@@ -905,7 +926,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           jobs.set(jobId, { status: "failed", error: "Missing action type" });
           //return { error: "Missing action type" };
         }
-        else if (!recordId) {
+        else if (!recordId && typeof recordId !== 'number') {
           jobs.set(jobId, { status: "failed", error: "Missing record id" });
           //return { error: "Missing record id" };
         } else {
