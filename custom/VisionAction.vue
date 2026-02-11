@@ -67,10 +67,10 @@
     :click-to-close-outside="false"
   >
     <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
-      <template v-if="globalState.records.length && popupMode === 'generation'" >
+      <template v-if="recordsList.length && popupMode === 'generation'" >
         <VisionTable
           class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
-          :records="globalState.records"
+          :records="recordsList"
           :meta="props.meta"
           :tableHeaders="tableHeaders"
           :customFieldNames="customFieldNames"
@@ -195,10 +195,9 @@ type RecordState = {
   listOfImageNotGenerated: Record<string, any>;
 };
 
-const globalState = reactive<{ records: RecordState[]; recordsById: Record<string, RecordState> }>({
-  records: [],
-  recordsById: {},
-});
+const recordIds = ref<Array<string | number>>([]);
+const recordsById = new Map<string, RecordState>();
+const uncheckedRecordIds = new Set<string>();
 
 defineExpose({
   click
@@ -218,11 +217,16 @@ const generationPrompts = ref<any>({});
 const isDataSaved = ref(false);
 const overwriteExistingValues = ref<boolean>(false);
 
-const checkedCount = computed(() => globalState.records.filter(record => record.isChecked).length);
-const isProcessingAny = computed(() => globalState.records.some(record => record.status === 'processing'));
+const checkedCount = computed(() => recordIds.value.length - uncheckedRecordIds.size);
+const isProcessingAny = computed(() => Array.from(recordsById.values()).some(record => record.status === 'processing'));
 
 const tableHeaders = computed(() => generateTableHeaders(props.meta.outputFields));
 const customFieldNames = computed(() => tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName));
+const recordsVersion = ref(0);
+const recordsList = computed(() => {
+  recordsVersion.value;
+  return recordIds.value.map(id => getOrCreateRecord(id));
+});
 
 const openDialog = async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler);
@@ -281,9 +285,9 @@ async function runAiActions() {
     return;
   }
   const limit = pLimit(props.meta.concurrencyLimit || 10);
-  const tasks = globalState.records
-    .filter(record => record.isChecked)
-    .map(record => limit(() => processOneRecord(String(record.id))));
+  const tasks = recordIds.value
+    .filter(id => !uncheckedRecordIds.has(String(id)))
+    .map(id => limit(() => processOneRecord(String(id))));
   await Promise.all(tasks);
 }
 
@@ -300,14 +304,30 @@ const closeDialog = () => {
 
 async function initializeGlobalState() {
   const ids = await getListOfIds();
-  const records = ids.map((recordId: any) => createEmptyRecord(recordId));
-  globalState.records.splice(0, globalState.records.length, ...records);
-  globalState.recordsById = Object.fromEntries(records.map(record => [String(record.id), record]));
+  recordIds.value = ids;
+  recordsById.clear();
+  uncheckedRecordIds.clear();
 }
 
 function resetGlobalState() {
-  globalState.records.splice(0, globalState.records.length);
-  globalState.recordsById = {};
+  recordIds.value = [];
+  recordsById.clear();
+  uncheckedRecordIds.clear();
+}
+
+function getOrCreateRecord(recordId: string | number): RecordState {
+  const key = String(recordId);
+  let record = recordsById.get(key);
+  if (!record) {
+    record = createEmptyRecord(recordId);
+    record.isChecked = !uncheckedRecordIds.has(key);
+    recordsById.set(key, record);
+  }
+  return record;
+}
+
+function touchRecords() {
+  recordsVersion.value += 1;
 }
 
 function createImageFieldMap<T>(factory: () => T): Record<string, T> {
@@ -346,11 +366,12 @@ function createEmptyRecord(recordId: string | number): RecordState {
 }
 
 async function processOneRecord(recordId: string) {
-  const record = globalState.recordsById[recordId];
+  const record = getOrCreateRecord(recordId);
   if (!record || !record.isChecked) {
     return;
   }
   record.status = 'processing';
+  touchRecords();
   record.imageGenerationFailed = false;
   record.imageGenerationErrorMessage = '';
   record.imageToTextErrorMessages = {};
@@ -365,6 +386,7 @@ async function processOneRecord(recordId: string) {
     record.aiStatus.generatedImages = true;
     record.aiStatus.analyzedImages = true;
     record.aiStatus.analyzedNoImages = true;
+    touchRecords();
     return;
   }
   record.label = oldDataResult._label || record.label;
@@ -387,6 +409,7 @@ async function processOneRecord(recordId: string) {
   const results = await Promise.allSettled(actions.map(actionType => runActionForRecord(record, actionType)));
   const hasError = results.some(result => result.status === 'rejected');
   record.status = hasError ? 'failed' : 'completed';
+  touchRecords();
 }
 
 async function checkRateLimits() {
@@ -535,6 +558,7 @@ function applyJobResult(record: RecordState, job: any, actionType: 'analyze' | '
       ...(job?.result || {}),
     };
   }
+  touchRecords();
 }
 
 function applyJobFailure(record: RecordState, job: any, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
@@ -555,6 +579,7 @@ function applyJobFailure(record: RecordState, job: any, actionType: 'analyze' | 
       record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || 'Unknown error';
     }
   }
+  touchRecords();
 }
 
 async function waitForRefresh(actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
@@ -612,6 +637,7 @@ function initializeRecordData(record: RecordState, oldRecord: Record<string, any
   newOldData._label = oldRecord._label;
   record.data = newData;
   record.oldData = newOldData;
+  touchRecords();
 }
 
 function normalizeEnumValue(key: string, value: any) {
@@ -633,6 +659,7 @@ async function fetchImages(record: RecordState, oldRecord: Record<string, any>) 
       },
     });
     record.images = res.images?.[0] || [];
+    touchRecords();
   } catch (error) {
     console.error('Failed to get images:', error);
     isError.value = true;
@@ -675,7 +702,10 @@ function handleTableError(errorData) {
   errorMessage.value = errorData.errorMessage;
 }
 async function prepareDataForSave() {
-  const checkedRecords = globalState.records.filter(record => record.isChecked);
+  const checkedRecords = recordIds.value
+    .filter(id => !uncheckedRecordIds.has(String(id)))
+    .map(id => recordsById.get(String(id)))
+    .filter((record): record is RecordState => Boolean(record));
   const checkedItems = checkedRecords.map(record => ({
     ...record.data,
     [primaryKey]: record.id,
@@ -731,7 +761,8 @@ async function saveData() {
   const [reqData, checkedRecords] = await prepareDataForSave();
     if (!checkedRecords.some(record => record.imageGenerationFailed)) {
       const imagesToUpload = [];
-      for (const [index, item] of reqData.entries()) {
+      for (let index = 0; index < reqData.length; index++) {
+        const item = reqData[index];
         const record = checkedRecords[index];
         for (const [key, value] of Object.entries(item)) {
           if (props.meta.outputImageFields?.includes(key)) {
@@ -880,13 +911,15 @@ function regenerateImages({ recordId }: { recordId: any }) {
     });
     return;
   }
-  const record = globalState.recordsById[String(recordId)];
+  const record = recordsById.get(String(recordId));
   if (!record) {
     return;
   }
   record.aiStatus.generatedImages = false;
+  touchRecords();
   runActionForRecord(record, 'generate_images').catch(() => {
     record.aiStatus.generatedImages = true;
+    touchRecords();
   });
 }
 
@@ -1028,7 +1061,7 @@ async function regenerateCell(recordInfo: any) {
     });
     return;
   }
-  const record = globalState.recordsById[String(recordInfo.recordId)];
+  const record = recordsById.get(String(recordInfo.recordId));
   if (!record) {
     return;
   }
@@ -1036,6 +1069,7 @@ async function regenerateCell(recordInfo: any) {
     record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
   }
   record.regeneratingFieldsStatus[recordInfo.fieldName] = true;
+  touchRecords();
   const actionType = props.meta.outputFieldsForAnalizeFromImages?.includes(recordInfo.fieldName)
     ? 'analyze'
     : props.meta.outputPlainFields?.includes(recordInfo.fieldName)
@@ -1044,6 +1078,7 @@ async function regenerateCell(recordInfo: any) {
   if (!actionType) {
     console.error(`Field ${recordInfo.fieldName} is not configured for analysis.`);
     record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+    touchRecords();
     return;
   }
   
@@ -1114,6 +1149,7 @@ async function regenerateCell(recordInfo: any) {
       record.aiStatus.analyzedNoImages = true;
     }
     record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+    touchRecords();
     return;
   } else if (res.job?.status === 'completed') {
     record.data = {
@@ -1128,6 +1164,7 @@ async function regenerateCell(recordInfo: any) {
       record.aiStatus.analyzedNoImages = true;
     }
     record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+    touchRecords();
   }
 }
 
