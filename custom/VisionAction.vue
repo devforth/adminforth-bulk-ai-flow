@@ -20,7 +20,7 @@
         { 
           label: checkedCount > 1 ? t('Save fields') : t('Save field'), 
           options: { 
-            disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isProcessingAny, 
+            disabled: isLoading || checkedCount < 1 || isFetchingRecords || isProcessingAny, 
             loader: isLoading, class: 'w-fit' 
           }, 
           onclick: async (dialog) => { await saveData(); dialog.hide(); } 
@@ -208,7 +208,6 @@ const primaryKey = props.meta.primaryKey;
 const isLoading = ref(false);
 const isFetchingRecords = ref(false);
 const isError = ref(false);
-const isCriticalError = ref(false);
 const errorMessage = ref('');
 const isDialogOpen = ref(false);
 const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
@@ -218,7 +217,10 @@ const isDataSaved = ref(false);
 const overwriteExistingValues = ref<boolean>(false);
 
 const checkedCount = computed(() => recordIds.value.length - uncheckedRecordIds.size);
-const isProcessingAny = computed(() => Array.from(recordsById.values()).some(record => record.status === 'processing'));
+const isProcessingAny = computed(() => {
+  recordsVersion.value;
+  return Array.from(recordsById.values()).some(record => record.status === 'processing');
+});
 
 const tableHeaders = computed(() => generateTableHeaders(props.meta.outputFields));
 const customFieldNames = computed(() => tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName));
@@ -299,7 +301,6 @@ const closeDialog = () => {
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   resetGlobalState();
   isError.value = false;
-  isCriticalError.value = false;
   errorMessage.value = '';
   isDialogOpen.value = false;
   popupMode.value = 'confirmation';
