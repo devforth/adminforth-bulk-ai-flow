@@ -102,7 +102,7 @@
             ></div>
             <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
               <template v-if="isProcessingAny || isGenerationPaused">
-                {{ (displayedProcessedCount  /  totalRecords) * 100 }}%
+                {{ Math.floor((displayedProcessedCount  /  totalRecords) * 100) }}%
               </template>
               <template v-else-if="isGenerationCancelled">
                 {{ t('Generation cancelled') }}
