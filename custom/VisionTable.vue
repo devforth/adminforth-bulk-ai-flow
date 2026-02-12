@@ -1,5 +1,6 @@
 <template>
     <Table
+      ref="tableRef"
       :columns="tableHeaders"
       :data="tableDataProvider"
       :pageSize="pageSize"
@@ -245,6 +246,15 @@ const pageSize = 6;
 const pagination = reactive({ offset: 0, limit: pageSize });
 const zoomedImage = ref(null);
 const hovers = ref<Record<string, Record<string, boolean>>>({});
+const tableRef = ref(null);
+
+defineExpose({
+  refresh() {
+    if (tableRef.value) {
+      tableRef.value.refreshTable();
+    }
+  }
+});
 
 const paginatedRecords = computed(() => props.records.slice(pagination.offset, pagination.offset + pagination.limit));
 

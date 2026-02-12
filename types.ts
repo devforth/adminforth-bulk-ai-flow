@@ -136,4 +136,12 @@ export interface PluginOptions {
    * Default is 'checkbox'.
    */
   recordSelector?: 'checkbox' | 'filtered';
+
+  /** 
+   * additional confirmation: generation of very many records is risky in terms of budget. On 1m budget it might be thousands USD,
+  * this settings allows to suspend rgeneration and allow user to review everything what was already generated so far
+  * and then suggest Resume / Stop Generation buttons. You can set it in mode where it is shown only afterFirst N records (e.g. at start) or every N records
+  */
+  askConfirmation?: ({ afterRecords: number } | { everyRecords: number })[]
+
 }
