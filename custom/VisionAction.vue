@@ -830,19 +830,18 @@ async function saveData() {
     const saveResults = await Promise.all(saveTasks);
     const failedResult = saveResults.find(res => res?.ok === false || res?.error);
 
-    if (!failedResult) {
-      confirmDialog.value.close();
-      props.updateList();
-      props.clearCheckboxes?.();
-    } else if (failedResult.ok === false) {
-      adminforth.alert({
-        message: failedResult.error,
-        variant: 'danger',
-        timeout: 'unlimited',
+     if (failedResult && failedResult.ok === false) {
+      saveResults.filter(res => res?.ok === false).forEach(res => {
+        adminforth.alert({
+          message: res.error || t(errorText),
+          variant: 'danger',
+          timeout: 'unlimited',
+        });
+        console.error('Error saving data:', res.error);
       });
       isError.value = true;
       errorMessage.value = t(errorText);
-    } else {
+    } else if ( failedResult ) {
       console.error('Error saving data:', failedResult);
       isError.value = true;
       errorMessage.value = t(errorText);
@@ -852,6 +851,9 @@ async function saveData() {
     isError.value = true;
     errorMessage.value = t(errorText);
   } finally {
+    confirmDialog.value.close();
+    props.updateList();
+    props.clearCheckboxes?.();
     isLoading.value = false;
     isDataSaved.value = true;
     window.removeEventListener('beforeunload', beforeUnloadHandler);

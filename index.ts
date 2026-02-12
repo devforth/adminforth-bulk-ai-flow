@@ -825,7 +825,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             }
           }
           const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+
           const decimalFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'decimal').map(c => c.name);
+          const integerFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'integer').map(c => c.name);
+          const floatFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'float').map(c => c.name);
+
           const updates = selectedIds.map(async (ID, idx) => {
             const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
             for (const [key, value] of Object.entries(outputImageFields)) {
@@ -869,6 +873,21 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 }
               }
             }
+            if (integerFieldsArray.length > 0) {
+              for (const fieldName of integerFieldsArray) {
+                if (fieldsToUpdate[idx].hasOwnProperty(fieldName)) {
+                  fieldsToUpdate[idx][fieldName] = parseInt(fieldsToUpdate[idx][fieldName], 10);
+                }
+              }
+            }
+            if (floatFieldsArray.length > 0) {
+              for (const fieldName of floatFieldsArray) {
+                if (fieldsToUpdate[idx].hasOwnProperty(fieldName)) {
+                  fieldsToUpdate[idx][fieldName] = parseFloat(fieldsToUpdate[idx][fieldName]);
+                }
+              }
+            }
+
             const newRecord = {
               ...oldRecord,
               ...fieldsToUpdate[idx]
@@ -881,7 +900,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               adminUser: adminUser,
             })
           });
-          await Promise.all(updates);
+          try {
+            await Promise.all(updates);
+          } catch (error) {
+            return { ok: false, error: `Error updating records, because of unprocesseble data for record ID ${selectedIds}` };
+          }
           return { ok: true };
         } else {
           return { ok: false, error: isAllowedToSave.error };
