@@ -292,7 +292,6 @@ async function runAiActions() {
   }
   const limit = pLimit(props.meta.concurrencyLimit || 10);
   const tasks = recordIds.value
-    .filter(id => !uncheckedRecordIds.has(String(id)))
     .map(id => limit(() => processOneRecord(String(id))));
   await Promise.all(tasks);
 }
@@ -778,6 +777,7 @@ async function convertImages(fieldName, img) {
 
 
 async function saveData() {
+  const errorText = 'Failed to save some records. Not all data may be saved'
   try {
     isLoading.value = true;
   const [reqData, checkedRecords] = await prepareDataForSave();
@@ -841,16 +841,16 @@ async function saveData() {
         timeout: 'unlimited',
       });
       isError.value = true;
-      errorMessage.value = t(`Failed to save data. You are not allowed to save.`);
+      errorMessage.value = t(errorText);
     } else {
       console.error('Error saving data:', failedResult);
       isError.value = true;
-      errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
+      errorMessage.value = t(errorText);
     }
   } catch (error) {
     console.error('Error saving data:', error);
     isError.value = true;
-    errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
+    errorMessage.value = t(errorText);
   } finally {
     isLoading.value = false;
     isDataSaved.value = true;
