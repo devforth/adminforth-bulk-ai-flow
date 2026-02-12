@@ -68,6 +68,32 @@
   >
     <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
       <template v-if="recordsList.length && popupMode === 'generation'" >
+
+
+        <div class="w-full">
+          <div
+            class="w-full h-[30px] rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
+            role="progressbar"
+            :aria-valuenow="displayedProcessedCount"
+            :aria-valuemin="0"
+            :aria-valuemax="totalRecords"
+          >
+            <div
+              class="h-full bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 transition-all duration-200"
+              :style="{ width: `${displayedProgressPercent}%` }"
+            ></div>
+            <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
+              <template v-if="isProcessingAny">
+                {{ displayedProcessedCount }} / {{ totalRecords }}
+              </template>
+              <template v-else>
+                {{ t('Processed') }}
+              </template>
+            </div>
+          </div>
+        </div>
+
+
         <VisionTable
           class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
           :records="recordsList"
@@ -217,6 +243,33 @@ const isDataSaved = ref(false);
 const overwriteExistingValues = ref<boolean>(false);
 
 const checkedCount = computed(() => recordIds.value.length - uncheckedRecordIds.size);
+const totalRecords = computed(() => recordIds.value.length);
+const processedCount = computed(() => {
+  recordsVersion.value;
+  return Array.from(recordsById.values()).filter(record => record.status === 'completed' || record.status === 'failed').length;
+});
+const progressStep = computed(() => {
+  if (!totalRecords.value || totalRecords.value < 100) {
+    return 1;
+  }
+  return Math.max(1, Math.floor(totalRecords.value / 100));
+});
+const displayedProcessedCount = computed(() => {
+  const step = progressStep.value;
+  if (step <= 1) {
+    return processedCount.value;
+  }
+  if (processedCount.value >= totalRecords.value) {
+    return totalRecords.value;
+  }
+  return Math.floor(processedCount.value / step) * step;
+});
+const displayedProgressPercent = computed(() => {
+  if (!totalRecords.value) {
+    return 0;
+  }
+  return Math.min(100, Math.round((displayedProcessedCount.value / totalRecords.value) * 100));
+});
 const isProcessingAny = computed(() => {
   recordsVersion.value;
   return Array.from(recordsById.values()).some(record => record.status === 'processing');
