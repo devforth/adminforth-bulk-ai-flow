@@ -20,7 +20,7 @@
         { 
           label: checkedCount > 1 ? t('Save fields') : t('Save field'), 
           options: { 
-            disabled: isLoading || checkedCount < 1 || isCriticalError || isFetchingRecords || isGeneratingImages || isAnalizingFields || isAnalizingImages, 
+            disabled: isLoading || checkedCount < 1 || isFetchingRecords || isProcessingAny, 
             loader: isLoading, class: 'w-fit' 
           }, 
           onclick: async (dialog) => { await saveData(); dialog.hide(); } 
@@ -67,46 +67,49 @@
     :click-to-close-outside="false"
   >
     <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
-      <template v-if="records && props.checkboxes.length && popupMode === 'generation'" >
+      <template v-if="recordsList.length && popupMode === 'generation'" >
+
+
+        <div class="w-full">
+          <div
+            class="w-full h-[30px] rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
+            role="progressbar"
+            :aria-valuenow="displayedProcessedCount"
+            :aria-valuemin="0"
+            :aria-valuemax="totalRecords"
+          >
+            <div
+              class="h-full bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 transition-all duration-200"
+              :style="{ width: `${displayedProgressPercent}%` }"
+            ></div>
+            <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
+              <template v-if="isProcessingAny">
+                {{ displayedProcessedCount }} / {{ totalRecords }}
+              </template>
+              <template v-else>
+                {{ t('Processed') }}
+              </template>
+            </div>
+          </div>
+        </div>
+
+
         <VisionTable
-        class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
-          :checkbox="props.checkboxes"
-          :records="records"
+          class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
+          :records="recordsList"
           :meta="props.meta"
-          :images="images"
           :tableHeaders="tableHeaders"
-          :tableColumns="tableColumns"
           :customFieldNames="customFieldNames"
-          :tableColumnsIndexes="tableColumnsIndexes"
-          :selected="selected"
-          :oldData="oldData"
           :isError="isError"
           :errorMessage="errorMessage"
-          :isAiResponseReceivedAnalizeImage="isAiResponseReceivedAnalizeImage"
-          :isAiResponseReceivedAnalizeNoImage="isAiResponseReceivedAnalizeNoImage"
-          :isAiResponseReceivedImage="isAiResponseReceivedImage"
-          :primaryKey="primaryKey"
-          :openGenerationCarousel="openGenerationCarousel"
-          :openImageCompare="openImageCompare"
-          @error="handleTableError"
-          :carouselSaveImages="carouselSaveImages"
-          :carouselImageIndex="carouselImageIndex"
           :regenerateImagesRefreshRate="props.meta.refreshRates?.regenerateImages"
-          :isAiGenerationError="isAiGenerationError"
-          :aiGenerationErrorMessage="aiGenerationErrorMessage"
-          :isAiImageGenerationError="isAiImageGenerationError"
-          :imageGenerationErrorMessage="imageGenerationErrorMessage"
-          @regenerate-images="regenerateImages"
           :isImageHasPreviewUrl="isImageHasPreviewUrl"
           :imageGenerationPrompts="generationPrompts.generateImages"
-          :isImageToTextGenerationError="isImageToTextGenerationError"
-          :imageToTextErrorMessages="imageToTextErrorMessages"
-          :isTextToTextGenerationError="isTextToTextGenerationError"
-          :textToTextErrorMessages="textToTextErrorMessages"
           :outputImageFields="props.meta.outputImageFields"
           :outputFieldsForAnalizeFromImages="props.meta.outputFieldsForAnalizeFromImages"
           :outputPlainFields="props.meta.outputPlainFields"
-          :regeneratingFieldsStatus="regeneratingFieldsStatus"
+          @error="handleTableError"
+          @regenerate-images="regenerateImages"
           @regenerate-cell="regenerateCell"
         />
         <div class="text-red-600 flex items-center w-full">
@@ -165,8 +168,9 @@
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { Ref, ref, watch } from 'vue'
-import { Dialog, Button, Textarea, Toggle, Tooltip } from '@/afcl';
+import { ref, computed, reactive } from 'vue'
+import pLimit from 'p-limit';
+import { Dialog, Textarea, Toggle, Tooltip } from '@/afcl';
 import VisionTable from './VisionTable.vue'
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
@@ -174,9 +178,11 @@ import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { useCoreStore } from '@/stores/core';
 import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
+import { useFiltersStore } from '@/stores/filters';
 
 
 const coreStore = useCoreStore();
+const filtersStore = useFiltersStore();
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -188,58 +194,98 @@ const props = defineProps<{
   clearCheckboxes?: () => any,
 }>();
 
+type RecordStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+type RecordState = {
+  id: string | number;
+  status: RecordStatus;
+  isChecked: boolean;
+  label: string;
+  data: Record<string, any>;
+  oldData: Record<string, any>;
+  images: any[];
+  aiStatus: {
+    generatedImages: boolean;
+    analyzedImages: boolean;
+    analyzedNoImages: boolean;
+  };
+  openGenerationCarousel: Record<string, boolean>;
+  openImageCompare: Record<string, boolean>;
+  carouselSaveImages: Record<string, any[]>;
+  carouselImageIndex: Record<string, number>;
+  imageGenerationErrorMessage: string;
+  imageGenerationFailed: boolean;
+  imageToTextErrorMessages: Record<string, string>;
+  textToTextErrorMessages: Record<string, string>;
+  regeneratingFieldsStatus: Record<string, boolean>;
+  listOfImageNotGenerated: Record<string, any>;
+};
+
+const recordIds = ref<Array<string | number>>([]);
+const recordsById = new Map<string, RecordState>();
+const uncheckedRecordIds = new Set<string>();
+
 defineExpose({
   click
 });
 
-const confirmDialog = ref(null);
-const records = ref<any[]>([]);
-const images = ref<any[]>([]);
-const tableHeaders = ref([]);
-const tableColumns = ref([]);
-const tableColumnsIndexes = ref([]);
-const customFieldNames = ref([]);
-const selected = ref<any[]>([]);
-const oldData = ref<any[]>([]);
-const carouselSaveImages = ref<any[]>([]);
-const carouselImageIndex = ref<any[]>([]);
-const isAiResponseReceivedAnalizeImage = ref([]);
-const isAiResponseReceivedAnalizeNoImage = ref([]);
-const isAiResponseReceivedImage = ref([]);
+const confirmDialog = ref<any>(null);
 const primaryKey = props.meta.primaryKey;
-const openGenerationCarousel = ref([]);
-const openImageCompare = ref([]);
 const isLoading = ref(false);
 const isFetchingRecords = ref(false);
 const isError = ref(false);
-const isCriticalError = ref(false);
-const isImageGenerationError = ref(false);
 const errorMessage = ref('');
-const checkedCount = ref(0);
-const isGeneratingImages = ref(false);
-const isAnalizingFields = ref(false);
-const isAnalizingImages = ref(false);
 const isDialogOpen = ref(false);
-const isAiGenerationError = ref<boolean[]>([false]);
-const aiGenerationErrorMessage = ref<string[]>([]);
-const isAiImageGenerationError = ref<boolean[]>([false]);
-
-const isImageToTextGenerationError = ref<boolean[]>([false]);
-const imageToTextErrorMessages = ref<Record<string, string>[]>([]);
-
-const isTextToTextGenerationError = ref<boolean[]>([false]);
-const textToTextErrorMessages = ref<Record<string, string>[]>([]);
-
-const imageGenerationErrorMessage = ref<string[]>([]);
 const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
 const popupMode = ref<'generation' | 'confirmation' | 'settings'>('confirmation');
 const generationPrompts = ref<any>({});
 const isDataSaved = ref(false);
-
-const regeneratingFieldsStatus = ref<Record<string, Record<string, boolean>>>({});
 const overwriteExistingValues = ref<boolean>(false);
 
-const listOfImageThatWasNotGeneratedPerRecord = ref<Record<string, string[]>>({});
+const checkedCount = computed(() => recordIds.value.length - uncheckedRecordIds.size);
+const totalRecords = computed(() => recordIds.value.length);
+const processedCount = computed(() => {
+  recordsVersion.value;
+  return Array.from(recordsById.values()).filter(record => record.status === 'completed' || record.status === 'failed').length;
+});
+const progressStep = computed(() => {
+  if (!totalRecords.value || totalRecords.value < 100) {
+    return 1;
+  }
+  return Math.max(1, Math.floor(totalRecords.value / 100));
+});
+const displayedProcessedCount = computed(() => {
+  const step = progressStep.value;
+  if (step <= 1) {
+    return processedCount.value;
+  }
+  if (processedCount.value >= totalRecords.value) {
+    return totalRecords.value;
+  }
+  return Math.floor(processedCount.value / step) * step;
+});
+const displayedProgressPercent = computed(() => {
+  if (!totalRecords.value) {
+    return 0;
+  }
+  return Math.min(100, Math.round((displayedProcessedCount.value / totalRecords.value) * 100));
+});
+const isProcessingAny = computed(() => {
+  recordsVersion.value;
+  return Array.from(recordsById.values()).some(record => record.status === 'processing');
+});
+
+const tableHeaders = computed(() => generateTableHeaders(props.meta.outputFields));
+const customFieldNames = computed(() => tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName));
+const recordsVersion = ref(0);
+const recordsList = computed(() => {
+  recordsVersion.value;
+  return recordIds.value.map(id => getOrCreateRecord(id));
+});
+
+function checkIfDialogOpen() {
+  return isDialogOpen.value === true;
+}
 
 const openDialog = async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler);
@@ -251,32 +297,9 @@ const openDialog = async () => {
   isDialogOpen.value = true;
   confirmDialog.value.open();
   isFetchingRecords.value = true;
-  await getRecords();
-  if (props.meta.isAttachFiles) {
-    await getImages();
-  }
+  await initializeGlobalState();
   await findPreviewURLForImages();
-  tableHeaders.value = generateTableHeaders(props.meta.outputFields);
-  const result = generateTableColumns();
-  tableColumns.value = result.tableData;
-  tableColumnsIndexes.value = result.indexes;
-  customFieldNames.value = tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName);
-  setSelected();
-  if (props.meta.isImageGeneration) {
-    fillCarouselSaveImages();
-  }
-  for (let i = 0; i < selected.value?.length; i++) {
-    openGenerationCarousel.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
-      acc[key] = false;
-      return acc;
-    },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
-    openImageCompare.value[i] = props.meta.outputImageFields?.reduce((acc,key) =>{
-      acc[key] = false;
-      return acc;
-    },{[primaryKey]: records.value[i][primaryKey]} as Record<string, boolean>);
-  }
   isFetchingRecords.value = false;
-  // Ensure prompts are loaded before any automatic AI action run
   if (!generationPrompts.value || Object.keys(generationPrompts.value).length === 0) {
     await getGenerationPrompts();
   }
@@ -284,81 +307,444 @@ const openDialog = async () => {
     runAiActions();
   }
 }
+
+async function getListOfIds() {
+  if ( props.meta.recordSelector === 'filtered' ) {
+    const filters = filtersStore.getFilters(props.resource.resourceId);
+    let res;
+    try {
+      res = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/get_filtered_ids`,
+        method: 'POST',
+        body: { filters },
+        silentError: true,
+      });
+    } catch (e) {
+      console.error('Failed to get records for filtered selector:', e);
+      isError.value = true;
+      errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+      return [];
+    }
+    if (!res?.ok || !res?.recordIds) {
+      console.error('Failed to get records for filtered selector, response error:', res);
+      isError.value = true;
+      errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+      return [];
+    }
+    return res.recordIds;
+  } else {
+   return props.checkboxes;
+  }
+}
  
 
-function runAiActions() {
+async function runAiActions() {
   popupMode.value = 'generation';
-
-  if (props.meta.isImageGeneration) {
-    isGeneratingImages.value = true;
-    runAiAction({
-      endpoint: 'initial_image_generate',
-      actionType: 'generate_images',
-      responseFlag: isAiResponseReceivedImage,
-    });
+  if (!await checkRateLimits()) {
+    return;
   }
-  if (props.meta.isFieldsForAnalizeFromImages) {
-    isAnalizingImages.value = true;
-    runAiAction({
-      endpoint: 'analyze',
-      actionType: 'analyze',
-      responseFlag: isAiResponseReceivedAnalizeImage,
-    });
-  }
-  if (props.meta.isFieldsForAnalizePlain) {
-    isAnalizingFields.value = true;
-    runAiAction({
-      endpoint: 'analyze_no_images',
-      actionType: 'analyze_no_images',
-      responseFlag: isAiResponseReceivedAnalizeNoImage,
-    });
-  }
+  const limit = pLimit(props.meta.concurrencyLimit || 10);
+  const tasks = recordIds.value
+    .map(id => limit(() => processOneRecord(String(id))));
+  await Promise.all(tasks);
 }
 
 const closeDialog = () => {
   window.removeEventListener('beforeunload', beforeUnloadHandler);
-  isAiResponseReceivedAnalizeImage.value = [];
-  isAiResponseReceivedAnalizeNoImage.value = [];
-  isAiResponseReceivedImage.value = [];
-
-  imageToTextErrorMessages.value = [];
-  textToTextErrorMessages.value = [];
-  imageGenerationErrorMessage.value = [];
-  regeneratingFieldsStatus.value = {};
-
-  records.value = [];
-  images.value = [];
-  selected.value = [];
-  tableColumns.value = [];
-  tableColumnsIndexes.value = [];
+  resetGlobalState();
   isError.value = false;
-  isCriticalError.value = false;
-  isImageGenerationError.value = false;
   errorMessage.value = '';
   isDialogOpen.value = false;
   popupMode.value = 'confirmation';
   isDataSaved.value = false;
 }
 
-watch(selected, (val) => {
-  checkedCount.value = val.filter(item => item.isChecked === true).length;
-}, { deep: true });
+async function initializeGlobalState() {
+  const ids = await getListOfIds();
+  recordIds.value = ids;
+  recordsById.clear();
+  uncheckedRecordIds.clear();
+}
 
-function fillCarouselSaveImages() {
-  for (const item of selected.value) {
-    const tempItem: any = {};
-    const tempItemIndex: any = {};
-    for (const [key, value] of Object.entries(item)) {
-      if (props.meta.outputImageFields?.includes(key)) {
-        tempItem[key] = [];
-        tempItemIndex[key] = 0;
-      }
+function resetGlobalState() {
+  recordIds.value = [];
+  recordsById.clear();
+  uncheckedRecordIds.clear();
+}
+
+function getOrCreateRecord(recordId: string | number): RecordState {
+  const key = String(recordId);
+  let record = recordsById.get(key);
+  if (!record) {
+    record = createEmptyRecord(recordId);
+    record.isChecked = !uncheckedRecordIds.has(key);
+    recordsById.set(key, record);
+  }
+  return record;
+}
+
+function touchRecords() {
+  recordsVersion.value += 1;
+}
+
+function createImageFieldMap<T>(factory: () => T): Record<string, T> {
+  const result: Record<string, T> = {};
+  for (const field of props.meta.outputImageFields || []) {
+    result[field] = factory();
+  }
+  return result;
+}
+
+function createEmptyRecord(recordId: string | number): RecordState {
+  return {
+    id: recordId,
+    status: 'pending',
+    isChecked: true,
+    label: '',
+    data: {},
+    oldData: {},
+    images: [],
+    aiStatus: {
+      generatedImages: !props.meta.isImageGeneration,
+      analyzedImages: !props.meta.isFieldsForAnalizeFromImages,
+      analyzedNoImages: !props.meta.isFieldsForAnalizePlain,
+    },
+    openGenerationCarousel: createImageFieldMap(() => false),
+    openImageCompare: createImageFieldMap(() => false),
+    carouselSaveImages: createImageFieldMap(() => []),
+    carouselImageIndex: createImageFieldMap(() => 0),
+    imageGenerationErrorMessage: '',
+    imageGenerationFailed: false,
+    imageToTextErrorMessages: {},
+    textToTextErrorMessages: {},
+    regeneratingFieldsStatus: {},
+    listOfImageNotGenerated: {},
+  };
+}
+
+async function processOneRecord(recordId: string) {
+  if (!checkIfDialogOpen()) {
+    return;
+  }
+  const record = getOrCreateRecord(recordId);
+  if (!record || !record.isChecked) {
+    return;
+  }
+  record.status = 'processing';
+  touchRecords();
+  record.imageGenerationFailed = false;
+  record.imageGenerationErrorMessage = '';
+  record.imageToTextErrorMessages = {};
+  record.textToTextErrorMessages = {};
+  record.aiStatus.generatedImages = !props.meta.isImageGeneration;
+  record.aiStatus.analyzedImages = !props.meta.isFieldsForAnalizeFromImages;
+  record.aiStatus.analyzedNoImages = !props.meta.isFieldsForAnalizePlain;
+
+  const oldDataResult = await fetchOldData(recordId);
+  if (!checkIfDialogOpen()) {
+    return;
+  }
+  if (!oldDataResult) {
+    record.status = 'failed';
+    record.aiStatus.generatedImages = true;
+    record.aiStatus.analyzedImages = true;
+    record.aiStatus.analyzedNoImages = true;
+    touchRecords();
+    return;
+  }
+  record.label = oldDataResult._label || record.label;
+  initializeRecordData(record, oldDataResult);
+  if (props.meta.isAttachFiles) {
+    await fetchImages(record, oldDataResult);
+    if (!checkIfDialogOpen()) {
+      return;
     }
-    carouselSaveImages.value.push(tempItem);
-    carouselImageIndex.value.push(tempItemIndex);
+  }
+
+  const actions: Array<'generate_images' | 'analyze' | 'analyze_no_images'> = [];
+  if (props.meta.isImageGeneration) {
+    actions.push('generate_images');
+  }
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    actions.push('analyze');
+  }
+  if (props.meta.isFieldsForAnalizePlain) {
+    actions.push('analyze_no_images');
+  }
+
+  const results = await Promise.allSettled(actions.map(actionType => runActionForRecord(record, actionType)));
+  if (!checkIfDialogOpen()) {
+    return;
+  }
+  const hasError = results.some(result => result.status === 'rejected');
+  record.status = hasError ? 'failed' : 'completed';
+  touchRecords();
+}
+
+async function checkRateLimits() {
+  const actionsToCheck: Array<'generate_images' | 'analyze' | 'analyze_no_images'> = [];
+  if (props.meta.isImageGeneration) {
+    actionsToCheck.push('generate_images');
+  }
+  if (props.meta.isFieldsForAnalizeFromImages) {
+    actionsToCheck.push('analyze');
+  }
+  if (props.meta.isFieldsForAnalizePlain) {
+    actionsToCheck.push('analyze_no_images');
+  }
+  for (const actionType of actionsToCheck) {
+    try {
+      const rateLimitRes = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/update-rate-limits`,
+        method: 'POST',
+        body: { actionType },
+      });
+      if (rateLimitRes?.error || rateLimitRes?.ok === false) {
+        adminforth.alert({
+          message: t(`Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`),
+          variant: 'danger',
+          timeout: 'unlimited',
+        });
+        return false;
+      }
+    } catch (e) {
+      adminforth.alert({
+        message: t(`Error checking rate limit for "${actionType.replace('_', ' ')}" action.`),
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      return false;
+    }
+  }
+  return true;
+}
+
+async function runActionForRecord(record: RecordState, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+  if (!checkIfDialogOpen()) {
+    return;
+  }
+  const responseFlag = actionType === 'generate_images'
+    ? 'generatedImages'
+    : actionType === 'analyze'
+      ? 'analyzedImages'
+      : 'analyzedNoImages';
+  record.aiStatus[responseFlag] = false;
+
+  let customPrompt;
+  if (actionType === 'generate_images') {
+    customPrompt = generationPrompts.value.imageGenerationPrompts || generationPrompts.value.generateImages;
+  } else if (actionType === 'analyze') {
+    customPrompt = generationPrompts.value.imageFieldsPrompts;
+  } else if (actionType === 'analyze_no_images') {
+    customPrompt = generationPrompts.value.plainFieldsPrompts;
+  }
+
+  let createJobResponse;
+  try {
+    if (!checkIfDialogOpen()) {
+      return;
+    }
+    createJobResponse = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
+      method: 'POST',
+      body: {
+        actionType,
+        recordId: record.id,
+        ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
+        filterFilledFields: !overwriteExistingValues.value,
+      },
+      silentError: true,
+    });
+  } catch (e) {
+    record.aiStatus[responseFlag] = true;
+    throw e;
+  }
+
+  if (!checkIfDialogOpen()) {
+    return;
+  }
+
+  if (createJobResponse?.error || !createJobResponse?.jobId) {
+    record.aiStatus[responseFlag] = true;
+    adminforth.alert({
+      message: t(`Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`),
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+    throw new Error(createJobResponse?.error || 'Failed to create job');
+  }
+
+  await pollJob(record, createJobResponse.jobId, actionType, responseFlag);
+}
+
+async function pollJob(
+  record: RecordState,
+  jobId: string,
+  actionType: 'analyze' | 'analyze_no_images' | 'generate_images',
+  responseFlag: keyof RecordState['aiStatus']
+) {
+  let isInProgress = true;
+  while (isInProgress && isDialogOpen.value) {
+    const jobResponse = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
+      method: 'POST',
+      body: { jobId },
+      silentError: true,
+    });
+    if (!jobResponse) {
+      await waitForRefresh(actionType);
+      continue;
+    }
+    if (jobResponse?.error) {
+      record.aiStatus[responseFlag] = true;
+      throw new Error(jobResponse.error);
+    }
+    const jobStatus = jobResponse?.job?.status;
+    if (jobStatus === 'in_progress') {
+      await waitForRefresh(actionType);
+      continue;
+    }
+    if (jobStatus === 'completed') {
+      applyJobResult(record, jobResponse.job, actionType);
+      record.aiStatus[responseFlag] = true;
+      isInProgress = false;
+      continue;
+    }
+    if (jobStatus === 'failed') {
+      applyJobFailure(record, jobResponse.job, actionType);
+      record.aiStatus[responseFlag] = true;
+      throw new Error(jobResponse.job?.error || 'Job failed');
+    }
   }
 }
 
+function applyJobResult(record: RecordState, job: any, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+  if (actionType === 'generate_images') {
+    for (const fieldName of props.meta.outputImageFields || []) {
+      const resultValue = job?.result?.[fieldName];
+      if (resultValue !== undefined) {
+        record.data[fieldName] = resultValue;
+      }
+      record.carouselSaveImages[fieldName] = resultValue ? [resultValue] : [];
+      if (job?.recordMeta?.[`${fieldName}_meta`]) {
+        record.carouselSaveImages[fieldName] = [job.recordMeta[`${fieldName}_meta`].originalImage];
+        record.listOfImageNotGenerated[fieldName] = job.recordMeta[`${fieldName}_meta`];
+      }
+    }
+  } else {
+    record.data = {
+      ...record.data,
+      ...(job?.result || {}),
+    };
+  }
+  touchRecords();
+}
+
+function applyJobFailure(record: RecordState, job: any, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+  adminforth.alert({
+    message: t(`Generation action "${actionType.replace('_', ' ')}" failed for record: ${record.id}. Error: ${job?.error || 'Unknown error'}`),
+    variant: 'danger',
+    timeout: 'unlimited',
+  });
+  if (actionType === 'generate_images') {
+    record.imageGenerationFailed = true;
+    record.imageGenerationErrorMessage = job?.error || 'Unknown error';
+  } else if (actionType === 'analyze') {
+    for (const field of Object.keys(props.meta.outputFieldsForAnalizeFromImages || {})) {
+      record.imageToTextErrorMessages[props.meta.outputFieldsForAnalizeFromImages[field]] = job?.error || 'Unknown error';
+    }
+  } else if (actionType === 'analyze_no_images') {
+    for (const field of Object.keys(props.meta.outputPlainFields || {})) {
+      record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || 'Unknown error';
+    }
+  }
+  touchRecords();
+}
+
+async function waitForRefresh(actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+  if (actionType === 'generate_images') {
+    await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.generateImages));
+  } else if (actionType === 'analyze') {
+    await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillFieldsFromImages));
+  } else if (actionType === 'analyze_no_images') {
+    await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
+  }
+}
+
+async function fetchOldData(recordId: string) {
+  try {
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_old_data`,
+      method: 'POST',
+      body: { recordId },
+      silentError: true,
+    });
+    if (!res?.ok || !res?.record) {
+      adminforth.alert({
+        message: res?.error || t('Failed to fetch old data. Please, try to re-run the action.'),
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      return null;
+    }
+    return res.record;
+  } catch (error) {
+    console.error('Failed to get old record:', error);
+    isError.value = true;
+    errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+    return null;
+  }
+}
+
+function initializeRecordData(record: RecordState, oldRecord: Record<string, any>) {
+  const newData: Record<string, any> = {};
+  const newOldData: Record<string, any> = {};
+  for (const key in props.meta.outputFields || {}) {
+    const normalizedValue = normalizeEnumValue(key, oldRecord[key] ?? null);
+    newData[key] = normalizedValue;
+    newOldData[key] = normalizedValue;
+  }
+  if (props.meta.outputImageFields) {
+    for (const key of props.meta.outputImageFields) {
+      const normalizedValue = normalizeEnumValue(key, oldRecord[key] ?? null);
+      newData[key] = normalizedValue;
+      newOldData[key] = normalizedValue;
+    }
+  }
+  newData[primaryKey] = oldRecord[primaryKey] ?? record.id;
+  newOldData[primaryKey] = oldRecord[primaryKey] ?? record.id;
+  newOldData._label = oldRecord._label;
+  record.data = newData;
+  record.oldData = newOldData;
+  touchRecords();
+}
+
+function normalizeEnumValue(key: string, value: any) {
+  const colEnum = props.meta.columnEnums?.find(c => c.name === key);
+  if (!colEnum) {
+    return value;
+  }
+  const match = colEnum.enum.find(item => item.value === value);
+  return match ? value : null;
+}
+
+async function fetchImages(record: RecordState, oldRecord: Record<string, any>) {
+  try {
+    const res = await callAdminForthApi({
+      path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
+      method: 'POST',
+      body: {
+        record: [oldRecord],
+      },
+    });
+    record.images = res.images?.[0] || [];
+    touchRecords();
+  } catch (error) {
+    console.error('Failed to get images:', error);
+    isError.value = true;
+    errorMessage.value = t(`Failed to fetch images. Please, try to re-run the action.`);
+  }
+}
 
 function formatLabel(str) {
   const labelsMap = props.meta?.columnLabels || {};
@@ -390,124 +776,36 @@ function generateTableHeaders(outputFields) {
   }
   return headers;
 }
-
-function generateTableColumns() {
-  const fields = [];
-  const tableData = [];
-  const indexes = [];
-  for (const field of tableHeaders.value) {
-    fields.push( field.fieldName );
-  }
-  for (const [index, checkbox] of props.checkboxes.entries()) {
-    const record = records.value[index];
-    let reqFields: any = {};
-    for (const field of fields) {
-      reqFields[field] = record[field] || '';
-    }
-    reqFields.label = record._label;
-    reqFields.images = images.value[index];
-    reqFields[primaryKey] = record[primaryKey];
-    indexes.push({
-      [primaryKey]: record[primaryKey],
-      label: record._label,
-    });
-    tableData.push(reqFields);
-  }
-  return { tableData, indexes };
-}
-
-function setSelected() {
-  selected.value = records.value.map(() => ({}));
-  records.value.forEach((record, index) => {
-    for (const key in props.meta.outputFields) {
-      if (isInColumnEnum(key)) {
-        const colEnum = props.meta.columnEnums.find(c => c.name === key);
-        const object = colEnum.enum.find(item => item.value === record[key]);
-        selected.value[index][key] = object ? record[key] : null;
-      } else {
-        selected.value[index][key] = record[key];
-      }
-    }
-    selected.value[index].isChecked = true;
-    selected.value[index][primaryKey] = record[primaryKey];
-    oldData.value[index] = { ...selected.value[index] };
-  });
-}
-
-function isInColumnEnum(key: string): boolean {
-  const colEnum = props.meta.columnEnums?.find(c => c.name === key);
-  if (!colEnum) {
-    return false;
-  }
-  return true;
-}
-
 function handleTableError(errorData) {
   isError.value = errorData.isError;
   errorMessage.value = errorData.errorMessage;
 }
-
-async function getRecords() {
-  try {
-    const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get_records`,
-      method: 'POST',
-      body: {
-        record: props.checkboxes,
-      },
-    });
-    records.value = res.records;
-  } catch (error) {
-    console.error('Failed to get records:', error);
-    isError.value = true;
-    errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
-  }
-}
-
-async function getImages() {
-  try {
-    const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
-      method: 'POST',
-      body: {
-        record: records.value,
-      },
-    });
-    images.value = res.images;
-  } catch (error) {
-    console.error('Failed to get images:', error);
-    isError.value = true;
-    errorMessage.value = t(`Failed to fetch images. Please, try to re-run the action.`);
-  }
-}
-
 async function prepareDataForSave() {
-  const checkedItems = selected.value
-    .filter(item => item.isChecked === true)
-    .map(item => {
-      const { isChecked, primaryKey, ...itemWithoutIsCheckedAndId } = item;
-      return itemWithoutIsCheckedAndId;
-    });
-  const checkedItemsIDs = selected.value
-    .filter(item => item.isChecked === true)
-    .map(item => item[primaryKey]);
+  const checkedRecords = recordIds.value
+    .map(id => getOrCreateRecord(id))
+    .filter(record => record.isChecked === true);
+  const checkedItems = checkedRecords.map(record => ({
+    ...record.data,
+    [primaryKey]: record.id,
+  }));
 
-  if (isImageGenerationError.value !== true) {
-    const promises = [];
-    for (const item of checkedItems) {
-      for (const [key, value] of Object.entries(item)) {
-        if(props.meta.outputImageFields?.includes(key)) {
-          const p = convertImages(key, value).then(result => {
-            item[key] = result;
-          });
-        
-          promises.push(p);
-        }
+  const promises: Promise<void>[] = [];
+  checkedRecords.forEach((record, index) => {
+    if (record.imageGenerationFailed) {
+      return;
+    }
+    for (const [key, value] of Object.entries(checkedItems[index])) {
+      if (props.meta.outputImageFields?.includes(key)) {
+        const p = convertImages(key, value).then(result => {
+          checkedItems[index][key] = result;
+        });
+        promises.push(p);
       }
     }
-    await Promise.all(promises);
-  }
-  return [checkedItemsIDs, checkedItems];
+  });
+
+  await Promise.all(promises);
+  return [checkedItems, checkedRecords] as const;
 }
 
 async function convertImages(fieldName, img) {
@@ -532,36 +830,34 @@ async function convertImages(fieldName, img) {
 
 
 async function saveData() {
-  if (!selected.value?.length) {
-    adminforth.alert({ message: t('No items selected'), variant: 'warning' });
-    return;
-  }
+  const errorText = 'Failed to save some records. Not all data may be saved'
   try {
     isLoading.value = true;
-    const [checkedItemsIDs, reqData] = await prepareDataForSave();
-    if (isImageGenerationError.value === false) {
+  const [reqData, checkedRecords] = await prepareDataForSave();
+    if (checkedRecords.length < 1) {
+      adminforth.alert({ message: t('No items selected'), variant: 'warning' });
+      return;
+    }
+    if (!checkedRecords.some(record => record.imageGenerationFailed)) {
       const imagesToUpload = [];
-      for (const item of reqData) {
+      for (let index = 0; index < reqData.length; index++) {
+        const item = reqData[index];
+        const record = checkedRecords[index];
         for (const [key, value] of Object.entries(item)) {
-          if(props.meta.outputImageFields?.includes(key)) {
+          if (props.meta.outputImageFields?.includes(key)) {
             if (!value) {
               continue;
             }
             if (!overwriteExistingValues.value) {
-              const imageURL = selected.value.find(rec => rec[primaryKey] === item[primaryKey])[key];
-              let originalImageUrl = ''
-              try {
-                originalImageUrl = listOfImageThatWasNotGeneratedPerRecord.value[item[primaryKey]][key].originalImage;
-              } catch (error) {
-                originalImageUrl = '';
-              }
+              const imageURL = record.data[key];
+              const originalImageUrl = record.listOfImageNotGenerated?.[key]?.originalImage || '';
               if (originalImageUrl === imageURL) {
-                reqData.find(rec => rec[primaryKey] === item[primaryKey])[key] = undefined;
+                reqData[index][key] = undefined;
                 continue;
               }
             }
-            const p = uploadImage(value, item[primaryKey], key).then(result => {
-              item[key] = result;
+            const p = uploadImage(value, record.id, key).then(result => {
+              reqData[index][key] = result;
             });
             imagesToUpload.push(p);
           }
@@ -569,287 +865,53 @@ async function saveData() {
       }
       await Promise.all(imagesToUpload);
     }
-    const res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
-      method: 'POST',
-      body: {
-        selectedIds: checkedItemsIDs,
-        fields: reqData,
-        saveImages: !isImageGenerationError.value
-      },
-    });
+    const limit = pLimit(props.meta.concurrencyLimit || 10);
+    const saveTasks = checkedRecords.map((record, index) =>
+      limit(async () => {
+        return await callAdminForthApi({
+          path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
+          method: 'POST',
+          body: {
+            selectedIds: [record.id],
+            fields: [reqData[index]],
+            saveImages: !record.imageGenerationFailed,
+          },
+        });
+      })
+    );
 
-    if(res.ok === true) {
-      confirmDialog.value.close();
-      props.updateList();
-      props.clearCheckboxes();
-    } else if (res.ok === false) {
-      adminforth.alert({
-        message: res.error,
-        variant: 'danger',
-        timeout: 'unlimited',
+    const saveResults = await Promise.all(saveTasks);
+    const failedResult = saveResults.find(res => res?.ok === false || res?.error);
+
+     if (failedResult && failedResult.ok === false) {
+      saveResults.filter(res => res?.ok === false).forEach(res => {
+        adminforth.alert({
+          message: res.error || t(errorText),
+          variant: 'danger',
+          timeout: 'unlimited',
+        });
+        console.error('Error saving data:', res.error);
       });
       isError.value = true;
-      errorMessage.value = t(`Failed to save data. You are not allowed to save.`);
-    } else {
-      console.error('Error saving data:', res);
+      errorMessage.value = t(errorText);
+    } else if ( failedResult ) {
+      console.error('Error saving data:', failedResult);
       isError.value = true;
-      errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
+      errorMessage.value = t(errorText);
     }
   } catch (error) {
     console.error('Error saving data:', error);
     isError.value = true;
-    errorMessage.value = t(`Failed to save data. Please, try to re-run the action.`);
+    errorMessage.value = t(errorText);
   } finally {
+    confirmDialog.value.close();
+    props.updateList();
+    props.clearCheckboxes?.();
     isLoading.value = false;
     isDataSaved.value = true;
     window.removeEventListener('beforeunload', beforeUnloadHandler);
   }
 }
-
-
-async function runAiAction({
-  endpoint,
-  actionType,
-  responseFlag,
-  updateOnSuccess = true,
-  recordsIds = props.checkboxes,
-  disableRateLimitCheck = false,
-}: {
-  endpoint: string;
-  actionType: 'analyze' | 'analyze_no_images' | 'generate_images';
-  responseFlag: Ref<boolean[]>;
-  updateOnSuccess?: boolean;
-  recordsIds?: any[];
-  disableRateLimitCheck?: boolean;
-}) {
-  let hasError = false;
-  let errorMessage = '';
-  const jobsIds: { jobId: any; recordId: any; }[] = [];
-  // responseFlag.value = props.checkboxes.map(() => false);
-  for (let i = 0; i < recordsIds.length; i++) {
-    const index = props.checkboxes.findIndex(item => String(item) === String(recordsIds[i]));
-    if (index !== -1) {
-      responseFlag.value[index] = false;
-    }
-  }
-  let isRateLimitExceeded = false;
-  if (!disableRateLimitCheck){
-    try {
-      const rateLimitRes = await callAdminForthApi({
-        path: `/plugin/${props.meta.pluginInstanceId}/update-rate-limits`,
-        method: 'POST',
-        body: {
-          actionType: actionType,
-        },
-      });
-      if (rateLimitRes?.error) {
-        isRateLimitExceeded = true;
-        adminforth.alert({
-        message: t(`Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`),
-        variant: 'danger',
-        timeout: 'unlimited',
-      });
-        return;
-      }
-    } catch (e) {
-      adminforth.alert({
-        message: t(`Error checking rate limit for "${actionType.replace('_', ' ')}" action.`),
-        variant: 'danger',
-        timeout: 'unlimited',
-      });
-      isRateLimitExceeded = true;
-    }
-    if (isRateLimitExceeded) {
-      return;
-    };
-  }
-
-  let customPrompt;
-  if (actionType === 'generate_images') {
-    customPrompt = generationPrompts.value.imageGenerationPrompts || generationPrompts.value.generateImages;
-  } else if (actionType === 'analyze') {
-    customPrompt = generationPrompts.value.imageFieldsPrompts;
-  } else if (actionType === 'analyze_no_images') {
-    customPrompt = generationPrompts.value.plainFieldsPrompts;
-  }
-  //creating jobs
-  const tasks = recordsIds.map(async (checkbox, i) => {
-    try {
-      const res = await callAdminForthApi({
-        path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
-        method: 'POST',
-        body: {
-          actionType: actionType,
-          recordId: checkbox,
-          ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
-          filterFilledFields: !overwriteExistingValues.value,
-        },
-        silentError: true,
-      });
-
-      if (res?.error) {
-        throw new Error(res.error);
-      }
-      
-      if (!res) {
-        throw new Error(`${actionType} request returned empty response.`);
-      }
-
-      jobsIds.push({ jobId: res.jobId, recordId: checkbox });
-    } catch (e) {
-      console.error(`Error during ${actionType} for item ${i}:`, e);
-      hasError = true;
-      errorMessage = t(`Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`);
-      return { success: false, index: i, error: e };
-    }
-  });
-  await Promise.all(tasks);
-
-  //polling jobs
-  let isInProgress = true;
-  //if no jobs were created, skip polling
-  while (isInProgress && isDialogOpen.value) {
-    //check if at least one job is still in progress
-    let isAtLeastOneInProgress = false;
-    //checking status of each job
-    for (const { jobId, recordId } of jobsIds) {
-      //check job status
-      const jobResponse = await callAdminForthApi({
-        path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
-        method: 'POST',
-        body: { jobId },
-        silentError: true,
-      });
-      //check for errors
-      if (!jobResponse) {
-        isAtLeastOneInProgress = true;
-        continue;
-      }
-      if (jobResponse?.error) {
-        console.error(`Error during ${actionType}:`, jobResponse.error);
-        break;
-      };
-      // extract job status
-      let jobStatus = jobResponse?.job?.status;
-      // check if job is still in progress. If in progress - skip to next job
-      if (jobStatus === 'in_progress') {
-        isAtLeastOneInProgress = true;
-      //if job is completed - update record data
-      } else if (jobStatus === 'completed') {
-        // finding index of the record in selected array
-        const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
-        //if we are generating images - update carouselSaveImages with new image
-        if (actionType === 'generate_images') {
-          for (const [key, value] of Object.entries(carouselSaveImages.value[index])) {
-            if (props.meta.outputImageFields?.includes(key)) {
-              carouselSaveImages.value[index][key] = [jobResponse.job.result[key]];
-              if (jobResponse.job.recordMeta?.[`${key}_meta`]) {
-                carouselSaveImages.value[index][key] = [jobResponse.job.recordMeta[`${key}_meta`].originalImage];
-                if (!listOfImageThatWasNotGeneratedPerRecord.value[recordId]) {
-                  listOfImageThatWasNotGeneratedPerRecord.value[recordId] = [];
-                }
-                listOfImageThatWasNotGeneratedPerRecord.value[recordId][key] = jobResponse.job.recordMeta[`${key}_meta`];
-              }
-            } 
-          }
-        }
-        //marking that we received response for this record
-        //if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
-          responseFlag.value[index] = true;
-        //}
-        //updating selected with new data from AI
-        const pk = selected.value[index]?.[primaryKey];
-        if (pk) {
-          selected.value[index] = {
-            ...selected.value[index],
-            ...jobResponse.job.result,
-            isChecked: true,
-            [primaryKey]: pk,
-          };
-        }
-        //removing job from jobsIds
-        if (index !== -1) {
-          jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
-        }
-        // checking one more time if we have in progress jobs
-        isAtLeastOneInProgress = true;
-        // if job is failed - set error
-      } else if (jobStatus === 'failed') {
-        const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordId));
-        //if (actionType !== 'analyze_no_images' || !props.meta.isFieldsForAnalizeFromImages) {
-          responseFlag.value[index] = true;
-        //}
-        if (index !== -1) {
-          jobsIds.splice(jobsIds.findIndex(j => j.jobId === jobId), 1);
-        } else {
-          jobsIds.splice(0, jobsIds.length);
-        }
-        isAtLeastOneInProgress = true;
-        adminforth.alert({
-          message: t(`Generation action "${actionType.replace('_', ' ')}" failed for record: ${recordId}. Error: ${jobResponse.job?.error || 'Unknown error'}`),
-          variant: 'danger',
-          timeout: 'unlimited',
-        });
-        if (actionType === 'generate_images') {
-          isAiImageGenerationError.value[index] = true;
-          imageGenerationErrorMessage.value[index] = jobResponse.job?.error || 'Unknown error';
-        } else if (actionType === 'analyze') {
-          for (const field of Object.keys(props.meta.outputFieldsForAnalizeFromImages ) ) {
-            if (!imageToTextErrorMessages.value[index]) {
-              imageToTextErrorMessages.value[index] = {};
-            }
-            imageToTextErrorMessages.value[index][props.meta.outputFieldsForAnalizeFromImages[field]] = jobResponse.job?.error || 'Unknown error';
-          }
-        } else if (actionType === 'analyze_no_images') {
-          for( const field of Object.keys(props.meta.outputPlainFields ) ) {
-            if (!textToTextErrorMessages.value[index]) {
-              textToTextErrorMessages.value[index] = {};
-            }
-            textToTextErrorMessages.value[index][props.meta.outputPlainFields[field]] = jobResponse.job?.error || 'Unknown error';
-          }
-        }
-      }
-    }
-    if (!isAtLeastOneInProgress) {
-      isInProgress = false;
-    }
-    if (jobsIds.length > 0) {
-      if (actionType === 'generate_images') {
-        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.generateImages));
-      } else if (actionType === 'analyze') {
-        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillFieldsFromImages));
-      } else if (actionType === 'analyze_no_images') {
-        await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-  }
-
-  if (hasError) {
-    adminforth.alert({
-      message: errorMessage,
-      variant: 'danger',
-      timeout: 'unlimited',
-    });
-    isError.value = true;
-    if (actionType === 'generate_images') {
-      isImageGenerationError.value = true;
-    }
-    this.errorMessage.value = errorMessage;
-    return;
-  }
-
-  if (actionType === 'generate_images') {
-    isGeneratingImages.value = false;
-  } else if (actionType === 'analyze') {
-    isAnalizingImages.value = false;
-  } else if (actionType === 'analyze_no_images') {
-    isAnalizingFields.value = false;
-  }
-}
-
 async function uploadImage(imgBlob, id, fieldName) {
   const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type.split('/').pop()}`, { type: imgBlob.type });
   const { name, size, type } = file;
@@ -921,7 +983,7 @@ async function uploadImage(imgBlob, id, fieldName) {
   }
 }
 
-function regenerateImages(recordInfo: any) {
+function regenerateImages({ recordId }: { recordId: any }) {
   if (coreStore.isInternetError) {
     adminforth.alert({
       message: t('Cannot regenerate images while internet connection is lost. Please check your connection and try again.'),
@@ -930,13 +992,15 @@ function regenerateImages(recordInfo: any) {
     });
     return;
   }
-  isGeneratingImages.value = true;
-  runAiAction({
-    endpoint: 'initial_image_generate',
-    actionType: 'generate_images',
-    responseFlag: isAiResponseReceivedImage,
-    recordsIds: [recordInfo.recordInfo],
-    disableRateLimitCheck: true,
+  const record = recordsById.get(String(recordId));
+  if (!record) {
+    return;
+  }
+  record.aiStatus.generatedImages = false;
+  touchRecords();
+  runActionForRecord(record, 'generate_images').catch(() => {
+    record.aiStatus.generatedImages = true;
+    touchRecords();
   });
 }
 
@@ -1078,10 +1142,15 @@ async function regenerateCell(recordInfo: any) {
     });
     return;
   }
-  if (!regeneratingFieldsStatus.value[recordInfo.recordId]) {
-    regeneratingFieldsStatus.value[recordInfo.recordId] = {};
+  const record = recordsById.get(String(recordInfo.recordId));
+  if (!record) {
+    return;
   }
-  regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = true;
+  if (!record.regeneratingFieldsStatus[recordInfo.fieldName]) {
+    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+  }
+  record.regeneratingFieldsStatus[recordInfo.fieldName] = true;
+  touchRecords();
   const actionType = props.meta.outputFieldsForAnalizeFromImages?.includes(recordInfo.fieldName)
     ? 'analyze'
     : props.meta.outputPlainFields?.includes(recordInfo.fieldName)
@@ -1089,16 +1158,18 @@ async function regenerateCell(recordInfo: any) {
       : null;
   if (!actionType) {
     console.error(`Field ${recordInfo.fieldName} is not configured for analysis.`);
+    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+    touchRecords();
     return;
   }
   
   let generationPromptsForField = {};
   if (actionType === 'analyze') {
     generationPromptsForField = generationPrompts.value.imageFieldsPrompts || {};
-    isAnalizingFields.value = true;
+    record.aiStatus.analyzedImages = false;
   } else if (actionType === 'analyze_no_images') {
     generationPromptsForField = generationPrompts.value.plainFieldsPrompts || {};
-    isAnalizingImages.value = true;
+    record.aiStatus.analyzedNoImages = false;
   }
   
   let jobId;
@@ -1117,7 +1188,7 @@ async function regenerateCell(recordInfo: any) {
       silentError: true,
     });
   } catch (e) {
-    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
+    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
     console.error(`Error during cell regeneration for record ${recordInfo.recordId}, field ${recordInfo.fieldName}:`, e);
   }
   if ( res.ok === false) {
@@ -1127,7 +1198,7 @@ async function regenerateCell(recordInfo: any) {
     });
     isError.value = true;
     errorMessage.value = t(`Failed to regenerate field`);
-    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
+    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
     return;
   }
   jobId = res.jobId;
@@ -1152,38 +1223,29 @@ async function regenerateCell(recordInfo: any) {
       timeout: 'unlimited',
     });
     if (actionType === 'analyze') {
-      imageToTextErrorMessages.value[recordInfo.recordId][recordInfo.fieldName] = res.job?.error || 'Unknown error';
-      isAnalizingFields.value = false;
+      record.imageToTextErrorMessages[recordInfo.fieldName] = res.job?.error || 'Unknown error';
+      record.aiStatus.analyzedImages = true;
     } else if (actionType === 'analyze_no_images') {
-      textToTextErrorMessages.value[recordInfo.recordId][recordInfo.fieldName] = res.job?.error || 'Unknown error';
-      isAnalizingImages.value = false;
+      record.textToTextErrorMessages[recordInfo.fieldName] = res.job?.error || 'Unknown error';
+      record.aiStatus.analyzedNoImages = true;
     }
-    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
+    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+    touchRecords();
     return;
   } else if (res.job?.status === 'completed') {
-    const index = selected.value.findIndex(item => String(item[primaryKey]) === String(recordInfo.recordId));
-
-    const pk = selected.value[index]?.[primaryKey];
-    if (pk) {
-      selected.value[index] = {
-        ...selected.value[index],
-        ...res.job.result,
-        isChecked: true,
-        [primaryKey]: pk,
-      };
-    }
+    record.data = {
+      ...record.data,
+      ...res.job.result,
+    };
     if (actionType === 'analyze') {
-      if (imageToTextErrorMessages.value[index]) {
-        imageToTextErrorMessages.value[index][recordInfo.fieldName] = '';
-      }
-      isAnalizingFields.value = false;
+      record.imageToTextErrorMessages[recordInfo.fieldName] = '';
+      record.aiStatus.analyzedImages = true;
     } else if (actionType === 'analyze_no_images') {
-      if (textToTextErrorMessages.value[index]) {
-        textToTextErrorMessages.value[index][recordInfo.fieldName] = '';
-      }
-      isAnalizingImages.value = false;
+      record.textToTextErrorMessages[recordInfo.fieldName] = '';
+      record.aiStatus.analyzedNoImages = true;
     }
-    regeneratingFieldsStatus.value[recordInfo.recordId][recordInfo.fieldName] = false;
+    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
+    touchRecords();
   }
 }
 

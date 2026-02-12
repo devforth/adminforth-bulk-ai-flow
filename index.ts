@@ -1,4 +1,4 @@
-import { AdminForthPlugin, Filters } from "adminforth";
+import { AdminForthFilterOperators, AdminForthPlugin, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource } from "adminforth";
 import { suggestIfTypo } from "adminforth";
 import type { PluginOptions } from './types.js';
@@ -601,7 +601,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         isFieldsForAnalizePlain: this.options.fillPlainFields ? Object.keys(this.options.fillPlainFields).length > 0 : false,
         isImageGeneration: this.options.generateImages ? Object.keys(this.options.generateImages).length > 0 : false,
         isAttachFiles: this.options.attachFiles ? true : false,
-        disabledWhenNoCheckboxes: true,
+        disabledWhenNoCheckboxes: this.options.recordSelector === 'filtered' ? false : true,
         refreshRates: {
           fillFieldsFromImages: this.options.refreshRates?.fillFieldsFromImages || 2_000,
           fillPlainFields: this.options.refreshRates?.fillPlainFields || 1_000,
@@ -609,6 +609,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           regenerateImages: this.options.refreshRates?.regenerateImages || 5_000,
         },
         askConfirmationBeforeGenerating: this.options.askConfirmationBeforeGenerating || false,
+        concurrencyLimit: this.options.concurrencyLimit || 10,
+        recordSelector: this.options.recordSelector || 'checkbox',
         generationPrompts: {
           plainFieldsPrompts: this.options.fillPlainFields || {},
           imageFieldsPrompts: this.options.fillFieldsFromImages || {},
@@ -767,6 +769,26 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     server.endpoint({
       method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/get_old_data`,
+      handler: async ({ body }) => {
+        const recordId = body.recordId;
+        if (recordId === undefined || recordId === null) {
+          return { ok: false, error: "Missing recordId" };
+        }
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        const record = await this.adminforth.resource(this.resourceConfig.resourceId)
+          .get([Filters.EQ(primaryKeyColumn.name, recordId)]);
+        if (!record) {
+          return { ok: false, error: "Record not found" };
+        }
+        record._label = this.resourceConfig.recordLabel(record);
+        return { ok: true, record };
+      }
+    });
+
+
+    server.endpoint({
+      method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
       handler: async ( body ) => {
         let images = [];
@@ -803,7 +825,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             }
           }
           const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+
           const decimalFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'decimal').map(c => c.name);
+          const integerFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'integer').map(c => c.name);
+          const floatFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'float').map(c => c.name);
+
           const updates = selectedIds.map(async (ID, idx) => {
             const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
             for (const [key, value] of Object.entries(outputImageFields)) {
@@ -847,6 +873,21 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                 }
               }
             }
+            if (integerFieldsArray.length > 0) {
+              for (const fieldName of integerFieldsArray) {
+                if (fieldsToUpdate[idx].hasOwnProperty(fieldName)) {
+                  fieldsToUpdate[idx][fieldName] = parseInt(fieldsToUpdate[idx][fieldName], 10);
+                }
+              }
+            }
+            if (floatFieldsArray.length > 0) {
+              for (const fieldName of floatFieldsArray) {
+                if (fieldsToUpdate[idx].hasOwnProperty(fieldName)) {
+                  fieldsToUpdate[idx][fieldName] = parseFloat(fieldsToUpdate[idx][fieldName]);
+                }
+              }
+            }
+
             const newRecord = {
               ...oldRecord,
               ...fieldsToUpdate[idx]
@@ -855,11 +896,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               resource: this.resourceConfig,
               recordId: ID,
               oldRecord: oldRecord,
-              record: newRecord,
+              updates: newRecord,
               adminUser: adminUser,
             })
           });
-          await Promise.all(updates);
+          try {
+            await Promise.all(updates);
+          } catch (error) {
+            return { ok: false, error: `Error updating records, because of unprocesseble data for record ID ${selectedIds}` };
+          }
           return { ok: true };
         } else {
           return { ok: false, error: isAllowedToSave.error };
@@ -905,7 +950,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           jobs.set(jobId, { status: "failed", error: "Missing action type" });
           //return { error: "Missing action type" };
         }
-        else if (!recordId) {
+        else if (!recordId && typeof recordId !== 'number') {
           jobs.set(jobId, { status: "failed", error: "Missing record id" });
           //return { error: "Missing record id" };
         } else {
@@ -1011,6 +1056,45 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         } catch (e) {
           return { ok: false, error: "Error compiling preview url" };
         }
+      }
+    });
+
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/get_filtered_ids`,
+      handler: async ({ body, adminUser, headers }) => {
+        const filters = body.filters;
+
+        const normalizedFilters = { operator: AdminForthFilterOperators.AND, subFilters: [] };
+        if (filters) {
+          if (typeof filters !== 'object') {
+            throw new Error(`Filter should be an array or an object`);
+          }
+          if (Array.isArray(filters)) {
+            // if filters are an array, they will be connected with "AND" operator by default
+            normalizedFilters.subFilters = filters;
+          } else if (filters.field) {
+            // assume filter is a SingleFilter
+            normalizedFilters.subFilters = [filters];
+          } else if (filters.subFilters) {
+            // assume filter is a AndOr filter
+            normalizedFilters.operator = filters.operator;
+            normalizedFilters.subFilters = filters.subFilters;
+          } else {
+            // wrong filter
+            throw new Error(`Wrong filter object value: ${JSON.stringify(filters)}`);
+          }
+        }
+
+        const records = await this.adminforth.resource(this.resourceConfig.resourceId).list(normalizedFilters);
+        if (!records) {
+          return { ok: true, recordIds: [] };
+        }
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+
+        const recordIds = records.map(record => record[primaryKeyColumn.name]);
+
+        return { ok: true, recordIds }
       }
     });
   }
