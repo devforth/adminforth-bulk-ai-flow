@@ -36,7 +36,7 @@
         { 
           label: t('Cancel'), 
           options: {
-            class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'
+            class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
           }, 
           onclick: (dialog) => confirmDialog.tryToHideModal() 
         },
@@ -60,7 +60,7 @@
             {
               label: t('Cancel'),
               options: {
-                class: 'w-2/5 bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200'
+                class: 'w-2/5 bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
               },
               onclick: (dialog) => confirmDialog.tryToHideModal()
             },
@@ -81,13 +81,13 @@
           <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
             <div class="flex items-center gap-2">
               <button
-                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white"
+                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 border-none ml-2"
                 @click="resumeGeneration"
               >
                 {{ t('Resume generation') }}
               </button>
               <button
-                class="h-8 px-3 py-1.5 text-sm rounded-md bg-white hover:bg-gray-100 text-gray-900 border border-gray-200"
+                class="h-8 px-3 py-1.5 text-sm rounded-md bg-white hover:bg-gray-100 text-gray-900 border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 dark:border-gray-600"
                 @click="cancelGeneration"
               >
                 {{ t('Cancel generation') }}
