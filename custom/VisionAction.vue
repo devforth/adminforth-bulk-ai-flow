@@ -190,7 +190,7 @@
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import pLimit from 'p-limit';
 import { Dialog, Textarea, Toggle, Tooltip } from '@/afcl';
 import VisionTable from './VisionTable.vue'
@@ -466,7 +466,7 @@ function resumeGeneration() {
   resolvePause();
 }
 
-function cancelGeneration() {
+async function cancelGeneration() {
   if (isGenerationCancelled.value) {
     return;
   }
@@ -486,6 +486,7 @@ function cancelGeneration() {
     }
   }
   touchRecords();
+  await nextTick();
   tableRef.value?.refresh();
 }
 
