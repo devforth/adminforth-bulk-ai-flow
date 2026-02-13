@@ -192,10 +192,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     const selectedId = recordId;
     let isError = false;
     if (STUB_MODE) {
-      await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
-      jobs.set(jobId, { status: 'completed', result: {} });
-      jobs.set(jobId, { status: 'failed', error: `ERROR: test error` });
-      return { ok: false, error: 'test error' };
+      const fakeError = Math.random() < 0.005; // 0.05% chance of error
+      // await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
+      if (fakeError) {
+        jobs.set(jobId, { status: 'failed', error: `ERROR: test error` });
+        return { ok: false, error: 'test error' };
+      } else {
+        jobs.set(jobId, { status: 'completed', result: {description: 'test description', price: 99999999, engine_power: 999} });
+        return { ok: true };
+      }
     } else {
       const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
       const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
@@ -611,6 +616,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         askConfirmationBeforeGenerating: this.options.askConfirmationBeforeGenerating || false,
         concurrencyLimit: this.options.concurrencyLimit || 10,
         recordSelector: this.options.recordSelector || 'checkbox',
+        askConfirmation: this.options.askConfirmation || [],
         generationPrompts: {
           plainFieldsPrompts: this.options.fillPlainFields || {},
           imageFieldsPrompts: this.options.fillFieldsFromImages || {},

@@ -20,7 +20,7 @@
         { 
           label: checkedCount > 1 ? t('Save fields') : t('Save field'), 
           options: { 
-            disabled: isLoading || checkedCount < 1 || isFetchingRecords || isProcessingAny, 
+            disabled: isLoading || checkedCount < 1 || isFetchingRecords || isProcessingAny || isGenerationPaused, 
             loader: isLoading, class: 'w-fit' 
           }, 
           onclick: async (dialog) => { await saveData(); dialog.hide(); } 
@@ -71,20 +71,41 @@
 
 
         <div class="w-full">
+          <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
+            <p class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
+            <div class="flex items-center gap-2">
+              <button
+                class="px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white"
+                @click="resumeGeneration"
+              >
+                {{ t('Resume generation') }}
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm rounded-md bg-white hover:bg-gray-100 text-gray-900 border border-gray-200"
+                @click="cancelGeneration"
+              >
+                {{ t('Cancel generation') }}
+              </button>
+            </div>
+          </div>
           <div
-            class="w-full h-[30px] rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
+            class="w-full h-[30px] rounded-2xl bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
+            :class="isGenerationPaused ? 'opacity-80' : ''"
             role="progressbar"
             :aria-valuenow="displayedProcessedCount"
             :aria-valuemin="0"
             :aria-valuemax="totalRecords"
           >
             <div
-              class="h-full bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 transition-all duration-200"
+              class="h-full bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 transition-all duration-200 "
               :style="{ width: `${displayedProgressPercent}%` }"
             ></div>
             <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
-              <template v-if="isProcessingAny">
-                {{ displayedProcessedCount }} / {{ totalRecords }}
+              <template v-if="isProcessingAny || isGenerationPaused">
+                {{ Math.floor((displayedProcessedCount  /  totalRecords) * 100) }}%
+              </template>
+              <template v-else-if="isGenerationCancelled">
+                {{ t('Generation cancelled') }}
               </template>
               <template v-else>
                 {{ t('Processed') }}
@@ -96,6 +117,7 @@
 
         <VisionTable
           class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
+          ref="tableRef"
           :records="recordsList"
           :meta="props.meta"
           :tableHeaders="tableHeaders"
@@ -244,6 +266,15 @@ const overwriteExistingValues = ref<boolean>(false);
 
 const checkedCount = computed(() => recordIds.value.length - uncheckedRecordIds.size);
 const totalRecords = computed(() => recordIds.value.length);
+const isGenerationPaused = ref(false);
+const isGenerationCancelled = ref(false);
+const pendingResumeResolver = ref<null | (() => void)>(null);
+const completedRecordIds = ref<Set<string>>(new Set());
+const isActiveGeneration = ref(false);
+const pauseBreakpoints = computed(() => props.meta.askConfirmation || []);
+const startedRecordCount = ref(0);
+let startGate = Promise.resolve();
+const tableRef = ref<any>(null);
 const processedCount = computed(() => {
   recordsVersion.value;
   return Array.from(recordsById.values()).filter(record => record.status === 'completed' || record.status === 'failed').length;
@@ -280,7 +311,10 @@ const customFieldNames = computed(() => tableHeaders.value.slice((props.meta.isA
 const recordsVersion = ref(0);
 const recordsList = computed(() => {
   recordsVersion.value;
-  return recordIds.value.map(id => getOrCreateRecord(id));
+  const ids = isGenerationCancelled.value
+    ? recordIds.value.filter(id => completedRecordIds.value.has(String(id)))
+    : recordIds.value;
+  return ids.map(id => getOrCreateRecord(id));
 });
 
 function checkIfDialogOpen() {
@@ -343,10 +377,16 @@ async function runAiActions() {
   if (!await checkRateLimits()) {
     return;
   }
+  isGenerationCancelled.value = false;
+  isGenerationPaused.value = false;
+  isActiveGeneration.value = true;
+  completedRecordIds.value = new Set();
+  startedRecordCount.value = 0;
   const limit = pLimit(props.meta.concurrencyLimit || 10);
   const tasks = recordIds.value
     .map(id => limit(() => processOneRecord(String(id))));
   await Promise.all(tasks);
+  isActiveGeneration.value = false;
 }
 
 const closeDialog = () => {
@@ -387,6 +427,82 @@ function touchRecords() {
   recordsVersion.value += 1;
 }
 
+function waitForResumeIfPaused() {
+  if (!isGenerationPaused.value) {
+    return Promise.resolve();
+  }
+  return new Promise<void>(resolve => {
+    pendingResumeResolver.value = resolve;
+  });
+}
+
+function resolvePause() {
+  if (pendingResumeResolver.value) {
+    pendingResumeResolver.value();
+    pendingResumeResolver.value = null;
+  }
+}
+
+function shouldPauseAfterRecords(processed: number) {
+  if (!pauseBreakpoints.value?.length) {
+    return false;
+  }
+  return pauseBreakpoints.value.some((rule: any) => {
+    if (typeof rule?.afterRecords === 'number' && processed === rule.afterRecords) {
+      return true;
+    }
+    if (typeof rule?.everyRecords === 'number' && rule.everyRecords > 0 && processed % rule.everyRecords === 0) {
+      return true;
+    }
+    return false;
+  });
+}
+
+function resumeGeneration() {
+  if (!isGenerationPaused.value) {
+    return;
+  }
+  isGenerationPaused.value = false;
+  resolvePause();
+}
+
+function cancelGeneration() {
+  if (isGenerationCancelled.value) {
+    return;
+  }
+  isGenerationCancelled.value = true;
+  isGenerationPaused.value = false;
+  resolvePause();
+  const generatedIds = new Set(completedRecordIds.value);
+  recordIds.value = recordIds.value.filter(id => generatedIds.has(String(id)));
+  for (const key of Array.from(recordsById.keys())) {
+    if (!generatedIds.has(key)) {
+      recordsById.delete(key);
+    }
+  }
+  for (const key of Array.from(uncheckedRecordIds)) {
+    if (!generatedIds.has(key)) {
+      uncheckedRecordIds.delete(key);
+    }
+  }
+  touchRecords();
+  tableRef.value?.refresh();
+}
+
+async function withStartGate<T>(fn: () => Promise<T>) {
+  const previousGate = startGate;
+  let releaseGate: () => void;
+  startGate = new Promise<void>(resolve => {
+    releaseGate = resolve;
+  });
+  await previousGate;
+  try {
+    return await fn();
+  } finally {
+    releaseGate!();
+  }
+}
+
 function createImageFieldMap<T>(factory: () => T): Record<string, T> {
   const result: Record<string, T> = {};
   for (const field of props.meta.outputImageFields || []) {
@@ -424,6 +540,29 @@ function createEmptyRecord(recordId: string | number): RecordState {
 
 async function processOneRecord(recordId: string) {
   if (!checkIfDialogOpen()) {
+    return;
+  }
+  if (isGenerationCancelled.value) {
+    return;
+  }
+  await withStartGate(async () => {
+    while (true) {
+      if (!checkIfDialogOpen() || isGenerationCancelled.value) {
+        return;
+      }
+      if (isGenerationPaused.value) {
+        await waitForResumeIfPaused();
+        continue;
+      }
+      const nextStarted = startedRecordCount.value + 1;
+      startedRecordCount.value = nextStarted;
+      if (isActiveGeneration.value && shouldPauseAfterRecords(nextStarted)) {
+        isGenerationPaused.value = true;
+      }
+      break;
+    }
+  });
+  if (!checkIfDialogOpen() || isGenerationCancelled.value) {
     return;
   }
   const record = getOrCreateRecord(recordId);
@@ -478,6 +617,7 @@ async function processOneRecord(recordId: string) {
   }
   const hasError = results.some(result => result.status === 'rejected');
   record.status = hasError ? 'failed' : 'completed';
+  completedRecordIds.value.add(String(recordId));
   touchRecords();
 }
 
