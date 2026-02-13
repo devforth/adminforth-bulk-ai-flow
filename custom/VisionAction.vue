@@ -382,6 +382,8 @@ async function runAiActions() {
   isActiveGeneration.value = true;
   completedRecordIds.value = new Set();
   startedRecordCount.value = 0;
+  await nextTick();
+  tableRef.value?.refresh();
   const limit = pLimit(props.meta.concurrencyLimit || 10);
   const tasks = recordIds.value
     .map(id => limit(() => processOneRecord(String(id))));
@@ -397,6 +399,9 @@ const closeDialog = () => {
   isDialogOpen.value = false;
   popupMode.value = 'confirmation';
   isDataSaved.value = false;
+  if (isGenerationPaused.value || isGenerationCancelled.value) {
+    resolvePause();
+  }
 }
 
 async function initializeGlobalState() {
