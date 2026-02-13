@@ -25,6 +25,14 @@
           }, 
           onclick: async (dialog) => { await saveData(); dialog.hide(); } 
         },
+        {
+          label: t('Save current'),
+          options: {
+            disabled: isLoading || isSavingCurrent || completedRecordIds.size < 1,
+            loader: isSavingCurrent, class: 'w-fit'
+          },
+          onclick: async () => { await saveCurrentGenerated(); }
+        },
         { 
           label: t('Cancel'), 
           options: {
@@ -68,20 +76,18 @@
   >
     <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
       <template v-if="recordsList.length && popupMode === 'generation'" >
-
-
         <div class="w-full">
+          <p :class="isGenerationPaused ? '' : 'opacity-0'" class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
           <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
-            <p class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
             <div class="flex items-center gap-2">
               <button
-                class="px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white"
+                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white"
                 @click="resumeGeneration"
               >
                 {{ t('Resume generation') }}
               </button>
               <button
-                class="px-3 py-1.5 text-sm rounded-md bg-white hover:bg-gray-100 text-gray-900 border border-gray-200"
+                class="h-8 px-3 py-1.5 text-sm rounded-md bg-white hover:bg-gray-100 text-gray-900 border border-gray-200"
                 @click="cancelGeneration"
               >
                 {{ t('Cancel generation') }}
@@ -89,7 +95,8 @@
             </div>
           </div>
           <div
-            class="w-full h-[30px] rounded-2xl bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
+            v-if="!isGenerationPaused"
+            class="w-full h-8 rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
             :class="isGenerationPaused ? 'opacity-80' : ''"
             role="progressbar"
             :aria-valuenow="displayedProcessedCount"
@@ -137,6 +144,9 @@
         <div class="text-red-600 flex items-center w-full">
           <p v-if="isError === true">{{ errorMessage }}</p>
         </div>
+      </template>
+      <template v-else-if="!recordsList.length && popupMode === 'generation'">
+        <p>No data to save. Feel free to click "Cancel"</p>
       </template>
       <div 
         v-else-if="popupMode === 'settings'" 
@@ -316,7 +326,7 @@ const recordsList = computed(() => {
     : recordIds.value;
   return ids.map(id => getOrCreateRecord(id));
 });
-
+const isSavingCurrent = ref(false);
 function checkIfDialogOpen() {
   return isDialogOpen.value === true;
 }
@@ -954,6 +964,31 @@ async function prepareDataForSave() {
   return [checkedItems, checkedRecords] as const;
 }
 
+async function prepareDataForRecords(records: RecordState[]) {
+  const checkedItems = records.map(record => ({
+    ...record.data,
+    [primaryKey]: record.id,
+  }));
+
+  const promises: Promise<void>[] = [];
+  records.forEach((record, index) => {
+    if (record.imageGenerationFailed) {
+      return;
+    }
+    for (const [key, value] of Object.entries(checkedItems[index])) {
+      if (props.meta.outputImageFields?.includes(key)) {
+        const p = convertImages(key, value).then(result => {
+          checkedItems[index][key] = result;
+        });
+        promises.push(p);
+      }
+    }
+  });
+
+  await Promise.all(promises);
+  return [checkedItems, records] as const;
+}
+
 async function convertImages(fieldName, img) {
   let imgBlob;
   if (typeof img === 'string' && img.startsWith('data:')) {
@@ -974,6 +1009,37 @@ async function convertImages(fieldName, img) {
   return imgBlob;
 }
 
+async function uploadImagesForRecords(reqData: Record<string, any>[], checkedRecords: RecordState[]) {
+  if (checkedRecords.some(record => record.imageGenerationFailed)) {
+    return;
+  }
+  const imagesToUpload = [];
+  for (let index = 0; index < reqData.length; index++) {
+    const item = reqData[index];
+    const record = checkedRecords[index];
+    for (const [key, value] of Object.entries(item)) {
+      if (props.meta.outputImageFields?.includes(key)) {
+        if (!value) {
+          continue;
+        }
+        if (!overwriteExistingValues.value) {
+          const imageURL = record.data[key];
+          const originalImageUrl = record.listOfImageNotGenerated?.[key]?.originalImage || '';
+          if (originalImageUrl === imageURL) {
+            reqData[index][key] = undefined;
+            continue;
+          }
+        }
+        const p = uploadImage(value, record.id, key).then(result => {
+          reqData[index][key] = result;
+        });
+        imagesToUpload.push(p);
+      }
+    }
+  }
+  await Promise.all(imagesToUpload);
+}
+
 
 async function saveData() {
   const errorText = 'Failed to save some records. Not all data may be saved'
@@ -984,33 +1050,7 @@ async function saveData() {
       adminforth.alert({ message: t('No items selected'), variant: 'warning' });
       return;
     }
-    if (!checkedRecords.some(record => record.imageGenerationFailed)) {
-      const imagesToUpload = [];
-      for (let index = 0; index < reqData.length; index++) {
-        const item = reqData[index];
-        const record = checkedRecords[index];
-        for (const [key, value] of Object.entries(item)) {
-          if (props.meta.outputImageFields?.includes(key)) {
-            if (!value) {
-              continue;
-            }
-            if (!overwriteExistingValues.value) {
-              const imageURL = record.data[key];
-              const originalImageUrl = record.listOfImageNotGenerated?.[key]?.originalImage || '';
-              if (originalImageUrl === imageURL) {
-                reqData[index][key] = undefined;
-                continue;
-              }
-            }
-            const p = uploadImage(value, record.id, key).then(result => {
-              reqData[index][key] = result;
-            });
-            imagesToUpload.push(p);
-          }
-        }
-      }
-      await Promise.all(imagesToUpload);
-    }
+    await uploadImagesForRecords(reqData, checkedRecords);
     const limit = pLimit(props.meta.concurrencyLimit || 10);
     const saveTasks = checkedRecords.map((record, index) =>
       limit(async () => {
@@ -1400,5 +1440,83 @@ const beforeUnloadHandler = (event) => {
   event.preventDefault();
   event.returnValue = '';
 };
+
+async function saveCurrentGenerated() {
+  const errorText = 'Failed to save some records. Not all data may be saved';
+  const generatedIds = new Set(completedRecordIds.value);
+  if (generatedIds.size < 1) {
+    return;
+  }
+  const recordsToSave = Array.from(generatedIds)
+    .map(id => recordsById.get(String(id)))
+    .filter((record): record is RecordState => Boolean(record))
+    .filter(record => record.isChecked === true);
+  if (recordsToSave.length < 1) {
+    return;
+  }
+  try {
+    isSavingCurrent.value = true;
+    const [reqData, checkedRecords] = await prepareDataForRecords(recordsToSave);
+    await uploadImagesForRecords(reqData, checkedRecords);
+
+    const limit = pLimit(props.meta.concurrencyLimit || 10);
+    const saveTasks = checkedRecords.map((record, index) =>
+      limit(async () => {
+        const res = await callAdminForthApi({
+          path: `/plugin/${props.meta.pluginInstanceId}/update_fields`,
+          method: 'POST',
+          body: {
+            selectedIds: [record.id],
+            fields: [reqData[index]],
+            saveImages: !record.imageGenerationFailed,
+          },
+        });
+        return { recordId: String(record.id), res };
+      })
+    );
+
+    const saveResults = await Promise.all(saveTasks);
+    const failedResults = saveResults.filter(item => item.res?.ok === false || item.res?.error);
+    const savedIds = saveResults
+      .filter(item => item.res?.ok !== false && !item.res?.error)
+      .map(item => item.recordId);
+
+    if (failedResults.length > 0) {
+      failedResults.forEach(item => {
+        adminforth.alert({
+          message: item.res?.error || t(errorText),
+          variant: 'danger',
+          timeout: 'unlimited',
+        });
+      });
+      isError.value = true;
+      errorMessage.value = t(errorText);
+    }
+
+    if (savedIds.length > 0) {
+      recordIds.value = recordIds.value.filter(id => !savedIds.includes(String(id)));
+      for (let index = 0; index < savedIds.length; index++) {
+        const id = savedIds[index];
+        recordsById.delete(id);
+        uncheckedRecordIds.delete(id);
+        completedRecordIds.value.delete(id);
+      }
+      adminforth.alert({
+        message: t('Successfully saved generated data for {count} records', { count: savedIds.length }),
+        variant: 'success',
+      });
+      touchRecords();
+    }
+  } catch (error) {
+    console.error('Error saving data:', error);
+    isError.value = true;
+    errorMessage.value = t(errorText);
+  } finally {
+    isSavingCurrent.value = false;
+  }
+  await nextTick();
+  tableRef.value.refresh();
+  props.updateList();
+}
 
 </script>
