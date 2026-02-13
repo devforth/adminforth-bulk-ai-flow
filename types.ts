@@ -137,11 +137,19 @@ export interface PluginOptions {
    */
   recordSelector?: 'checkbox' | 'filtered';
 
-  /** 
-   * additional confirmation: generation of very many records is risky in terms of budget. On 1m budget it might be thousands USD,
-  * this settings allows to suspend rgeneration and allow user to review everything what was already generated so far
-  * and then suggest Resume / Stop Generation buttons. You can set it in mode where it is shown only afterFirst N records (e.g. at start) or every N records
-  */
+  /**
+   * Additional confirmation settings for long-running generations.
+   *
+   * Generating a very large number of records can be expensive. This option
+   * lets you pause the process at specific checkpoints so the user can review
+   * everything generated so far and then choose to Resume or Stop the
+   * generation.
+   *
+   * Each entry in the array defines a confirmation breakpoint:
+   * - `{ afterRecords: N }` – show a confirmation once, after the first N
+   *   records have been processed.
+   * - `{ everyRecords: N }` – show a confirmation after every N records.
+   */
   askConfirmation?: ({ afterRecords: number } | { everyRecords: number })[]
 
 }
