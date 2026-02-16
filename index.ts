@@ -1,6 +1,6 @@
 import { AdminForthFilterOperators, AdminForthPlugin, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource } from "adminforth";
-import { suggestIfTypo } from "adminforth";
+import { suggestIfTypo, filtersTools } from "adminforth";
 import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
@@ -1068,7 +1068,30 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_filtered_ids`,
-      handler: async ({ body, adminUser, headers }) => {
+      handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
+        const resource = this.resourceConfig;
+
+        for (const hook of resource.hooks?.list?.beforeDatasourceRequest || []) {
+          const filterTools = filtersTools.get(body);
+          body.filtersTools = filterTools;
+          const resp = await hook({
+            resource,
+            query: body,
+            adminUser,
+            //@ts-ignore
+            filtersTools: filterTools, 
+            extra: {
+              body, query, headers, cookies, requestUrl
+            },
+            adminforth: this.adminforth,
+          });
+          if (!resp || (!resp.ok && !resp.error)) {
+            throw new Error(`Hook must return object with {ok: true} or { error: 'Error' } `);
+          }
+          if (resp.error) {
+            return { error: resp.error };
+          }
+        }
         const filters = body.filters;
 
         const normalizedFilters = { operator: AdminForthFilterOperators.AND, subFilters: [] };
