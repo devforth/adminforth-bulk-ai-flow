@@ -30,7 +30,7 @@
     "handlebars": "^4.7.8"
   },
   "peerDependencies": {
-    "adminforth": "^2.21.1"
+    "adminforth": "next"
   },
   "release": {
     "plugins": [
