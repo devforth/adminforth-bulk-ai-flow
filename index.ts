@@ -229,8 +229,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         resp = chatResponse
       } catch (e) {
         isError = true;
-        jobs.set(jobId, { status: 'failed', error: 'AI provider refused to fill fields' });
-        return { ok: false, error: 'AI provider refused to fill fields' };
+        jobs.set(jobId, { status: 'failed', error: `AI provider refused to fill fields: ${e}` });
+        return { ok: false, error: `AI provider refused to fill fields: ${e}` };
       }
       let resData;
         try {
