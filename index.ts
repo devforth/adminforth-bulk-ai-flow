@@ -164,8 +164,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` });
           return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
         }
-
-        const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
+        const textOutput = resp?.output?.[1]?.content?.[0]?.text ?? resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content ?? resp.output?.[0]?.content?.[1]?.text;
         if (!textOutput || typeof textOutput !== 'string') {
           jobs.set(jobId, { status: 'failed', error: 'Unexpected AI response format' });
         }

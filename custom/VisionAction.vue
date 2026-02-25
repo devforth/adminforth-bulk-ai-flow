@@ -9,7 +9,7 @@
     ref="confirmDialog"
     header="Bulk AI Generation"
     class="[scrollbar-gutter:stable] !max-w-full w-fit h-fit"
-    :class="popupMode === 'generation' ? 'lg:w-[1600px] !lg:max-w-[1600px]' 
+    :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
     :beforeCloseFunction="closeDialog"
