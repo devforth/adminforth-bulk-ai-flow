@@ -30,7 +30,7 @@
     "handlebars": "^4.7.8"
   },
   "peerDependencies": {
-    "adminforth": "next"
+    "adminforth": "^2.24.0"
   },
   "release": {
     "plugins": [
@@ -41,6 +41,7 @@
       [
         "semantic-release-slack-bot",
         {
+          "packageName": "@adminforth/bulk-ai-flow",
           "notifyOnSuccess": true,
           "notifyOnFail": true,
           "slackIcon": ":package:",
