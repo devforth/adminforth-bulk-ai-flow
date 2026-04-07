@@ -109,7 +109,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
-    if (await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
+    if (this.options.rateLimits && this.options.rateLimits.fillFieldsFromImages && await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
       jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
       return { error: "Rate limit exceeded" };
     }
@@ -193,7 +193,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
-    if (await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
+    if (this.options.rateLimits && this.options.rateLimits.fillPlainFields && await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
       jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
       return { error: "Rate limit exceeded" };
     }
@@ -253,7 +253,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
-    if (await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
+    if (this.options.rateLimits && this.options.rateLimits.generateImages && await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
       jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
       return { error: "Rate limit exceeded" };
     }
