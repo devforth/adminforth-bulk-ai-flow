@@ -362,7 +362,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       return { ok: false, error: 'Error during image generation' };
     }
   }
-  
+   
   private async regenerateImage(jobId: string, recordId: string, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const Id = recordId;
     let isError = false;
