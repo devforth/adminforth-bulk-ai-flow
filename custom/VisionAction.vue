@@ -67,7 +67,8 @@
             {
               label: t('Start generation'),
               options: {
-                class: 'w-3/5 px-5 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none'
+                class: 'w-3/5 px-5 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none',
+                loader: isCheckingRateLimits
               },
               onclick: (dialog) => { runAiActions(); }
             }
@@ -283,6 +284,7 @@ const completedRecordIds = ref<Set<string>>(new Set());
 const isActiveGeneration = ref(false);
 const pauseBreakpoints = computed(() => props.meta.askConfirmation || []);
 const startedRecordCount = ref(0);
+const isCheckingRateLimits = ref(false);
 let startGate = Promise.resolve();
 const tableRef = ref<any>(null);
 const processedCount = computed(() => {
@@ -383,11 +385,11 @@ async function getListOfIds() {
  
 
 async function runAiActions() {
-  popupMode.value = 'generation';
   if (!await checkRateLimits()) {
     confirmDialog.value.close();
     return;
   }
+  popupMode.value = 'generation';
   isGenerationCancelled.value = false;
   isGenerationPaused.value = false;
   isActiveGeneration.value = true;
@@ -639,6 +641,7 @@ async function processOneRecord(recordId: string) {
 }
 
 async function checkRateLimits() {
+  isCheckingRateLimits.value = true;
   const actionsToCheck: Array<'generate_images' | 'analyze' | 'analyze_no_images'> = [];
   if (props.meta.isImageGeneration) {
     actionsToCheck.push('generate_images');
@@ -670,9 +673,11 @@ async function checkRateLimits() {
         variant: 'danger',
         timeout: 'unlimited',
       });
+      isCheckingRateLimits.value = false;
       return false;
     }
   }
+  isCheckingRateLimits.value = false;
   return true;
 }
 
