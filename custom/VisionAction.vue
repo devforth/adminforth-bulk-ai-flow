@@ -385,6 +385,7 @@ async function getListOfIds() {
 async function runAiActions() {
   popupMode.value = 'generation';
   if (!await checkRateLimits()) {
+    confirmDialog.value.close();
     return;
   }
   isGenerationCancelled.value = false;
