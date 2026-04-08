@@ -1,6 +1,7 @@
 import AdminForth, { ImageVisionAdapter, ImageGenerationAdapter, CompletionAdapter } from "adminforth";
+import  {type PluginsCommonOptions } from "adminforth";
 
-export interface PluginOptions {
+export interface PluginOptions extends PluginsCommonOptions {
     /**
      * Name of the action in three dots menu.
      */
