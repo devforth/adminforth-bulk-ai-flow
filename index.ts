@@ -226,7 +226,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
       let resp: any;
       try {
-        const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(prompt, [], numberOfTokens);
+        const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(prompt, numberOfTokens);
         // resp = (chatResponse as any).response;
         if (topLevelError || resp?.error) {
           isError = true;
@@ -495,7 +495,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
         let resp;
         try {
-          const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(finalPrompt, [], numberOfTokens);
+          const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete(finalPrompt, numberOfTokens);
           if (topLevelError) {
             // return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError)}` };
             jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError)}` });
