@@ -1513,6 +1513,10 @@ async function saveCurrentGenerated() {
       });
       touchRecords();
     }
+    if (recordIds.value.length === 0) {
+      confirmDialog.value.close();
+      return;
+    }
   } catch (error) {
     console.error('Error saving data:', error);
     isError.value = true;
