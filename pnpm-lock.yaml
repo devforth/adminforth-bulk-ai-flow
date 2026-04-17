@@ -12,7 +12,7 @@ importers:
         specifier: ^4.0.40
         version: 4.1.0
       adminforth:
-        specifier: ^2.30.0
+        specifier: ^2.35.0
         version: 2.35.0(@types/node@25.3.3)(typescript@5.9.3)
       handlebars:
         specifier: ^4.7.8
