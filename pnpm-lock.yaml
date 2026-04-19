@@ -11,9 +11,6 @@ importers:
       '@types/handlebars':
         specifier: ^4.0.40
         version: 4.1.0
-      adminforth:
-        specifier: ^2.35.0
-        version: 2.35.0(@types/node@25.3.3)(typescript@5.9.3)
       handlebars:
         specifier: ^4.7.8
         version: 4.7.8
@@ -21,6 +18,9 @@ importers:
       '@types/node':
         specifier: latest
         version: 25.3.3
+      adminforth:
+        specifier: ^2.35.0
+        version: 2.35.0(@types/node@25.3.3)(typescript@5.9.3)
       semantic-release:
         specifier: ^24.2.1
         version: 24.2.9(typescript@5.9.3)
