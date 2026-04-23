@@ -1,7 +1,31 @@
 # AdminForth Bulk AI Flow Plugin
 
-<img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /> <img src="https://woodpecker.devforth.io/api/badges/3848/status.svg" alt="Build Status" /> <a href="https://www.npmjs.com/package/@adminforth/bulk-ai-flow"> <img src="https://img.shields.io/npm/dt/@adminforth/bulk-ai-flow" alt="npm downloads" /></a> <a href="https://www.npmjs.com/package/@adminforth/bulk-ai-flow"><img src="https://img.shields.io/npm/v/@adminforth/bulk-ai-flow" alt="npm version" /></a> <a href="https://www.npmjs.com/package/@adminforth/bulk-ai-flow">
+<img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /> <img src="https://woodpecker.devforth.io/api/badges/3848/status.svg" alt="Build Status" /> <a href="https://www.npmjs.com/package/@adminforth/bulk-ai-flow"><img src="https://img.shields.io/npm/dm/@adminforth/bulk-ai-flow" alt="npm downloads" /></a> <a href="https://www.npmjs.com/package/@adminforth/bulk-ai-flow"><img src="https://img.shields.io/npm/v/@adminforth/bulk-ai-flow" alt="npm version" /></a>
 
-Allows you to log changes made to table records via adminforth.
+[![Ask AI](https://tluma.ai/badge)](https://tluma.ai/ask-ai/devforth/adminforth)
 
-## For usage, see [AdminForth Bulk AI Flow Documentation](https://adminforth.dev/docs/tutorial/Plugins/bulk-ai-flow/)
+Allows you to generate record data and images in bulk using AI flows in AdminForth.
+
+## Features
+
+- Generate record data in bulk with AI-powered flows.
+- Produce content and images for multiple entries faster.
+- Reduce repetitive manual work in content operations.
+- Plug AI generation into AdminForth resource workflows.
+
+## Documentation
+
+Full setup and configuration guide:
+
+[AdminForth Bulk AI Flow Documentation](https://adminforth.dev/docs/tutorial/Plugins/bulk-ai-flow/)
+
+## About AdminForth
+
+AdminForth is an open-source, agent-first admin framework for building robust admin panels and back-office applications faster.
+
+## Related links
+
+- [AdminForth website](https://adminforth.dev)
+- [npm package](https://www.npmjs.com/package/@adminforth/bulk-ai-flow)
+- [More AdminForth plugins](https://adminforth.dev/docs/tutorial/ListOfPlugins/)
+- [Built by DevForth](https://devforth.io)
