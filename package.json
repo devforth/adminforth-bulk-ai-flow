@@ -20,7 +20,7 @@
     "image-processing",
     "field-generation"
   ],
-  "author": "",
+  "author": "DevForth (https://devforth.io)",
   "license": "MIT",
   "description": "Bulk AI workflow plugin for AdminForth for batch field generation and image processing",
   "devDependencies": {
