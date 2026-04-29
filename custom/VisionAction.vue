@@ -16,31 +16,7 @@
     :closable="false"
     :askForCloseConfirmation="popupMode === 'generation' ? true : false"
     :closeConfirmationText="t('Are you sure you want to close without saving?')"
-    :buttons="popupMode === 'generation' ? [
-        { 
-          label: checkedCount > 1 ? t('Save fields') : t('Save field'), 
-          options: { 
-            disabled: isLoading || checkedCount < 1 || isFetchingRecords || isProcessingAny || isGenerationPaused, 
-            loader: isLoading, class: 'w-fit' 
-          }, 
-          onclick: async (dialog) => { await saveData(); dialog.hide(); } 
-        },
-        {
-          label: t('Save current'),
-          options: {
-            disabled: isLoading || isSavingCurrent || completedRecordIds.size < 1,
-            loader: isSavingCurrent, class: 'w-fit'
-          },
-          onclick: async () => { await saveCurrentGenerated(); }
-        },
-        { 
-          label: t('Cancel'), 
-          options: {
-            class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
-          }, 
-          onclick: (dialog) => confirmDialog.tryToHideModal() 
-        },
-      ] : popupMode === 'settings' ? [
+    :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
           {
             label: t('Save settings'),
             options: {
@@ -50,13 +26,6 @@
           },
         ] : 
           [
-            // {
-            //   label: t('Edit prompts'),
-            //   options: {
-            //     class: 'w-fit ml-auto'
-            //   },
-            //   onclick: (dialog) => { clickSettingsButton(); }
-            // },
             {
               label: t('Cancel'),
               options: {
@@ -105,7 +74,7 @@
             :aria-valuemax="totalRecords"
           >
             <div
-              class="h-full bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 transition-all duration-200 "
+              class="h-full bg-gradient-to-r from-lightPrimary/70 via-lightPrimary/80 to-lightPrimary/90 dark:from-darkPrimary/70 dark:via-darkPrimary/80 dark:to-darkPrimary/90 transition-all duration-200 "
               :style="{ width: `${displayedProgressPercent}%` }"
             ></div>
             <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
@@ -328,6 +297,40 @@ const recordsList = computed(() => {
     : recordIds.value;
   return ids.map(id => getOrCreateRecord(id));
 });
+
+const generationModeButtons = computed(() => {
+  const arrayToReturn = [
+    { 
+      label: checkedCount.value > 1 ? t('Save fields') : t('Save field'), 
+      options: { 
+        disabled: isLoading.value || checkedCount.value < 1 || isFetchingRecords.value || isProcessingAny.value || isGenerationPaused.value, 
+        loader: isLoading.value, class: 'w-fit' 
+      }, 
+      onclick: async (dialog) => { await saveData(); dialog.hide(); } 
+    },
+    { 
+      label: t('Cancel'), 
+      options: {
+        class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
+      }, 
+      onclick: (dialog) => confirmDialog.value.tryToHideModal() 
+    },
+  ]
+
+  if (isProcessingAny.value) {
+    arrayToReturn.splice(1, 0, {
+      label: t('Save processed'),
+      options: {
+        disabled: isLoading.value || isSavingCurrent.value || completedRecordIds.value.size < 1,
+        loader: isSavingCurrent.value, class: 'w-fit'
+      },
+      onclick: async () => { await saveCurrentGenerated(); }
+    })
+  }
+  return arrayToReturn;
+});
+
+
 const isSavingCurrent = ref(false);
 function checkIfDialogOpen() {
   return isDialogOpen.value === true;
