@@ -109,10 +109,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
-    if (this.options.rateLimits && this.options.rateLimits.fillFieldsFromImages && await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
-      jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-      return { error: "Rate limit exceeded" };
-    }
+    // TODO: need to do correct check of rate limit
+    // if (this.options.rateLimits && this.options.rateLimits.fillFieldsFromImages && await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
+    //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //   return { error: "Rate limit exceeded" };
+    // }
     const selectedId = recordId;
     let isError = false;
     // Fetch the record using the provided ID
@@ -193,10 +194,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
-    if (this.options.rateLimits && this.options.rateLimits.fillPlainFields && await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
-      jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-      return { error: "Rate limit exceeded" };
-    }
+    // TODO: need to do correct check of rate limit
+    // if (this.options.rateLimits && this.options.rateLimits.fillPlainFields && await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
+    //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //   return { error: "Rate limit exceeded" };
+    // }
     const selectedId = recordId;
     let isError = false;
     if (STUB_MODE) {
@@ -256,10 +258,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
-    if (this.options.rateLimits && this.options.rateLimits.generateImages && await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
-      jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-      return { error: "Rate limit exceeded" };
-    }
+    // TODO: need to do correct check of rate limit
+    // if (this.options.rateLimits && this.options.rateLimits.generateImages && await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
+    //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //   return { error: "Rate limit exceeded" };
+    // }
     const selectedId = recordId;
     let isError = false;
     const start = +new Date();
@@ -369,10 +372,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async regenerateImage(jobId: string, recordId: string, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const Id = recordId;
     let isError = false;
-    if (await this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
-      jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
-      return { error: "Rate limit exceeded" };
-    }
+    // TODO: need to do correct check of rate limit
+    // if (await this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
+    //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
+    //   return { error: "Rate limit exceeded" };
+    // }
     const start = +new Date();
     const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
     let attachmentFiles
