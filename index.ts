@@ -1017,16 +1017,41 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get-job-status`,
-      handler: async ({ body, adminUser, headers }) => {
+      handler: async ({ body, adminUser, headers, response }) => {
         const jobId = body.jobId;
         if (!jobId) {
-          return { error: "Can't find job id" };
+          response.setStatus(400);
+
+          return {
+            ok: false,
+            error: "Can't find job id",
+          };
         }
         const job = jobs.get(jobId);
         if (!job) {
-          return { error: "Job not found" };
+          response.setStatus(404);
+
+          return {
+            ok: false,
+            error: "Job not found",
+          };
         }
-        return { ok: true, job };
+        if (job.status === 'failed') {
+          response.setStatus(500);
+
+          return {
+            ok: false,
+            error: 'Job failed',
+            job: {
+              ...job,
+              status: 'error',
+            },
+          };
+        }
+        return {
+          ok: true,
+          job,
+        };
       }
     });
 
