@@ -12,10 +12,8 @@
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
-    :beforeCloseFunction="closeDialog"
+    :beforeCloseFunction="handleBeforeClose"
     :closable="false"
-    :askForCloseConfirmation="popupMode === 'generation' ? true : false"
-    :closeConfirmationText="t('Are you sure you want to close without saving?')"
     :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
           {
             label: t('Save settings'),
@@ -185,6 +183,7 @@ import { useFiltersStore } from '@/stores/filters';
 
 const coreStore = useCoreStore();
 const filtersStore = useFiltersStore();
+const showCloseConfirmModal = ref(false);
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -313,7 +312,7 @@ const generationModeButtons = computed(() => {
       options: {
         class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
       }, 
-      onclick: (dialog) => confirmDialog.value.tryToHideModal() 
+      onclick: async (dialog) => { await handleBeforeClose(dialog); } 
     },
   ]
 
@@ -330,6 +329,28 @@ const generationModeButtons = computed(() => {
   return arrayToReturn;
 });
 
+const handleBeforeClose = async (dialog?: any) => {
+  if (popupMode.value === 'generation') {
+    const confirmed = await adminforth.confirm({
+      title: t('Close without saving?'),
+      message: t('Are you sure you want to close without saving?'),
+      yes: t('Yes'),
+      no: t('Cancel'),
+    });
+
+  if (confirmed) {
+    closeDialog();
+      
+    if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
+      confirmDialog.value.hide();
+    } else if (dialog && typeof dialog.hide === 'function') {
+      dialog.hide();
+    }
+    return true; 
+  }
+    return false;
+  }
+}
 
 const isSavingCurrent = ref(false);
 function checkIfDialogOpen() {
