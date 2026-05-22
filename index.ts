@@ -1041,11 +1041,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
           return {
             ok: false,
-            error: 'Job failed',
-            job: {
-              ...job,
-              status: 'error',
-            },
+            error: job.error
+            // job: {
+            //   ...job,
+            //   status: 'error',
+            // },
           };
         }
         return {
