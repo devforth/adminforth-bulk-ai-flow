@@ -197,6 +197,7 @@ const props = defineProps<{
 }>();
 
 type RecordStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type GenerationAction = 'analyze' | 'analyze_no_images' | 'generate_images';
 
 type RecordState = {
   id: string | number;
@@ -256,6 +257,11 @@ const startedRecordCount = ref(0);
 const isCheckingRateLimits = ref(false);
 let startGate = Promise.resolve();
 const tableRef = ref<any>(null);
+const generationFailureGroups = new Map<string, {
+  actionType: GenerationAction;
+  error: string;
+  recordIds: Set<string>;
+}>();
 const processedCount = computed(() => {
   recordsVersion.value;
   return Array.from(recordsById.values()).filter(record => record.status === 'completed' || record.status === 'failed').length;
@@ -398,12 +404,14 @@ async function runAiActions() {
   isActiveGeneration.value = true;
   completedRecordIds.value = new Set();
   startedRecordCount.value = 0;
+  generationFailureGroups.clear();
   await nextTick();
   tableRef.value?.refresh();
   const limit = pLimit(props.meta.concurrencyLimit || 10);
   const tasks = recordIds.value
     .map(id => limit(() => processOneRecord(String(id))));
   await Promise.all(tasks);
+  showGenerationFailureSummary();
   isActiveGeneration.value = false;
 }
 
@@ -431,6 +439,39 @@ function resetGlobalState() {
   recordIds.value = [];
   recordsById.clear();
   uncheckedRecordIds.clear();
+  generationFailureGroups.clear();
+}
+
+function getActionLabel(actionType: GenerationAction) {
+  return actionType.replace('_', ' ');
+}
+
+function registerGenerationFailure(record: RecordState, actionType: GenerationAction, error: string) {
+  const key = `${actionType}:${error}`;
+  let group = generationFailureGroups.get(key);
+  if (!group) {
+    group = {
+      actionType,
+      error,
+      recordIds: new Set(),
+    };
+    generationFailureGroups.set(key, group);
+  }
+  group.recordIds.add(String(record.id));
+}
+
+function showGenerationFailureSummary() {
+  for (const group of generationFailureGroups.values()) {
+    const failedCount = group.recordIds.size;
+    const firstRecordId = Array.from(group.recordIds)[0];
+    adminforth.alert({
+      message: t(
+        `Generation action "${getActionLabel(group.actionType)}" failed for ${failedCount} record(s). First failed record: ${firstRecordId}. Error: ${group.error}`,
+      ),
+      variant: 'danger',
+      timeout: 'unlimited',
+    });
+  }
 }
 
 function getOrCreateRecord(recordId: string | number): RecordState {
@@ -622,7 +663,7 @@ async function processOneRecord(recordId: string) {
     }
   }
 
-  const actions: Array<'generate_images' | 'analyze' | 'analyze_no_images'> = [];
+  const actions: GenerationAction[] = [];
   if (props.meta.isImageGeneration) {
     actions.push('generate_images');
   }
@@ -645,7 +686,7 @@ async function processOneRecord(recordId: string) {
 
 async function checkRateLimits() {
   isCheckingRateLimits.value = true;
-  const actionsToCheck: Array<'generate_images' | 'analyze' | 'analyze_no_images'> = [];
+  const actionsToCheck: GenerationAction[] = [];
   if (props.meta.isImageGeneration) {
     actionsToCheck.push('generate_images');
   }
@@ -664,7 +705,7 @@ async function checkRateLimits() {
       });
       if (rateLimitRes?.error || rateLimitRes?.ok === false) {
         adminforth.alert({
-          message: t(`Rate limit exceeded for "${actionType.replace('_', ' ')}" action. Please try again later.`),
+          message: t(`Rate limit exceeded for "${getActionLabel(actionType)}" action. Please try again later.`),
           variant: 'danger',
           timeout: 'unlimited',
         });
@@ -672,7 +713,7 @@ async function checkRateLimits() {
       }
     } catch (e) {
       adminforth.alert({
-        message: t(`Error checking rate limit for "${actionType.replace('_', ' ')}" action.`),
+        message: t(`Error checking rate limit for "${getActionLabel(actionType)}" action.`),
         variant: 'danger',
         timeout: 'unlimited',
       });
@@ -684,7 +725,7 @@ async function checkRateLimits() {
   return true;
 }
 
-async function runActionForRecord(record: RecordState, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+async function runActionForRecord(record: RecordState, actionType: GenerationAction) {
   if (!checkIfDialogOpen()) {
     return;
   }
@@ -722,6 +763,7 @@ async function runActionForRecord(record: RecordState, actionType: 'analyze' | '
     });
   } catch (e) {
     record.aiStatus[responseFlag] = true;
+    registerGenerationFailure(record, actionType, e instanceof Error ? e.message : String(e));
     throw e;
   }
 
@@ -731,11 +773,7 @@ async function runActionForRecord(record: RecordState, actionType: 'analyze' | '
 
   if (createJobResponse?.error || !createJobResponse?.jobId) {
     record.aiStatus[responseFlag] = true;
-    adminforth.alert({
-      message: t(`Failed to ${actionType.replace('_', ' ')}. Please, try to re-run the action.`),
-      variant: 'danger',
-      timeout: 'unlimited',
-    });
+    registerGenerationFailure(record, actionType, createJobResponse?.error || `Failed to ${getActionLabel(actionType)}. Please, try to re-run the action.`);
     throw new Error(createJobResponse?.error || 'Failed to create job');
   }
 
@@ -745,7 +783,7 @@ async function runActionForRecord(record: RecordState, actionType: 'analyze' | '
 async function pollJob(
   record: RecordState,
   jobId: string,
-  actionType: 'analyze' | 'analyze_no_images' | 'generate_images',
+  actionType: GenerationAction,
   responseFlag: keyof RecordState['aiStatus']
 ) {
   let isInProgress = true;
@@ -762,6 +800,7 @@ async function pollJob(
     }
     if (jobResponse?.error) {
       record.aiStatus[responseFlag] = true;
+      registerGenerationFailure(record, actionType, jobResponse.error);
       throw new Error(jobResponse.error);
     }
     const jobStatus = jobResponse?.job?.status;
@@ -783,7 +822,7 @@ async function pollJob(
   }
 }
 
-function applyJobResult(record: RecordState, job: any, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+function applyJobResult(record: RecordState, job: any, actionType: GenerationAction) {
   if (actionType === 'generate_images') {
     for (const fieldName of props.meta.outputImageFields || []) {
       const resultValue = job?.result?.[fieldName];
@@ -805,12 +844,8 @@ function applyJobResult(record: RecordState, job: any, actionType: 'analyze' | '
   touchRecords();
 }
 
-function applyJobFailure(record: RecordState, job: any, actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
-  adminforth.alert({
-    message: t(`Generation action "${actionType.replace('_', ' ')}" failed for record: ${record.id}. Error: ${job?.error || 'Unknown error'}`),
-    variant: 'danger',
-    timeout: 'unlimited',
-  });
+function applyJobFailure(record: RecordState, job: any, actionType: GenerationAction) {
+  registerGenerationFailure(record, actionType, job?.error || 'Unknown error');
   if (actionType === 'generate_images') {
     record.imageGenerationFailed = true;
     record.imageGenerationErrorMessage = job?.error || 'Unknown error';
@@ -826,7 +861,7 @@ function applyJobFailure(record: RecordState, job: any, actionType: 'analyze' | 
   touchRecords();
 }
 
-async function waitForRefresh(actionType: 'analyze' | 'analyze_no_images' | 'generate_images') {
+async function waitForRefresh(actionType: GenerationAction) {
   if (actionType === 'generate_images') {
     await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.generateImages));
   } else if (actionType === 'analyze') {
