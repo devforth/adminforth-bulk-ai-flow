@@ -446,8 +446,16 @@ function getActionLabel(actionType: GenerationAction) {
   return actionType.replace('_', ' ');
 }
 
+function getGenerationFailureGroupKey(actionType: GenerationAction, error: string) {
+  const normalizedError = error
+    .replace(/Please retry in [\d.]+s\.?/g, 'Please retry later.')
+    .replace(/\b\d+\.\d+s\b/g, '<duration>')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<uuid>');
+  return `${actionType}:${normalizedError}`;
+}
+
 function registerGenerationFailure(record: RecordState, actionType: GenerationAction, error: string) {
-  const key = `${actionType}:${error}`;
+  const key = getGenerationFailureGroupKey(actionType, error);
   let group = generationFailureGroups.get(key);
   if (!group) {
     group = {
