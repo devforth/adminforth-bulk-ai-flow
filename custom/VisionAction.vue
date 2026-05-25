@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-end justify-start gap-2 cursor-pointer">
-    <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
+    <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-lightPrimary via-lightPrimary/90 to-lightPrimary/80 hover:opacity-90 focus:ring-4 focus:outline-none focus:ring-lightPrimary/30 dark:focus:ring-darkPrimary/30 font-medium rounded-md text-sm px-1 text-center dark:bg-none dark:bg-darkPrimary/10 dark:text-darkPrimary dark:brightness-200">
       {{t('AI')}}
     </div>
     <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
@@ -27,14 +27,14 @@
             {
               label: t('Cancel'),
               options: {
-                class: 'w-2/5 bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
+                class: 'w-1/2 px-5 py-2.5 text-sm font-medium rounded-xl hover:opacity-90 border border-lightPrimary dark:border-darkPrimary bg-white hover:bg-lightPrimary dark:hover:bg-darkPrimary text-lightPrimary dark:text-gray-900 hover:text-white focus:ring-4 focus:outline-none focus:ring-lightPrimary/20 dark:focus:ring-darkPrimary/20 transition-all duration-150 text-center justify-center'
               },
               onclick: (dialog) => confirmDialog.tryToHideModal()
             },
             {
               label: t('Start generation'),
               options: {
-                class: 'w-3/5 px-5 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none',
+                class: 'w-1/2 px-5 py-2.5 text-sm font-medium rounded-xl hover:opacity-90 border border-lightPrimary dark:border-darkPrimary bg-white hover:bg-lightPrimary dark:hover:bg-darkPrimary text-lightPrimary dark:text-gray-900 hover:text-white focus:ring-4 focus:outline-none focus:ring-lightPrimary/20 dark:focus:ring-darkPrimary/20 transition-all duration-150 text-center justify-center',
                 loader: isCheckingRateLimits
               },
               onclick: (dialog) => { runAiActions(); }
@@ -42,14 +42,14 @@
           ]"
     :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
+    <div class="bulk-vision-table flex flex-col gap-4 overflow-y-auto w-full">
       <template v-if="recordsList.length && popupMode === 'generation'" >
         <div class="w-full">
           <p :class="isGenerationPaused ? '' : 'opacity-0'" class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
           <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
             <div class="flex items-center gap-2">
               <button
-                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 border-none ml-2"
+                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-lightPrimary to-lightPrimary/80 text-white border-none ml-2"
                 @click="resumeGeneration"
               >
                 {{ t('Resume generation') }}
@@ -133,34 +133,56 @@
               {{ formatLabel(promptKey) }} {{ t('prompt') }}:
               <Textarea 
                 v-model="generationPrompts[key][promptKey]" 
-                class="w-full h-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                class="w-full h-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lightPrimary"
               ></Textarea>
               <p class="text-red-500 hover:underline hover:cursor-pointer mt-2" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
             </div>
           </div>
         </div>
       </div>
-      <div v-else class="flex flex-col gap-2 mt-2 w-full h-full">
-        <div class="flex items-center justify-between mb-2 w-full">
-          <div class="flex items-center justify-center gap-2">
-            <IconShieldSolid class="w-6 h-6 text-lightPrimary dark:text-darkPrimary" />
-            <p class="sm:text-base text-sm">{{ t('Overwrite existing values') }}</p>
-            <Tooltip>
-                <IconInfoCircleSolid class="w-5 h-5 me-2 text-lightPrimary dark:text-darkPrimary"/>
-                <template #tooltip>
-                  <p class="max-w-64">{{ t('When enabled, the AI will overwrite content for fields that already have data. When off - this helps to preserve existing information and avoid overwriting valuable content.') }}</p>
-                </template>
-            </Tooltip>
+      <div v-else class="flex flex-col gap-4 w-full h-full">
+        <div class="flex flex-col p-5 rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
+                <IconShieldCheckOutline class="w-5 h-5 dark:brightness-200"  />
+              </div>
+              <div class="min-w-0">
+                <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Overwrite existing values') }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words pr-2">AI-generated data will replace existing values.</p>
+              </div>
+            </div>
+            <div class="shrink-0 pt-1">
+              <Toggle v-model="overwriteExistingValues" />
+            </div>
           </div>
-          <Toggle
-            v-model="overwriteExistingValues"
-          />
+
+          <div v-if="overwriteExistingValues" class="mt-4 flex items-start text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 text-sm">
+            <IconInfoCircleSolid class="w-4 h-4 me-2 shrink-0 mt-0.5 " />
+            <p>{{ t('Warning: Existing values will be overwritten.') }}</p>
+          </div>
         </div>
-        <div :class="overwriteExistingValues === true ? 'opacity-100' : 'opacity-0'" class="flex items-center text-yellow-800 bg-yellow-100 p-2 rounded-md border border-yellow-300">
-          <IconExclamationTriangle class="w-6 h-6 me-2"/>
-          <p class="sm:text-base text-sm">{{ t('Warning: Existing values will be overwritten.') }}</p>
+
+        <div 
+          @click="clickSettingsButton()"
+          class="flex items-center justify-between p-5 rounded-2xl border border-gray-100 bg-white hover:bg-gray-50 shadow-sm dark:border-gray-800 dark:bg-gray-900/40 dark:hover:bg-gray-900/60 cursor-pointer transition-all duration-150"
+        >
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
+              <IconMessageCaptionOutline class="w-5 h-5 dark:brightness-200" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Configure prompts') }}</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">Change the instructions for AI to generate actual data.</p>
+            </div>
+          </div>
         </div>
-        <p class="w-fit flex justify-start text-lightPrimary dark:text-white hover:underline cursor-pointer" @click="clickSettingsButton()">{{ t('Configure prompts') }}</p>
+
+        <div class="flex items-center gap-2 px-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+          <IconInfoCircleSolid class="w-4 h-4 " />
+          <p>This action will only apply to the fields included in your prompts.</p>
+        </div>
+    
       </div>
     </div>
   </Dialog>
@@ -179,6 +201,7 @@ import { useCoreStore } from '@/stores/core';
 import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
 import { useFiltersStore } from '@/stores/filters';
+import { IconMessageCaptionOutline, IconShieldCheckOutline } from '@iconify-prerendered/vue-flowbite';
 
 
 const coreStore = useCoreStore();
