@@ -125,12 +125,8 @@
       <template v-else-if="!recordsList.length && popupMode === 'generation'">
         <p>No data to save. Feel free to click "Cancel"</p>
       </template>
-      <div 
-        v-else-if="popupMode === 'settings'" 
-        v-for="(promptsCategory, key) in generationPrompts" 
-        :key="key" 
-        class="w-full flex flex-col gap-6 mb-6"
-      >
+      <div v-else-if="popupMode === 'settings'" class="w-full flex flex-col gap-6">
+        <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
         <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
           <div class="flex items-start gap-3.5 mb-6 border-b border-gray-100 dark:border-gray-800">
             
@@ -223,6 +219,7 @@
             </div>
           </div>
         </div>
+      </template>
       </div>
       <div v-else class="flex flex-col gap-4 w-full h-full">
         <div class="flex flex-col p-5 rounded-default border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
