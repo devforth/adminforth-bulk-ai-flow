@@ -16,9 +16,17 @@
     :closable="false"
     :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
           {
+            label: t('Cancel'),
+            options: {
+              class: 'afcl-button w-1/6',
+              mode: 'secondary'
+            },
+            onclick: () => { popupMode = 'confirmation'; }
+          },
+          {
             label: t('Save settings'),
             options: {
-              class: 'w-fit'
+              class: 'afcl-button w-1/6',
             },
             onclick: (dialog) => { saveSettings(); }
           },
@@ -27,14 +35,15 @@
             {
               label: t('Cancel'),
               options: {
-                class: 'w-1/2 px-5 py-2.5 text-sm font-medium rounded-xl hover:opacity-90 border border-lightPrimary dark:border-darkPrimary bg-white hover:bg-lightPrimary dark:hover:bg-darkPrimary text-lightPrimary dark:text-gray-900 hover:text-white focus:ring-4 focus:outline-none focus:ring-lightPrimary/20 dark:focus:ring-darkPrimary/20 transition-all duration-150 text-center justify-center'
+                class: 'afcl-button w-1/2',
+                mode: 'secondary'
               },
               onclick: (dialog) => confirmDialog.tryToHideModal()
             },
             {
               label: t('Start generation'),
               options: {
-                class: 'w-1/2 px-5 py-2.5 text-sm font-medium rounded-xl hover:opacity-90 border border-lightPrimary dark:border-darkPrimary bg-white hover:bg-lightPrimary dark:hover:bg-darkPrimary text-lightPrimary dark:text-gray-900 hover:text-white focus:ring-4 focus:outline-none focus:ring-lightPrimary/20 dark:focus:ring-darkPrimary/20 transition-all duration-150 text-center justify-center',
+                class: 'afcl-button w-1/2',
                 loader: isCheckingRateLimits
               },
               onclick: (dialog) => { runAiActions(); }
@@ -120,28 +129,103 @@
         v-else-if="popupMode === 'settings'" 
         v-for="(promptsCategory, key) in generationPrompts" 
         :key="key" 
-        class="w-full"
+        class="w-full flex flex-col gap-6 mb-6"
       >
-        <div v-if="Object.keys(promptsCategory).length > 0" class="gap-4 mb-6 ml-1">
-          <p class="text-start w-full text-xl font-bold mb-2">{{
-           key === "plainFieldsPrompts" ? "Prompts for non-image fields" 
-            : key === "generateImages" ? "Prompts for image fields" 
-              : "Prompts for image analysis"
-          }}</p>
-          <div class="grid grid-cols-2 gap-4">
-            <div v-for="(prompt, promptKey) in promptsCategory" :key="promptKey">
-              {{ formatLabel(promptKey) }} {{ t('prompt') }}:
-              <Textarea 
-                v-model="generationPrompts[key][promptKey]" 
-                class="w-full h-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lightPrimary"
-              ></Textarea>
-              <p class="text-red-500 hover:underline hover:cursor-pointer mt-2" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
+        <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
+          <div class="flex items-start gap-3.5 mb-6 border-b border-gray-100 dark:border-gray-800">
+            
+            <div class="flex-1 min-w-0">
+              <h3 class="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                {{
+                 key === "plainFieldsPrompts" ? t("Prompts for non-image fields") 
+                  : key === "generateImages" ? t("Prompts for image fields") 
+                    : t("Prompts for image analysis")
+                }}
+              </h3>
+              <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {{ 
+                  key === "plainFieldsPrompts" ? t("Define how AI should generate content for text-based fields.") 
+                  : key === "generateImages" ? t("Configure prompt rules for generating media and images.") 
+                    : t("Instructions for extracting text specifications from images.")
+                }}
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div 
+              v-for="(prompt, promptKey) in promptsCategory" 
+              :key="promptKey" 
+              class="
+              flex flex-col bg-white dark:bg-gray-900 border border-gray-200/80 p-5 rounded-default shadow-sm transition-all duration-200
+              hover:shadow-md hover:border-gray-300
+              dark:border-gray-800
+              dark:hover:border-gray-700"
+            >
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="p-2 bg-lightPrimary/10 text-lightPrimary rounded-lg shrink-0
+                    dark:bg-darkPrimary/20
+                    dark:text-darkPrimary ">
+                    <IconImageSolid 
+                      v-if="key === 'generateImages'" 
+                      class="w-5 h-5 dark:brightness-200" 
+                    />
+                    <IconFileLinesOutline 
+                      v-else 
+                      class="w-5 h-5 dark:brightness-200" 
+                    />
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 capitalize tracking-tight">
+                      {{ formatLabel(promptKey) }}
+                    </h4>
+                    <p class="text-[11px] text-gray-400 dark:text-gray-500">
+                      {{ key === 'generateImages' ? t('Generate source media') : t('Generate a detailed content') }}
+                    </p>
+                  </div>
+                </div>
+
+                <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-md bg-lightPrimary/10 text-lightPrimary dark:bg-darkPrimary/10 dark:text-darkPrimary">
+                  {{ key === 'generateImages' ? t('Image field') : t('Text field') }}
+                </span>
+              </div>
+
+              <div class="relative flex-1">
+                <Textarea 
+                  v-model="generationPrompts[key][promptKey]" 
+                  class="w-full h-56 p-3.5 text-sm leading-relaxed border border-gray-200 bg-gray-50/30 text-gray-800 shadow-sm resize-none font-sans
+                  dark:border-gray-700  
+                  dark:bg-gray-800/40  
+                  dark:text-gray-100 rounded-xl 
+                  dark:focus:border-gray-700
+                  focus:outline-none 
+                  focus:border-gray-200"
+                  placeholder="Enter prompt instructions..."
+                ></Textarea>
+              </div>
+
+              <Button 
+                type="button"
+                mode = "secondary"
+                @click="resetPromptToDefault(key, promptKey)"
+                class="
+                afcl-button w-1/2 mt-6 text-red-600 border-red-600
+                hover:text-red-700 dark:text-red-500
+                hover:border-red-700 
+                dark:hover:text-red-400
+                dark:border-red-500 
+                dark:hover:border-red-400">
+                <IconUndoOutline class="w-4 h-4 dark:brightness-200"  />
+                {{ t('Reset to default') }}
+              </Button>
+
             </div>
           </div>
         </div>
       </div>
       <div v-else class="flex flex-col gap-4 w-full h-full">
-        <div class="flex flex-col p-5 rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
+        <div class="flex flex-col p-5 rounded-default border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
           <div class="flex items-start justify-between gap-4">
             <div class="flex items-start gap-3 min-w-0">
               <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
@@ -165,7 +249,9 @@
 
         <div 
           @click="clickSettingsButton()"
-          class="flex items-center justify-between p-5 rounded-2xl border border-gray-100 bg-white hover:bg-gray-50 shadow-sm dark:border-gray-800 dark:bg-gray-900/40 dark:hover:bg-gray-900/60 cursor-pointer transition-all duration-150"
+          class="
+          flex items-center justify-between p-5 rounded-default border border-gray-100 bg-white shadow-sm cursor-pointer transition-all duration-150
+          dark:border-gray-800 dark:bg-gray-900/40 "
         >
           <div class="flex items-start gap-3 min-w-0">
             <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
@@ -201,7 +287,8 @@ import { useCoreStore } from '@/stores/core';
 import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
 import { useFiltersStore } from '@/stores/filters';
-import { IconMessageCaptionOutline, IconShieldCheckOutline } from '@iconify-prerendered/vue-flowbite';
+import { Button } from '@/afcl'
+import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid } from '@iconify-prerendered/vue-flowbite';
 
 
 const coreStore = useCoreStore();
@@ -513,7 +600,7 @@ function registerGenerationFailure(record: RecordState, actionType: GenerationAc
 }
 
 function showGenerationFailureSummary() {
-  for (const group of generationFailureGroups.values()) {
+  for (const group of Array.from(generationFailureGroups.values())) {
     const failedCount = group.recordIds.size;
     const firstRecordId = Array.from(group.recordIds)[0];
     adminforth.alert({
