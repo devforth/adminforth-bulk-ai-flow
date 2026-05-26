@@ -51,9 +51,9 @@
           ]"
     :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col gap-4 overflow-y-auto w-full">
+    <div class="bulk-vision-table flex flex-col max-h-[700px] gap-4 overflow-y-auto w-full">
       <template v-if="recordsList.length && popupMode === 'generation'" >
-        <div class="w-full">
+        <div class="w-full min-w-[980px]">
           <p :class="isGenerationPaused ? '' : 'opacity-0'" class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
           <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
             <div class="flex items-center gap-2">
@@ -71,18 +71,58 @@
               </button>
             </div>
           </div>
-          
-          <ProgressBar 
-            v-if="!isGenerationPaused"
-            class="w-full mb-4"
-            :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
-            :max-value="100" 
-            :min-value="0"
-            :showAnimation="isProcessingAny"
-            :showLabels="false"
-            :showValues="false"
-            :show-progress="false"
-          />
+
+          <div class="w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 rounded-2xl shadow-sm flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div 
+                  class="p-2 rounded-xl shrink-0"
+                  :class="isGenerationPaused ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/40 dark:text-yellow-400' 
+                    : displayedProcessedCount === totalRecords ? 'bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400'
+                    : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'"
+                >
+                  <IconShieldCheckOutline v-if="displayedProcessedCount === totalRecords" class="w-5 h-5" />
+                  <IconRefreshOutline v-else :class="isProcessingAny ? 'animate-spin' : ''" class="w-5 h-5" />
+                </div>
+                
+                <div>
+                  <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 tracking-tight">
+                    {{ displayedProcessedCount }} {{ t('of') }} {{ totalRecords }} {{ t('fields ready to save') }}
+                  </h4>
+                </div>
+              </div>
+
+              <span 
+                class="px-2.5 py-1 text-xs font-bold tracking-wide rounded-full flex items-center gap-1.5"
+                :class="isGenerationPaused ? 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50'
+                  : displayedProcessedCount === totalRecords ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50'"
+              >
+                <span 
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="isGenerationPaused ? 'bg-yellow-500' : displayedProcessedCount === totalRecords ? 'bg-green-500' : 'bg-blue-500'"
+                ></span>
+                {{ 
+                  isGenerationPaused ? t('On pause') 
+                  : displayedProcessedCount === totalRecords ? t('Ready') 
+                  : t('Processing') 
+                }}
+              </span>
+            </div>
+
+            <ProgressBar 
+              class="w-full"
+              :class="isGenerationPaused ? 'opacity-80' : ''"
+              :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
+              :max-value="100" 
+              :min-value="0"
+              :showAnimation="isProcessingAny && !isGenerationPaused"
+              :showLabels="false"
+              :showValues="false"
+              :show-progress="false"
+            />
+
+          </div>
         </div>
 
 
@@ -105,6 +145,13 @@
           @regenerate-images="regenerateImages"
           @regenerate-cell="regenerateCell"
         />
+        <div class="mt-2 flex items-start text-lightPrimary dark:text-darkPrimary bg-lightPrimary/10 dark:bg-darkPrimary/10 px-4 py-3 rounded-default border border-lightPrimary/20 dark:border-darkPrimary/20 text-sm">
+          <IconInfoCircleSolid class="w-5 h-5 me-2 shrink-0 mt-0.5 text-lightPrimary dark:text-darkPrimary dark:brightness-200" />
+          <p class="text-lightPrimary dark:text-darkPrimary dark:brightness-200">
+            <span class="font-semibold text-lightPrimary dark:text-darkPrimary dark:brightness-200">{{ t('Only checked fields will be saved.') }}</span> 
+            {{ t('You can regenerate fields before saving if needed.') }}
+          </p>
+        </div>
         <div class="text-red-600 flex items-center w-full">
           <p v-if="isError === true">{{ errorMessage }}</p>
         </div>
@@ -188,20 +235,21 @@
                 ></Textarea>
               </div>
 
-              <Button 
+              <button 
                 type="button"
-                mode = "secondary"
+                mode="secondary"
                 @click="resetPromptToDefault(key, promptKey)"
                 class="
-                afcl-button w-1/2 mt-6 text-red-600 border-red-600
-                hover:text-red-700 dark:text-red-500
-                hover:border-red-700 
-                dark:hover:text-red-400
-                dark:border-red-500 
-                dark:hover:border-red-400">
-                <IconUndoOutline class="w-4 h-4 dark:brightness-200"  />
-                {{ t('Reset to default') }}
-              </Button>
+                mt-4 flex items-center gap-1.5 text-xs font-semibold bg-transparent px-2.5 py-1 w-fit rounded-default
+                border border-red-200 hover:border-red-600
+                text-red-600 hover:text-red-700 
+                dark:border-red-900/50 dark:hover:border-red-500
+                dark:text-red-500 dark:hover:text-red-400
+                transition-colors duration-150"
+              >
+                <IconUndoOutline class="w-3.5 h-3.5 dark:brightness-200" />
+                {{ t('Reset') }}
+              </button>
 
             </div>
           </div>
@@ -272,7 +320,7 @@ import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-f
 import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
 import { useFiltersStore } from '@/stores/filters';
 import { Button } from '@/afcl'
-import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid } from '@iconify-prerendered/vue-flowbite';
+import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid, IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
 import { ProgressBar } from '@/afcl';
 
 
@@ -404,14 +452,16 @@ const generationModeButtons = computed(() => {
       label: checkedCount.value > 1 ? t('Save fields') : t('Save field'), 
       options: { 
         disabled: isLoading.value || checkedCount.value < 1 || isFetchingRecords.value || isProcessingAny.value || isGenerationPaused.value, 
-        loader: isLoading.value, class: 'w-fit' 
+        loader: isLoading.value, 
+        class: 'afcl-button w-1/6'
       }, 
       onclick: async (dialog) => { await saveData(); dialog.hide(); } 
     },
     { 
       label: t('Cancel'), 
       options: {
-        class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
+        class: 'afcl-button w-1/6',
+        mode: 'secondary'
       }, 
       onclick: async (dialog) => { await handleBeforeClose(dialog); } 
     },
@@ -422,7 +472,8 @@ const generationModeButtons = computed(() => {
       label: t('Save processed'),
       options: {
         disabled: isLoading.value || isSavingCurrent.value || completedRecordIds.value.size < 1,
-        loader: isSavingCurrent.value, class: 'w-fit'
+        loader: isSavingCurrent.value,
+        class: 'afcl-button w-1/6',
       },
       onclick: async () => { await saveCurrentGenerated(); }
     })
