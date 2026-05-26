@@ -71,31 +71,18 @@
               </button>
             </div>
           </div>
-          <div
+          
+          <ProgressBar 
             v-if="!isGenerationPaused"
-            class="w-full h-8 rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
-            :class="isGenerationPaused ? 'opacity-80' : ''"
-            role="progressbar"
-            :aria-valuenow="displayedProcessedCount"
-            :aria-valuemin="0"
-            :aria-valuemax="totalRecords"
-          >
-            <div
-              class="h-full bg-gradient-to-r from-lightPrimary/70 via-lightPrimary/80 to-lightPrimary/90 dark:from-darkPrimary/70 dark:via-darkPrimary/80 dark:to-darkPrimary/90 transition-all duration-200 "
-              :style="{ width: `${displayedProgressPercent}%` }"
-            ></div>
-            <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
-              <template v-if="isProcessingAny || isGenerationPaused">
-                {{ Math.floor((displayedProcessedCount  /  totalRecords) * 100) }}%
-              </template>
-              <template v-else-if="isGenerationCancelled">
-                {{ t('Generation cancelled') }}
-              </template>
-              <template v-else>
-                {{ t('Processed') }}
-              </template>
-            </div>
-          </div>
+            class="w-full mb-4"
+            :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
+            :max-value="100" 
+            :min-value="0"
+            :showAnimation="isProcessingAny"
+            :showLabels="false"
+            :showValues="false"
+            :show-progress="false"
+          />
         </div>
 
 
@@ -286,6 +273,7 @@ import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
 import { useFiltersStore } from '@/stores/filters';
 import { Button } from '@/afcl'
 import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid } from '@iconify-prerendered/vue-flowbite';
+import { ProgressBar } from '@/afcl';
 
 
 const coreStore = useCoreStore();
