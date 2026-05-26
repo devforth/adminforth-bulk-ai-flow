@@ -157,7 +157,7 @@
         </div>
       </template>
       <template v-else-if="!recordsList.length && popupMode === 'generation'">
-        <p>No data to save. Feel free to click "Cancel"</p>
+        <p>{{ t('No data to save. Feel free to click "Cancel"') }}</p>
       </template>
       <div v-else-if="popupMode === 'settings'" class="w-full flex flex-col gap-6">
         <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
@@ -265,7 +265,7 @@
               </div>
               <div class="min-w-0">
                 <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Overwrite existing values') }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words pr-2">AI-generated data will replace existing values.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words pr-2">{{ t('AI-generated data will replace existing values.') }}</p>
               </div>
             </div>
             <div class="shrink-0 pt-1">
@@ -290,15 +290,15 @@
               <IconMessageCaptionOutline class="w-5 h-5 dark:brightness-200" />
             </div>
             <div class="min-w-0">
-              <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Configure prompts') }}</p>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">Change the instructions for AI to generate actual data.</p>
+              <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Configure prompts')}}</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">{{ t('Change the instructions for AI to generate actual data.')}}</p>
             </div>
           </div>
         </div>
 
         <div class="flex items-center gap-2 px-1 text-xs font-medium text-gray-400 dark:text-gray-500">
           <IconInfoCircleSolid class="w-4 h-4 " />
-          <p>This action will only apply to the fields included in your prompts.</p>
+          <p>{{ t('This action will only apply to the fields included in your prompts.') }}</p>
         </div>
     
       </div>
