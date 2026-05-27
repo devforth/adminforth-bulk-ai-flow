@@ -146,7 +146,7 @@
           @regenerate-cell="regenerateCell"
         />
         <div class="mt-2 flex items-center text-lightPrimary dark:text-darkPrimary bg-lightPrimary/10 dark:bg-darkPrimary/10 px-4 py-3 rounded-default border border-lightPrimary/20 dark:border-darkPrimary/20 text-sm">
-          <IconInfoCircleSolid class="w-5 h-5 me-2 shrink-0  text-lightPrimary dark:text-darkPrimary dark:brightness-200" />
+          <IconInfoCircleSolid class="w-5 h-5 me-2 shrink-0 text-lightPrimary dark:text-darkPrimary dark:brightness-200" />
           <p class="text-lightPrimary dark:text-darkPrimary dark:brightness-200">
             <span class="font-semibold text-lightPrimary dark:text-darkPrimary dark:brightness-200">{{ t('Only checked fields will be saved.') }}</span> 
             {{ t('You can regenerate fields before saving if needed.') }}

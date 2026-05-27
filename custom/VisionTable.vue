@@ -3,7 +3,7 @@
       ref="tableRef"
       :columns="tableHeaders"
       :data="tableDataProvider"
-      :pageSize="pageSize"
+      :pageSize="100"
       makeHeaderSticky
       makePaginationSticky
       >
@@ -171,11 +171,11 @@
                   <div>
                     <IconRefreshOutline
                       @click="() => {regenerateImages(item.id)}"
-                      class="w-20 h-20 hover:text-blue-500 cursor-pointer transition hover:scale-105"
+                      class="w-10 h-10 hover:text-blue-500 cursor-pointer transition hover:scale-105"
                     />
                   </div>
                   <template #tooltip>
-                    {{ item.imageGenerationErrorMessage + '. Click to retry.' }}
+                    {{ item.imageGenerationErrorMessage + 'Click to retry' }}
                   </template>
                 </Tooltip>
               </div>
