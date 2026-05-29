@@ -5,8 +5,6 @@ import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
 import { randomUUID } from "crypto";
-
-
 const STUB_MODE = false;
 const jobs = new Map(); 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
@@ -643,7 +641,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           plainFieldsPrompts: this.options.fillPlainFields || {},
           imageFieldsPrompts: this.options.fillFieldsFromImages || {},
           imageGenerationPrompts: this.options.generateImages || {},
-        }
+        },
+        pageSize: this.options.pageSize || undefined
       }
     }
     

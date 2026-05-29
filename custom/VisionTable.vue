@@ -1,222 +1,287 @@
 <template>
-    <Table
-      ref="tableRef"
-      :columns="tableHeaders"
-      :data="tableDataProvider"
-      :pageSize="100"
-      makeHeaderSticky
-      makePaginationSticky
+  <div class="overflow-auto pr-2" style="max-height: calc(100vh - 260px);">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 p-1">
+      <div 
+        v-for="item in paginatedRecords" 
+        :key="item.id"
+        class="bg-white border border-gray-200 rounded-default p-4 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between gap-4"
       >
-      <!-- HEADER TEMPLATE -->
-      <template #header:checkboxes="{ item }">
-        {{ $t('MARK FOR SAVE') }}
-      </template>
-      <!-- CHECKBOX CELL TEMPLATE -->
-      <template #cell:checkboxes="{ item }">
-        <div class="max-w-[100px] flex items-center justify-center">
-          <Checkbox
-            v-model="item.isChecked"
-          />
-        </div>
-      </template>
-      <!-- IMAGE CELL TEMPLATE -->
-      <template #cell:images="{item}">
-        <div class="flex flex-shrink-0 gap-2">
-          <div v-if="item.images.length" v-for="image in item.images" :key="image">
-            <div class="mt-2 flex items-center justify-center gap-2">
-              <img
-                  v-if="isValidUrl(image)" 
-                  :src="image"  
-                  class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition my-2" 
-                  @click="zoomImage(image)"
+        <div class="flex flex-col h-full">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div class="flex items-center gap-3 w-full min-w-0">
+              <Checkbox 
+                v-model="item.isChecked" 
+                class="shrink-0"
               />
-              <div v-else class="w-20 h-20">
-                <p>{{ $t('Invalid source image') }}</p>
+              <!-- CRITICAL WRAPPER -->
+              <div class="flex-1 min-w-0 w-0">
+                <h3 class="font-bold text-gray-900 w-full truncate overflow-hidden whitespace-nowrap">
+                  {{ item.label || item.data?.name || $t('Item Record') }}
+                </h3>
               </div>
             </div>
-          </div>
-          <div class="flex items-center justify-center text-center w-20 h-20" v-else>
-            <p>{{ $t('No images found') }}</p>
-          </div>
-          <transition name="fade">
-            <div
-              v-if="zoomedImage"
-              class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-              @click.self="closeZoom"
-            >
-              <transition name="zoom">
-                <img
-                  v-if="zoomedImage"
-                  :src="zoomedImage"
-                  class="max-w-full max-h-full rounded-lg object-contain cursor-grab z-75"
-                />
-              </transition>
+            <div class="text-right shrink-0 text-gray-400">
+              ID: {{ item.id }}
             </div>
-          </transition>
-        </div>
-      </template>
-      <!-- CUSTOM FIELD TEMPLATES -->
-      <template v-for="n in customFieldNames" :key="n" #[`cell:${n}`]="{ item }">
-        <div v-if="(isAnalyzing(item, n) && !item.regeneratingFieldsStatus?.[n]) && !isInColumnImage(n)" @mouseenter="(() => { setHover(item.id, n, true) })" @mouseleave="(() => { setHover(item.id, n, false) })">
-          <div class="flex gap-1 justify-end">
-            <Tooltip v-if="checkForError(item, n)">
-              <IconExclamationCircleSolid class="my-2 w-5 h-5 text-red-500" />
-              <template #tooltip> 
-                {{ checkForError(item, n) }}
-              </template>
-            </Tooltip>
-            <Tooltip>
-              <IconRefreshOutline class="my-2 w-5 h-5 hover:text-blue-500 cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed hover': shouldDisableRegenerateFieldIcon(item, n) }" @click="regerenerateFieldIconClick(item, n)"/>
-              <template #tooltip> 
-                {{ shouldDisableRegenerateFieldIcon(item, n) ? $t("Can't analyze image without source image") : $t('Regenerate') }}
-              </template>
-            </Tooltip>
           </div>
-          <div v-if="isInColumnEnum(n)" class="flex flex-col items-start justify-end min-h-[90px]">
-              <Select
-                class="min-w-[150px]"
-                :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
-                v-model="item.data[n]"
-                :teleportToTop="true"
-                :teleportToBody="false"
-              >
-              </Select>
-              <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
-                  <p class="text-sm ">{{ $t('old value') }}</p>
-                </div>
-                <template #tooltip>
-                  {{  item.oldData?.[n] ?? "No old value" }}
-                </template>
-              </Tooltip>
-          </div>
-            <div v-else-if="typeof item.data?.[n] === 'string' || typeof item.data?.[n] === 'object'" class="flex flex-col items-start justify-end min-h-[90px]">
-            <Textarea
-              class="min-w-[150px] h-full"
-              type="text"
-              v-model="item.data[n]"
-            >
-            </Textarea>
-            <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
-                  <p class="text-sm ">{{ $t('old value') }}</p>
-                </div>
-              <template #tooltip>
-                <p class="max-w-[200px]">{{  item.oldData?.[n] ?? "No old value" }}</p>
-              </template>
-            </Tooltip>
-            </div>
-          <div v-else-if="typeof item.data?.[n] === 'boolean'" class="flex flex-col items-center justify-end min-h-[90px]">
-            <Toggle
-              class="p-2"
-              v-model="item.data[n]"
-            >
-            </Toggle>
-            <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
-                  <p class="text-sm ">{{ $t('old value') }}</p>
-                </div>
-              <template #tooltip>
-                {{  item.oldData?.[n] ?? "No old value" }}
-              </template>
-            </Tooltip>
-          </div>
-          <div v-else class="flex flex-col items-start justify-end min-h-[90px]">
-            <Input
-              type="number"
-              v-model="item.data[n]"
-              class="w-full min-w-[80px]"
-              :fullWidth="true"
-            />
-            <Tooltip>
-                <div class="mt-2 flex items-center justify-start gap-1 hover:text-blue-500" :class="{ 'opacity-0': !isHovered(item.id, n) }">
-                  <p class="text-sm ">{{ $t('old value') }}</p>
-                </div>
-              <template #tooltip>
-                {{  item.oldData?.[n] ?? "No old value" }}
-              </template>
-            </Tooltip>
-          </div>
-        </div>
 
-        <div v-if="item.aiStatus.generatedImages" @mouseenter="(() => { setHover(item.id, n, true) })" @mouseleave="(() => { setHover(item.id, n, false) })">
-          <div v-if="isInColumnImage(n)">
-            <div class="mt-2 mb-2 flex items-center justify-start gap-2">
-              <div v-if="isValidUrl(item.data?.[n])" class="flex flex-col items-center relative">
-              <img 
-                :src="item.data?.[n]"
-                class="w-20 h-20 object-cover rounded cursor-pointer border hover:border-blue-500 transition"
-                @click="() => {item.openGenerationCarousel[n] = true}"
-              />
-              <p
-                v-if="isImageHasPreviewUrl[n]"
-                class="absolute mt-20 text-sm hover:text-blue-500 hover:underline hover:cursor-pointer flex items-center gap-1"
-                :class="{ 'opacity-0': !isHovered(item.id, n) }"
-                @click="() => {item.openImageCompare[n] = true}"  
-              >
-                {{ $t('old image') }}
-              </p>
-              </div>
-              <div v-else class="flex items-center justify-center text-center w-20 h-20">
-                <Tooltip v-if="item.imageGenerationErrorMessage === 'No source images found'">
-                  <p
+          <div class="flex flex-col gap-3 flex-grow">
+            <div
+              class="w-full flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-200 h-full max-h-[260px] max-w-[428.5px] rounded-default text-center "
+            >
+              <!-- HAS IMAGES -->
+              <template v-if="item.images?.length">
+                <template
+                  v-for="(image, index) in item.images"
+                  :key="image || index"
+                >
+                  <img
+                    v-if="image && isValidUrl(image)"
+                    :src="image"
+                    class="w-full h-full object-cover rounded-default cursor-pointer border hover:border-blue-500 transition"
+                    @click="zoomImage(image)"
+                  />
+
+                  <div
+                    v-else
+                    class="text-xs text-red-500 flex flex-col items-center justify-center h-full p-2"
                   >
-                    {{ $t("Can't generate image.") }}
-                  </p>
-                  <template #tooltip>
-                    {{ item.imageGenerationErrorMessage }}
-                  </template>
-                </Tooltip>
-                <Tooltip v-else>
-                  <div>
-                    <IconRefreshOutline
-                      @click="() => {regenerateImages(item.id)}"
-                      class="w-10 h-10 hover:text-blue-500 cursor-pointer transition hover:scale-105"
+                    <IconExclamationCircleSolid class="w-6 h-6 mb-1" />
+                    <p>{{ $t('Invalid source image') }}</p>
+                  </div>
+                </template>
+              </template>
+
+              <!-- EMPTY ARRAY -->
+              <template v-else-if="item.images?.length === 0">
+                <div class="text-gray-400 h-[260px] flex flex-col items-center justify-center h-full">
+                  <svg
+                    class="w-8 h-8 mb-2 stroke-1 text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <p class="text-xs font-medium">{{ $t('No images found') }}</p>
+                </div>
+              </template>
+
+              <!-- NO DATA -->
+              <template v-else>
+                <div class="text-gray-400 flex flex-col items-center justify-center h-full">
+                  <svg
+                    class="w-8 h-8 mb-2 stroke-1 text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <p class="text-xs font-medium">{{ $t('No image found') }}</p>
+                </div>
+              </template>
+            </div>
+            
+            <div class="flex flex-col gap-3">
+              <div 
+                v-for="n in customFieldNames" 
+                :key="n"
+                class="flex flex-col relative"
+                @mouseenter="(() => { setHover(item.id, n, true) })" 
+                @mouseleave="(() => { setHover(item.id, n, false) })"
+              >
+                <div class="flex justify-between items-center mb-1">
+                  <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    {{ n.replace(/([A-Z])/g, ' $1').trim() }}
+                  </label>
+                  
+                  <div class="flex gap-1 items-center" v-if="!isInColumnImage(n)">
+                    <Tooltip v-if="checkForError(item, n)">
+                      <IconExclamationCircleSolid class="w-4 h-4 text-red-500" />
+                      <template #tooltip>{{ checkForError(item, n) }}</template>
+                    </Tooltip>
+                    <Tooltip>
+                      <IconRefreshOutline 
+                        class="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-pointer transition" 
+                        :class="{ 'opacity-30 cursor-not-allowed': shouldDisableRegenerateFieldIcon(item, n) }" 
+                        @click="regerenerateFieldIconClick(item, n)"
+                      />
+                      <template #tooltip> 
+                        {{ shouldDisableRegenerateFieldIcon(item, n) ? $t("Can't analyze image without source image") : $t('Regenerate') }}
+                      </template>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                <div v-if="isInColumnImage(n)">
+                  <div v-if="item.aiStatus?.generatedImages" class="flex flex-col gap-2">
+                    <div v-if="isValidUrl(item.data?.[n])" class="flex items-center gap-3 relative">
+                      <img 
+                        :src="item.data?.[n]" 
+                        class="w-16 h-16 object-cover rounded-default border border-gray-200 cursor-pointer hover:border-blue-500 transition" 
+                        @click="() => { item.openGenerationCarousel[n] = true }"
+                      />
+                      <p
+                        v-if="isImageHasPreviewUrl[n]"
+                        class="text-xs text-blue-500 hover:underline cursor-pointer transition-opacity"
+                        :class="{ 'opacity-0': !isHovered(item.id, n) }"
+                        @click="() => { item.openImageCompare[n] = true }"  
+                      >
+                        {{ $t('old image') }}
+                      </p>
+                    </div>
+                    <div v-else class="w-16 h-16 border rounded-default flex items-center justify-center bg-gray-50">
+                      <Tooltip v-if="item.imageGenerationErrorMessage === 'No source images found'">
+                        <p class="text-xs text-red-400 p-1 text-center">{{ $t("Can't generate") }}</p>
+                        <template #tooltip>{{ item.imageGenerationErrorMessage }}</template>
+                      </Tooltip>
+                      <Tooltip v-else>
+                        <IconRefreshOutline @click="() => { regenerateImages(item.id) }" class="w-6 h-6 text-gray-400 hover:text-blue-500 cursor-pointer" />
+                        <template #tooltip>{{ item.imageGenerationErrorMessage + '. Click to retry' }}</template>
+                      </Tooltip>
+                    </div>
+
+                    <GenerationCarousel
+                      v-if="item.openGenerationCarousel?.[n]"
+                      :images="item.carouselSaveImages?.[n]"
+                      :recordId="item.id"
+                      :meta="props.meta"
+                      :fieldName="n"
+                      :carouselImageIndex="item.carouselImageIndex?.[n]"
+                      :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
+                      :sourceImage="item.images && item.images.length ? item.images : null"
+                      :imageGenerationPrompts="imageGenerationPrompts[n]"
+                      @error="handleError"
+                      @close="item.openGenerationCarousel[n] = false"
+                      @selectImage="updateSelectedImage"
+                      @updateCarouselIndex="updateActiveIndex"
+                    />
+                    <ImageCompare
+                      v-if="item.openImageCompare?.[n]"
+                      :meta="props.meta"
+                      :columnName="n"
+                      :oldImage="item.oldData?.[n]"
+                      :newImage="item.data?.[n]"
+                      @close="item.openImageCompare[n] = false"
                     />
                   </div>
-                  <template #tooltip>
-                    {{ item.imageGenerationErrorMessage + 'Click to retry' }}
-                  </template>
-                </Tooltip>
+                  <div v-else>
+                    <Skeleton type="image" class="w-16 h-16 rounded-default" />
+                  </div>
+                </div>
+
+                <div v-else-if="(isAnalyzing(item, n) && !item.regeneratingFieldsStatus?.[n])">
+                  <div v-if="isInColumnEnum(n)">
+                    <Select
+                      class="w-full"
+                      :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
+                      v-model="item.data[n]"
+                      :teleportToTop="true"
+                    />
+                  </div>
+                  
+                  <div v-else-if="typeof item.data?.[n] === 'string' || typeof item.data?.[n] === 'object'">
+                    <Textarea
+                      v-model="item.data[n]"
+                      class="w-full min-h-[42px] text-sm"
+                    />
+                  </div>
+
+                  <div v-else-if="typeof item.data?.[n] === 'boolean'" class="flex items-center h-10">
+                    <Toggle v-model="item.data[n]" />
+                  </div>
+
+                  <div v-else>
+                    <Input
+                      type="number"
+                      v-model="item.data[n]"
+                      class="w-full"
+                      :fullWidth="true"
+                    />
+                  </div>
+
+                  <!-- <div class="text-[11px] text-gray-400 mt-1 min-h-[16px] transition-opacity" :class="{ 'opacity-0': !isHovered(item.id, n) }">
+                    {{ $t('old value') }}: <span class="font-medium text-gray-600">{{ item.oldData?.[n] ?? '—' }}</span>
+                  </div> -->
+                </div>
+
+                <div v-else>
+                  <Skeleton class="w-full h-10 rounded-default" />
+                </div>
               </div>
             </div>
-            <div>
-              <GenerationCarousel
-                v-if="item.openGenerationCarousel[n]"
-                :images="item.carouselSaveImages[n]"
-                :recordId="item.id"
-                :meta="props.meta"
-                :fieldName="n"
-                :carouselImageIndex="item.carouselImageIndex[n]"
-                :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
-                :sourceImage="item.images && item.images.length ? item.images : null"
-                :imageGenerationPrompts="imageGenerationPrompts[n]"
-                @error="handleError"
-                @close="item.openGenerationCarousel[n] = false"
-                @selectImage="updateSelectedImage"
-                @updateCarouselIndex="updateActiveIndex"
-              />
-              <ImageCompare
-                v-if="item.openImageCompare[n]"
-                :meta="props.meta"
-                :columnName="n"
-                :oldImage="item.oldData?.[n]"
-                :newImage="item.data?.[n]"
-                @close="item.openImageCompare[n] = false"
-              />
-            </div>
+
           </div>
         </div>
 
-        <div v-if="!item.aiStatus.generatedImages && isInColumnImage(n)">
-            <Skeleton type="image" class="w-20 h-20" />
+        <div class="border-t border-gray-100 flex justify-end shrink-0">
+          <button @click="() => regenerateImages(item.id)" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition">
+            <IconRefreshOutline class="w-3.5 h-3.5" /> {{ $t('Regenerate') }}
+          </button>
         </div>
+      </div>
+    </div>
 
-        <div v-if="(!isAnalyzing(item, n) || item.regeneratingFieldsStatus?.[n]) && !isInColumnImage(n)">
-          <Skeleton class="w-full h-6" />
-        </div>
-      </template>
-    </Table>
+    
+
+    <transition name="fade">
+      <div v-if="zoomedImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeZoom">
+        <transition name="zoom">
+          <img v-if="zoomedImage" :src="zoomedImage" class="max-w-[90vw] max-h-[90vh] rounded-default object-contain shadow-2xl" />
+        </transition>
+      </div>
+    </transition>
+
+    <div v-show="totalItems > 0" class="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between px-1 py-2 bg-transparent">
+      <p class="text-sm text-gray-500">
+        {{ $t('Showing') }}
+        <span class="font-semibold text-gray-900">{{ fromIndex }}</span>
+        {{ $t('to') }}
+        <span class="font-semibold text-gray-900">{{ toIndex }}</span>
+        {{ $t('of') }}
+        <span class="font-semibold text-gray-900">{{ totalItems }}</span>
+      </p>
+
+      <div class="inline-flex items-center gap-1 rounded-default border border-gray-200 bg-white px-2 py-1 shadow-sm">
+        <button
+          class="inline-flex items-center justify-center rounded-default px-3 py-1 text-sm font-medium text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="currentPage <= 1"
+          @click="previousPage"
+        >
+          {{ $t('Prev') }}
+        </button>
+
+        <template v-for="page in pageButtons" :key="page">
+          <button
+            class="inline-flex items-center justify-center rounded-default px-3 py-1 text-sm font-medium transition"
+            :class="page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'"
+            @click="goToPage(page)"
+          >
+            {{ page }}
+          </button>
+        </template>
+
+        <button
+          class="inline-flex items-center justify-center rounded-default px-3 py-1 text-sm font-medium text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="currentPage >= totalPages"
+          @click="nextPage"
+        >
+          {{ $t('Next') }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -242,8 +307,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(['error', 'regenerateImages', 'regenerateCell']);
 
-const pageSize = 6;
-const pagination = reactive({ offset: 0, limit: pageSize });
+const DEFAULT_PAGE_SIZE = 7;
+const initialPageSize = props.meta?.pageSize ?? DEFAULT_PAGE_SIZE;
+console.log(props.meta?.pageSize);
+
+const pagination = reactive({ offset: 0, limit: initialPageSize });
 const zoomedImage = ref(null);
 const hovers = ref<Record<string, Record<string, boolean>>>({});
 const tableRef = ref(null);
@@ -258,6 +326,23 @@ defineExpose({
 
 const paginatedRecords = computed(() => props.records.slice(pagination.offset, pagination.offset + pagination.limit));
 
+const totalItems = computed(() => props.records.length);
+const currentPage = computed(() => Math.floor(pagination.offset / pagination.limit) + 1);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / pagination.limit)));
+const fromIndex = computed(() => totalItems.value === 0 ? 0 : Math.min(pagination.offset + 1, totalItems.value));
+const toIndex = computed(() => Math.min(pagination.offset + pagination.limit, totalItems.value));
+const pageButtons = computed(() => {
+  const pages = [];
+  const current = currentPage.value;
+  const total = totalPages.value;
+  const start = Math.max(1, current - 2);
+  const end = Math.min(total, current + 2);
+
+  for (let number = start; number <= end; number += 1) {
+    pages.push(number);
+  }
+  return pages;
+});
 const tableDataProvider = async ({ offset, limit }) => {
   pagination.offset = offset;
   pagination.limit = limit;
@@ -266,6 +351,22 @@ const tableDataProvider = async ({ offset, limit }) => {
     total: props.records.length,
   };
 };
+
+watch(() => props.records.length, (newLength) => {
+  const maxOffset = Math.max(0, (Math.ceil(newLength / pagination.limit) - 1) * pagination.limit);
+  if (pagination.offset > maxOffset) {
+    pagination.offset = maxOffset;
+  }
+});
+
+watch(() => props.meta?.pageSize, (newSize) => {
+  const size = Number(newSize) || DEFAULT_PAGE_SIZE;
+  pagination.limit = size;
+  const maxOffset = Math.max(0, (Math.ceil(props.records.length / pagination.limit) - 1) * pagination.limit);
+  if (pagination.offset > maxOffset) {
+    pagination.offset = maxOffset;
+  }
+}, { immediate: true });
 
 watch(() => props.records, (newVal) => {
   hovers.value = Object.fromEntries((newVal || []).map(record => [String(record.id), {}]));
@@ -399,8 +500,18 @@ function isHovered(recordId: string | number, field: string) {
   return Boolean(hovers.value?.[String(recordId)]?.[field]);
 }
 
+function goToPage(page: number) {
+  const clampedPage = Math.min(Math.max(page, 1), totalPages.value);
+  pagination.offset = (clampedPage - 1) * pagination.limit;
+}
 
+function previousPage() {
+  goToPage(currentPage.value - 1);
+}
 
+function nextPage() {
+  goToPage(currentPage.value + 1);
+}
 </script>
 
 <style scoped>

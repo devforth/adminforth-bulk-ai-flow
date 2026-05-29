@@ -8,7 +8,7 @@
   <Dialog 
     ref="confirmDialog"
     header="Bulk AI Generation"
-    class="[scrollbar-gutter:stable] !max-w-full w-fit h-fit"
+    class="[scrollbar-gutter:stable] max-w-full h-fit"
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
@@ -51,11 +51,17 @@
           ]"
     :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col max-h-[700px] gap-4 overflow-y-auto w-full">
+    <div
+      class="bulk-vision-table flex flex-col gap-3 w-full"
+      :class="{
+        'h-[830px]': popupMode === 'generation',
+        'h-auto max-h-[720px]': popupMode !== 'generation'
+      }"
+    >
       <template v-if="recordsList.length && popupMode === 'generation'" >
         <div class="w-full min-w-[980px]">
-          <p :class="isGenerationPaused ? '' : 'opacity-0'" class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
           <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
+            <p class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
             <div class="flex items-center gap-2">
               <button
                 class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-lightPrimary to-lightPrimary/80 text-white border-none ml-2"
@@ -127,7 +133,7 @@
 
 
         <VisionTable
-          class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
+          class="w-full flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]"
           ref="tableRef"
           :records="recordsList"
           :meta="props.meta"
@@ -159,7 +165,7 @@
       <template v-else-if="!recordsList.length && popupMode === 'generation'">
         <p>{{ t('No data to save. Feel free to click "Cancel"') }}</p>
       </template>
-      <div v-else-if="popupMode === 'settings'" class="w-full flex flex-col gap-6">
+      <div v-else-if="popupMode === 'settings'" class="w-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 max-h-[70vh]">
         <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
         <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
           <div class="flex items-start gap-3.5 mb-6 border-b border-gray-100 dark:border-gray-800">
