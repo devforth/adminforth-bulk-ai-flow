@@ -1478,10 +1478,14 @@ async function getGenerationPrompts() {
   const calculatedGenerationPrompts: any = {};
   const savedPrompts = localStorage.getItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`);
   if (props.meta.generationPrompts.plainFieldsPrompts) {
-    calculatedGenerationPrompts.plainFieldsPrompts = props.meta.generationPrompts.plainFieldsPrompts;
+    calculatedGenerationPrompts.plainFieldsPrompts = {
+      ...props.meta.generationPrompts.plainFieldsPrompts
+    };
   }
   if (props.meta.generationPrompts.imageFieldsPrompts) {
-    calculatedGenerationPrompts.imageFieldsPrompts = props.meta.generationPrompts.imageFieldsPrompts;
+    calculatedGenerationPrompts.imageFieldsPrompts = {
+      ...props.meta.generationPrompts.imageFieldsPrompts
+    };
   }
   if (props.meta.generationPrompts.imageGenerationPrompts) {
     let imageFields = {};
