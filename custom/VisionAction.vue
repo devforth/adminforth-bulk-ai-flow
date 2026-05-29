@@ -13,7 +13,7 @@
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
     :beforeCloseFunction="handleBeforeClose"
-    :closable="false"
+    :closable="true"
     :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
           {
             label: t('Cancel'),
@@ -46,7 +46,7 @@
                 class: 'afcl-button w-1/2',
                 loader: isCheckingRateLimits
               },
-              onclick: (dialog) => { runAiActions(); }
+              onclick: async () => { await runAiActions(); }
             }
           ]"
     :click-to-close-outside="false"
@@ -496,16 +496,16 @@ const handleBeforeClose = async (dialog?: any) => {
       no: t('Cancel'),
     });
 
-  if (confirmed) {
-    closeDialog();
-      
-    if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
-      confirmDialog.value.hide();
-    } else if (dialog && typeof dialog.hide === 'function') {
-      dialog.hide();
+    if (confirmed) {
+      closeDialog();
+        
+      if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
+        confirmDialog.value.hide();
+      } else if (dialog && typeof dialog.hide === 'function') {
+        dialog.hide();
+      }
+      return true;
     }
-    return true; 
-  }
     return false;
   }
 }
