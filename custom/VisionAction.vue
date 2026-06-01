@@ -9,10 +9,10 @@
     ref="confirmDialog"
     header="Bulk AI Generation"
     class="[scrollbar-gutter:stable] max-w-full h-fit"
+    :beforeCancelFunction="handleBeforeCancel"
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
-    :beforeCloseFunction="handleBeforeClose"
     :closable="true"
     :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
           {
@@ -461,7 +461,7 @@ const generationModeButtons = computed(() => {
         loader: isLoading.value, 
         class: 'afcl-button w-1/6'
       }, 
-      onclick: async (dialog) => { await saveData(); dialog.hide(); } 
+      onclick: async (dialog) => { await saveData(); closeDialog(); dialog.hide(false); } 
     },
     { 
       label: t('Cancel'), 
@@ -469,7 +469,7 @@ const generationModeButtons = computed(() => {
         class: 'afcl-button w-1/6',
         mode: 'secondary'
       }, 
-      onclick: async (dialog) => { await handleBeforeClose(dialog); } 
+      onclick: async (dialog) => { await dialog.hide(true); } 
     },
   ]
 
@@ -535,6 +535,25 @@ const openDialog = async () => {
     runAiActions();
   }
 }
+
+const handleBeforeCancel = async () => {
+  if (popupMode.value === 'generation') {
+    const confirmed = await adminforth.confirm({
+      title: t('Close without saving?'),
+      message: t('Are you sure you want to close without saving?'),
+      yes: t('Yes'),
+      no: t('Cancel'),
+    });
+
+    if (confirmed) {
+      closeDialog();
+      return true;
+    }
+    return false;
+  }
+  closeDialog();
+  return true;
+};
 
 async function getListOfIds() {
   if ( props.meta.recordSelector === 'filtered' ) {
