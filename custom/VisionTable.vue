@@ -201,17 +201,28 @@
                 <div v-else-if="(isAnalyzing(item, n) && !item.regeneratingFieldsStatus?.[n])">
                   <div v-if="isInColumnEnum(n)">
                     <Select
+                      v-if="cardValueMode?.[String(item.id)] !== 'old'"
                       class="w-full"
                       :options="convertColumnEnumToSelectOptions(props.meta.columnEnums, n)"
                       v-model="item.data[n]"
                       :teleportToTop="true"
                     />
+                    
+                    <input
+                      v-else
+                      type="text"
+                      :value="item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')"
+                      disabled
+                      class="w-full h-10 px-3 border border-gray-200 rounded-default bg-gray-50 text-gray-400 text-sm focus:outline-none"
+                    />
                   </div>
                   
                   <div v-else-if="typeof item.data?.[n] === 'string' || typeof item.data?.[n] === 'object'">
-                    <Textarea
-                      v-model="item.data[n]"
-                      class="w-full min-h-[42px] text-sm"
+                    <textarea
+                      :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
+                      @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = e.target.value }"
+                      :disabled="cardValueMode?.[String(item.id)] === 'old'"
+                      class="w-full min-h-[42px] text-sm p-2 border border-gray-200 rounded-default focus:outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
                     />
                   </div>
 
@@ -220,17 +231,14 @@
                   </div>
 
                   <div v-else>
-                    <Input
-                      type="number"
-                      v-model="item.data[n]"
-                      class="w-full"
-                      :fullWidth="true"
+                    <input
+                      :type="cardValueMode?.[String(item.id)] === 'old' && !item.oldData?.[n] && item.oldData?.[n] !== 0 ? 'text' : 'number'"
+                      :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
+                      @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = Number(e.target.value) }"
+                      :disabled="cardValueMode?.[String(item.id)] === 'old'"
+                      class="w-full h-10 px-3 border border-gray-200 rounded-default focus:outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400 text-sm"
                     />
                   </div>
-
-                  <!-- <div class="text-[11px] text-gray-400 mt-1 min-h-[16px] transition-opacity" :class="{ 'opacity-0': !isHovered(item.id, n) }">
-                    {{ $t('old value') }}: <span class="font-medium text-gray-600">{{ item.oldData?.[n] ?? '—' }}</span>
-                  </div> -->
                 </div>
 
                 <div v-else>
