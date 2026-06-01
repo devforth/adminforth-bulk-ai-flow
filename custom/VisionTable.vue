@@ -146,8 +146,8 @@
                     <div v-if="isValidUrl(item.data?.[n])" class="flex items-center gap-3 relative">
                       <img 
                         :src="item.data?.[n]" 
-                        class="w-16 h-16 object-cover rounded-default border border-gray-200 cursor-pointer hover:border-blue-500 transition" 
-                        @click="() => { item.openGenerationCarousel[n] = true }"
+                        class="w-full max-h-[260px] object-contain rounded-default"
+                        style="image-rendering: auto;"
                       />
                       <p
                         v-if="isImageHasPreviewUrl[n]"
