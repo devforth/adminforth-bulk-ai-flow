@@ -20,8 +20,25 @@
                 </h3>
               </div>
             </div>
-            <div class="text-right shrink-0 text-gray-400">
-              ID: {{ item.id }}
+            <div class="flex items-center gap-3 shrink-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {{ cardValueMode?.[String(item.id)] === 'old' ? $t('old value') : $t('new value') }}
+                </span>
+                <button
+                  @click="toggleCardValueMode(item.id)"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                  :class="cardValueMode?.[String(item.id)] === 'old' ? 'bg-lightPrimary dark:bg-darkPrimary' : 'bg-gray-200 dark:bg-gray-700'"
+                >
+                  <span
+                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform dark:bg-gray-200"
+                    :class="cardValueMode?.[String(item.id)] === 'old' ? 'translate-x-6' : 'translate-x-1'"
+                  />
+                </button>
+              </div>
+              <div class="text-right text-gray-400 text-sm">
+                ID: {{ item.id }}
+              </div>
             </div>
           </div>
 
@@ -315,6 +332,7 @@ const pagination = reactive({ offset: 0, limit: initialPageSize });
 const zoomedImage = ref(null);
 const hovers = ref<Record<string, Record<string, boolean>>>({});
 const tableRef = ref(null);
+const cardValueMode = ref<Record<string, 'old' | 'new'>>({});
 
 defineExpose({
   refresh() {
@@ -370,6 +388,11 @@ watch(() => props.meta?.pageSize, (newSize) => {
 
 watch(() => props.records, (newVal) => {
   hovers.value = Object.fromEntries((newVal || []).map(record => [String(record.id), {}]));
+  const newCardValueMode = {};
+  (newVal || []).forEach(record => {
+    newCardValueMode[String(record.id)] = 'new';
+  });
+  cardValueMode.value = newCardValueMode;
 }, { immediate: true, deep: true });
 
 function zoomImage(img) {
@@ -498,6 +521,12 @@ function setHover(recordId: string | number, field: string, value: boolean) {
 
 function isHovered(recordId: string | number, field: string) {
   return Boolean(hovers.value?.[String(recordId)]?.[field]);
+}
+
+function toggleCardValueMode(recordId: string | number) {
+  const key = String(recordId);
+  const currentMode = cardValueMode.value[key] || 'new';
+  cardValueMode.value[key] = currentMode === 'new' ? 'old' : 'new';
 }
 
 function goToPage(page: number) {
