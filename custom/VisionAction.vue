@@ -78,7 +78,7 @@
             </div>
           </div>
 
-          <div class="w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 rounded-2xl shadow-sm flex flex-col gap-4">
+          <div class="w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 m-1 rounded-2xl shadow-sm flex flex-col gap-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div 
