@@ -1,6 +1,6 @@
 <template>
   <div class="overflow-auto pr-2" style="max-height: calc(100vh - 260px);">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 p-1">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
       <div 
         v-for="item in paginatedRecords" 
         :key="item.id"
