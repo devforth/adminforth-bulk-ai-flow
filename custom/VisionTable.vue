@@ -71,7 +71,7 @@
 
               <!-- EMPTY ARRAY -->
               <template v-else-if="item.images?.length === 0">
-                <div class="text-gray-400 h-[260px] flex flex-col items-center justify-center h-full">
+                <div class="text-gray-400 flex flex-col items-center justify-center w-[426.5px] h-[258px]">
                   <svg
                     class="w-8 h-8 mb-2 stroke-1 text-gray-300"
                     fill="none"
