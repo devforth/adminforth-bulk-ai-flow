@@ -128,16 +128,6 @@
                       <IconExclamationCircleSolid class="w-4 h-4 text-red-500" />
                       <template #tooltip>{{ checkForError(item, n) }}</template>
                     </Tooltip>
-                    <Tooltip>
-                      <IconRefreshOutline 
-                        class="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-pointer transition" 
-                        :class="{ 'opacity-30 cursor-not-allowed': shouldDisableRegenerateFieldIcon(item, n) }" 
-                        @click="regerenerateFieldIconClick(item, n)"
-                      />
-                      <template #tooltip> 
-                        {{ shouldDisableRegenerateFieldIcon(item, n) ? $t("Can't analyze image without source image") : $t('Regenerate') }}
-                      </template>
-                    </Tooltip>
                   </div>
                 </div>
 
@@ -252,7 +242,7 @@
         </div>
 
         <div class="border-t border-gray-100 flex justify-end shrink-0">
-          <button @click="() => regenerateImages(item.id)" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition">
+          <button @click="() => regenerateRecord(item.id)" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition">
             <IconRefreshOutline class="w-3.5 h-3.5" /> {{ $t('Regenerate') }}
           </button>
         </div>
@@ -331,7 +321,11 @@ const props = defineProps<{
   outputFieldsForAnalizeFromImages: string[],
   outputPlainFields: string[],
 }>();
-const emit = defineEmits(['error', 'regenerateImages', 'regenerateCell']);
+const emit = defineEmits(['error', 'regenerateImages', 'regenerateCell', 'regenerateRecord']);
+
+function regenerateRecord(recordId: any) {
+  emit('regenerateRecord', { recordId });
+}
 
 const DEFAULT_PAGE_SIZE = 7;
 const initialPageSize = props.meta?.pageSize ?? DEFAULT_PAGE_SIZE;

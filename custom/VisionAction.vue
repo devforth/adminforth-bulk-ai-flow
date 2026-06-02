@@ -149,7 +149,7 @@
           :outputPlainFields="props.meta.outputPlainFields"
           @error="handleTableError"
           @regenerate-images="regenerateImages"
-          @regenerate-cell="regenerateCell"
+          @regenerate-record="regenerateRecord"
         />
         <div class="mt-2 flex items-center text-lightPrimary dark:text-darkPrimary bg-lightPrimary/10 dark:bg-darkPrimary/10 px-4 py-3 rounded-default border border-lightPrimary/20 dark:border-darkPrimary/20 text-sm">
           <IconInfoCircleSolid class="w-5 h-5 me-2 shrink-0 text-lightPrimary dark:text-darkPrimary dark:brightness-200" />
@@ -486,6 +486,35 @@ const generationModeButtons = computed(() => {
   }
   return arrayToReturn;
 });
+
+async function regenerateRecord({ recordId }) {
+
+  const promises = [];
+
+  if (props.meta.isImageGeneration) {
+    promises.push(regenerateImages({ recordId }));
+  }
+
+  for (const fieldName of props.meta.outputFieldsForAnalizeFromImages || []) {
+    promises.push(
+      regenerateCell({
+        recordId,
+        fieldName,
+      })
+    );
+  }
+
+  for (const fieldName of props.meta.outputPlainFields || []) {
+    promises.push(
+      regenerateCell({
+        recordId,
+        fieldName,
+      })
+    );
+
+  await Promise.allSettled(promises);
+}
+}
 
 const handleBeforeClose = async (dialog?: any) => {
   if (popupMode.value === 'generation') {
@@ -925,7 +954,7 @@ async function checkRateLimits() {
   return true;
 }
 
-async function runActionForRecord(record: RecordState, actionType: GenerationAction) {
+async function runActionForRecord(record: RecordState, actionType: GenerationAction, forceFilterFilledFields?: boolean) {
   if (!checkIfDialogOpen()) {
     return;
   }
@@ -957,7 +986,7 @@ async function runActionForRecord(record: RecordState, actionType: GenerationAct
         actionType,
         recordId: record.id,
         ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
-        filterFilledFields: !overwriteExistingValues.value,
+        filterFilledFields: forceFilterFilledFields !== undefined ? forceFilterFilledFields: !overwriteExistingValues.value,
       },
       silentError: true,
     });
@@ -1413,7 +1442,7 @@ async function uploadImage(imgBlob, id, fieldName) {
   }
 }
 
-function regenerateImages({ recordId }: { recordId: any }) {
+async function regenerateImages({ recordId }: { recordId: any }) {
   if (coreStore.isInternetError) {
     adminforth.alert({
       message: t('Cannot regenerate images while internet connection is lost. Please check your connection and try again.'),
@@ -1427,11 +1456,27 @@ function regenerateImages({ recordId }: { recordId: any }) {
     return;
   }
   record.aiStatus.generatedImages = false;
+  record.status = 'processing';
   touchRecords();
-  runActionForRecord(record, 'generate_images').catch(() => {
+
+  try {
+    await runActionForRecord(
+      record,
+      'generate_images',
+      false
+    );
+
+    record.status = 'completed';
+    completedRecordIds.value.add(String(recordId));
+
     record.aiStatus.generatedImages = true;
     touchRecords();
-  });
+
+  } catch (e) {
+    record.aiStatus.generatedImages = true;
+    record.status = 'failed';
+    touchRecords();
+  }
 }
 
 async function findPreviewURLForImages() {
