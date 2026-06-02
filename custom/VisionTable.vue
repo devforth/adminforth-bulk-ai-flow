@@ -248,7 +248,7 @@
           </div>
         </div>
 
-        <div class="border-t border-gray-100 flex justify-end shrink-0">
+        <div class="flex justify-end shrink-0">
           <button @click="() => regenerateRecord(item.id)" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition">
             <IconRefreshOutline class="w-3.5 h-3.5" /> {{ $t('Regenerate') }}
           </button>
