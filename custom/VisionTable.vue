@@ -23,7 +23,7 @@
             <div class="flex items-center gap-3 shrink-0">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
-                  {{ cardValueMode?.[String(item.id)] === 'old' ? $t('old value') : $t('new value') }}
+                  {{ cardValueMode?.[String(item.id)] === 'old' ? $t('OLD VALUE') : $t('NEW VALUE') }}
                 </span>
                 <button
                   @click="toggleCardValueMode(item.id)"
