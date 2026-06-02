@@ -98,11 +98,9 @@
                 </div>
               </div>
 
-              <span 
-                class="px-2.5 py-1 text-xs font-bold tracking-wide rounded-full flex items-center gap-1.5"
-                :class="isGenerationPaused ? 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50'
-                  : displayedProcessedCount === totalRecords ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50'
-                  : 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50'"
+              <span
+                class="px-2.5 py-1 text-xs rounded-default border flex items-center gap-1.5"
+                :class="generationStatusClass"
               >
                 <span 
                   class="w-1.5 h-1.5 rounded-full"
@@ -1815,5 +1813,17 @@ async function saveCurrentGenerated() {
   tableRef.value.refresh();
   props.updateList();
 }
+
+const generationStatusClass = computed(() => {
+  if (isGenerationPaused.value) {
+    return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50'
+  }
+
+  if (displayedProcessedCount.value === totalRecords.value) {
+    return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50'
+  }
+
+  return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50'
+})
 
 </script>
