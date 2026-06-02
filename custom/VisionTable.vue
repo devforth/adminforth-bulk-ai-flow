@@ -73,7 +73,7 @@
               <template v-else-if="item.images?.length === 0">
                 <div class="text-gray-400 flex flex-col items-center justify-center w-[426.5px] h-[258px]">
                   <svg
-                    class="w-8 h-8 mb-2 stroke-1 text-gray-300"
+                    class="w-20 h-20 mb-2 stroke-1 text-gray-300"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -93,7 +93,7 @@
               <template v-else>
                 <div class="text-gray-400 flex flex-col items-center justify-center h-full">
                   <svg
-                    class="w-8 h-8 mb-2 stroke-1 text-gray-300"
+                    class="w-20 h-20 mb-2 stroke-1 text-gray-300"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -136,7 +136,7 @@
                     <div v-if="isValidUrl(item.data?.[n])" class="flex items-center gap-3 relative">
                       <img 
                         :src="item.data?.[n]" 
-                        class="w-full max-h-[280px] object-contain cursor-pointer rounded-default"
+                        class="w-full max-h-[280px] object-cover border cursor-pointer  hover:border-blue-500 rounded-default"
                         @click="() => {
                           openGenerationCarousel[item.id] ??= {}
                           openGenerationCarousel[item.id][n] = true
