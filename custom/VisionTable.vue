@@ -136,8 +136,11 @@
                     <div v-if="isValidUrl(item.data?.[n])" class="flex items-center gap-3 relative">
                       <img 
                         :src="item.data?.[n]" 
-                        class="w-full max-h-[280px] object-contain cursor-pointer rounded-default"\
-                        @click="() => { item.openGenerationCarousel[n] = true }"
+                        class="w-full max-h-[280px] object-contain cursor-pointer rounded-default"
+                        @click="() => {
+                          openGenerationCarousel[item.id] ??= {}
+                          openGenerationCarousel[item.id][n] = true
+                        }"
                         style="image-rendering: auto;"
                       />
                       <p
@@ -161,7 +164,7 @@
                     </div>
 
                     <GenerationCarousel
-                      v-if="item.openGenerationCarousel?.[n]"
+                      v-if="openGenerationCarousel[item.id]?.[n]"
                       :images="item.carouselSaveImages?.[n]"
                       :recordId="item.id"
                       :meta="props.meta"
@@ -171,7 +174,11 @@
                       :sourceImage="item.images && item.images.length ? item.images : null"
                       :imageGenerationPrompts="imageGenerationPrompts[n]"
                       @error="handleError"
-                      @close="item.openGenerationCarousel[n] = false"
+                      @close="() => {
+                        if (openGenerationCarousel[item.id]) {
+                          openGenerationCarousel[item.id][n] = false
+                        }
+                      }"
                       @selectImage="updateSelectedImage"
                       @updateCarouselIndex="updateActiveIndex"
                     />
@@ -346,6 +353,8 @@ defineExpose({
 });
 
 const paginatedRecords = computed(() => props.records.slice(pagination.offset, pagination.offset + pagination.limit));
+
+const openGenerationCarousel = ref<Record<string, Record<string, boolean>>>({})
 
 const totalItems = computed(() => props.records.length);
 const currentPage = computed(() => Math.floor(pagination.offset / pagination.limit) + 1);
