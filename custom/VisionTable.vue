@@ -152,15 +152,23 @@
                         {{ $t('old image') }}
                       </p>
                     </div>
-                    <div v-else class="w-16 h-16 border rounded-default flex items-center justify-center bg-gray-50">
-                      <Tooltip v-if="item.imageGenerationErrorMessage === 'No source images found'">
-                        <p class="text-xs text-red-400 p-1 text-center">{{ $t("Can't generate") }}</p>
-                        <template #tooltip>{{ item.imageGenerationErrorMessage }}</template>
-                      </Tooltip>
-                      <Tooltip v-else>
-                        <IconRefreshOutline @click="() => { regenerateImages(item.id) }" class="w-6 h-6 text-gray-400 hover:text-blue-500 cursor-pointer" />
-                        <template #tooltip>{{ item.imageGenerationErrorMessage + '. Click to retry' }}</template>
-                      </Tooltip>
+                    <div v-else>
+                      <div class="text-gray-400 flex flex-col items-center justify-center w-[426.5px] h-[258px] bg-gray-50 border border-dashed border-gray-200">
+                        <svg
+                          class="w-20 h-20 mb-2 stroke-1 text-gray-300"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <p class="text-xs font-medium">{{ $t('No images found') }}</p>
+                      </div>
                     </div>
 
                     <GenerationCarousel
