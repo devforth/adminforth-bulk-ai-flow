@@ -200,7 +200,7 @@
                     />
                   </div>
                   <div v-else>
-                    <Skeleton type="image" class="w-16 h-16 rounded-default" />
+                    <Skeleton type="image" class=" w-[426.5px] h-[258px] rounded-default" />
                   </div>
                 </div>
 
