@@ -248,7 +248,7 @@
                 </div>
 
                 <div v-else>
-                  <Skeleton class="w-full h-10 rounded-default" />
+                  <Skeleton type="input" class="w-full h-10 rounded-default" />
                 </div>
               </div>
             </div>
