@@ -274,44 +274,56 @@
       </div>
     </transition>
 
-    <div v-show="totalItems > 0" class="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between px-1 py-2 bg-transparent">
-      <p class="text-sm text-gray-500">
+    <nav v-show="totalItems > 0" class="bg-lightTableBackground dark:bg-darkTableBackground pt-2 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 pb-4">
+      <span class="text-sm font-normal text-center text-lightTablePaginationText dark:text-darkTablePaginationText sm:mb-4 md:mb-0 block w-full md:inline md:w-auto">
         {{ $t('Showing') }}
-        <span class="font-semibold text-gray-900">{{ fromIndex }}</span>
+        <span class="font-semibold text-lightTablePaginationNumeration dark:text-darkTablePaginationNumeration">{{ fromIndex }}</span>
         {{ $t('to') }}
-        <span class="font-semibold text-gray-900">{{ toIndex }}</span>
+        <span class="font-semibold text-lightTablePaginationNumeration dark:text-darkTablePaginationNumeration">{{ toIndex }}</span>
         {{ $t('of') }}
-        <span class="font-semibold text-gray-900">{{ totalItems }}</span>
-      </p>
-
-      <div class="inline-flex items-center gap-1 rounded-default border border-gray-200 bg-white px-2 py-1 shadow-sm">
-        <button
-          class="inline-flex items-center justify-center rounded-default px-3 py-1 text-sm font-medium text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="currentPage <= 1"
-          @click="previousPage"
-        >
-          {{ $t('Prev') }}
-        </button>
-
-        <template v-for="page in pageButtons" :key="page">
+        <span class="font-semibold text-lightTablePaginationNumeration dark:text-darkTablePaginationNumeration">{{ totalItems }}</span>
+      </span>
+      <div class="af-pagination-container flex flex-row items-center gap-3">
+        <div class="inline-flex">
           <button
-            class="inline-flex items-center justify-center rounded-default px-3 py-1 text-sm font-medium transition"
-            :class="page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'"
-            @click="goToPage(page)"
+            class="flex items-center py-1 px-3 gap-1 text-sm font-medium text-lightActivePaginationButtonText bg-lightActivePaginationButtonBackground border-r-0 rounded-s hover:opacity-90 dark:bg-darkActivePaginationButtonBackground dark:text-darkActivePaginationButtonText disabled:opacity-50"
+            :disabled="currentPage <= 1"
+            @click="previousPage"
           >
-            {{ page }}
+            <svg class="w-3.5 h-3.5 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5H1m0 0 4 4M1 5l4-4"/>
+            </svg>
           </button>
-        </template>
-
-        <button
-          class="inline-flex items-center justify-center rounded-default px-3 py-1 text-sm font-medium text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="currentPage >= totalPages"
-          @click="nextPage"
-        >
-          {{ $t('Next') }}
-        </button>
+          <button
+            class="flex items-center py-1 px-3 text-sm font-medium text-lightUnactivePaginationButtonText focus:outline-none bg-lightUnactivePaginationButtonBackground border-r-0 border border-lightUnactivePaginationButtonBorder hover:bg-lightUnactivePaginationButtonHoverBackground hover:text-lightUnactivePaginationButtonHoverText dark:bg-darkUnactivePaginationButtonBackground dark:text-darkUnactivePaginationButtonText dark:border-darkUnactivePaginationButtonBorder dark:hover:text-darkUnactivePaginationButtonHoverText dark:hover:bg-darkUnactivePaginationButtonHoverBackground disabled:opacity-50"
+            :disabled="currentPage <= 1"
+            @click="goToPage(1)"
+          >1</button>
+          <input
+            type="text"
+            v-model="pageInput"
+            :style="{ width: `${Math.max(1, pageInput.length + 4)}ch` }"
+            class="min-w-10 outline-none inline-block w-auto py-1.5 px-3 text-sm text-center text-lightTablePaginationInputText border border-lightTablePaginationInputBorder bg-lightTablePaginationInputBackground dark:border-darkTablePaginationInputBorder dark:text-darkTablePaginationInputText dark:bg-darkTablePaginationInputBackground z-10"
+            @keydown="onPageKeydown"
+            @blur="validatePageInput"
+          />
+          <button
+            class="flex items-center py-1 px-3 text-sm font-medium text-lightUnactivePaginationButtonText focus:outline-none bg-lightUnactivePaginationButtonBackground border-l-0 border border-lightUnactivePaginationButtonBorder hover:bg-lightUnactivePaginationButtonHoverBackground hover:text-lightUnactivePaginationButtonHoverText dark:bg-darkUnactivePaginationButtonBackground dark:text-darkUnactivePaginationButtonText dark:border-darkUnactivePaginationButtonBorder dark:hover:text-darkUnactivePaginationButtonHoverText dark:hover:bg-darkUnactivePaginationButtonHoverBackground disabled:opacity-50"
+            :disabled="currentPage >= totalPages"
+            @click="goToPage(totalPages)"
+          >{{ totalPages }}</button>
+          <button
+            class="flex items-center py-1 px-3 gap-1 text-sm font-medium text-lightActivePaginationButtonText focus:outline-none bg-lightActivePaginationButtonBackground border-l-0 rounded-e hover:opacity-90 dark:bg-darkActivePaginationButtonBackground dark:text-darkActivePaginationButtonText disabled:opacity-50"
+            :disabled="currentPage >= totalPages"
+            @click="nextPage"
+          >
+            <svg class="w-3.5 h-3.5 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
+            </svg>
+          </button>
+        </div>
       </div>
-    </div>
+    </nav>
   </div>
 </template>
 
@@ -369,18 +381,6 @@ const currentPage = computed(() => Math.floor(pagination.offset / pagination.lim
 const totalPages = computed(() => Math.max(1, Math.ceil(totalItems.value / pagination.limit)));
 const fromIndex = computed(() => totalItems.value === 0 ? 0 : Math.min(pagination.offset + 1, totalItems.value));
 const toIndex = computed(() => Math.min(pagination.offset + pagination.limit, totalItems.value));
-const pageButtons = computed(() => {
-  const pages = [];
-  const current = currentPage.value;
-  const total = totalPages.value;
-  const start = Math.max(1, current - 2);
-  const end = Math.min(total, current + 2);
-
-  for (let number = start; number <= end; number += 1) {
-    pages.push(number);
-  }
-  return pages;
-});
 const tableDataProvider = async ({ offset, limit }) => {
   pagination.offset = offset;
   pagination.limit = limit;
@@ -549,6 +549,9 @@ function toggleCardValueMode(recordId: string | number) {
   cardValueMode.value[key] = currentMode === 'new' ? 'old' : 'new';
 }
 
+const pageInput = ref(String(currentPage.value));
+watch(currentPage, (val) => { pageInput.value = String(val); });
+
 function goToPage(page: number) {
   const clampedPage = Math.min(Math.max(page, 1), totalPages.value);
   pagination.offset = (clampedPage - 1) * pagination.limit;
@@ -560,6 +563,16 @@ function previousPage() {
 
 function nextPage() {
   goToPage(currentPage.value + 1);
+}
+
+function onPageKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') validatePageInput();
+}
+
+function validatePageInput() {
+  const parsed = parseInt(pageInput.value);
+  if (!isNaN(parsed)) goToPage(parsed);
+  pageInput.value = String(currentPage.value);
 }
 </script>
 
