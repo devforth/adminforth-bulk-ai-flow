@@ -145,6 +145,7 @@
           :outputImageFields="props.meta.outputImageFields"
           :outputFieldsForAnalizeFromImages="props.meta.outputFieldsForAnalizeFromImages"
           :outputPlainFields="props.meta.outputPlainFields"
+          :overwriteExistingValues="overwriteExistingValues"
           @error="handleTableError"
           @regenerate-images="regenerateImages"
           @regenerate-record="regenerateRecord"

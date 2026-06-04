@@ -254,7 +254,11 @@
         </div>
 
         <div class="flex justify-end shrink-0">
-          <button @click="() => regenerateRecord(item.id)" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition">
+          <button
+            @click="() => canRegenerate(item) && regenerateRecord(item.id)"
+            :disabled="!canRegenerate(item)"
+            class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+          >
             <IconRefreshOutline class="w-3.5 h-3.5" /> {{ $t('Regenerate') }}
           </button>
         </div>
@@ -344,11 +348,21 @@ const props = defineProps<{
   outputImageFields: string[],
   outputFieldsForAnalizeFromImages: string[],
   outputPlainFields: string[],
+  overwriteExistingValues: boolean,
 }>();
 const emit = defineEmits(['error', 'regenerateImages', 'regenerateCell', 'regenerateRecord']);
 
 function regenerateRecord(recordId: any) {
   emit('regenerateRecord', { recordId });
+}
+
+function canRegenerate(item: any): boolean {
+  if (props.overwriteExistingValues) return true;
+  for (const n of props.customFieldNames) {
+    const val = item.data?.[n];
+    if (val === null || val === undefined || val === '') return true;
+  }
+  return false;
 }
 
 const DEFAULT_PAGE_SIZE = 7;
