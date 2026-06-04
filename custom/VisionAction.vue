@@ -83,9 +83,7 @@
               <div class="flex items-center gap-3">
                 <div 
                   class="p-2 rounded-xl shrink-0"
-                  :class="isGenerationPaused ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/40 dark:text-yellow-400' 
-                    : displayedProcessedCount === totalRecords ? 'bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400'
-                    : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'"
+                  :class="generationStatusClass"
                 >
                   <IconShieldCheckOutline v-if="displayedProcessedCount === totalRecords" class="w-5 h-5" />
                   <IconRefreshOutline v-else :class="isProcessingAny ? 'animate-spin' : ''" class="w-5 h-5" />
