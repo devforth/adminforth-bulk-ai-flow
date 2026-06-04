@@ -20,7 +20,7 @@
                 </h3>
               </div>
             </div>
-            <div class="flex items-center gap-3 shrink-0">
+            <div class="flex items-center gap-3 shrink-0" v-if="hasNonImageOutputFields">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
                   {{ cardValueMode?.[String(item.id)] === 'old' ? $t('OLD VALUE') : $t('NEW VALUE') }}
@@ -431,6 +431,17 @@ function isInColumnEnum(key: string): boolean {
 function isInColumnImage(key: string): boolean {
   return props.meta.outputImageFields?.includes(key) || false;
 }
+
+const hasNonImageOutputFields = computed(() => {
+  if (!props.customFieldNames) return false;
+  
+  for (const fieldName of props.customFieldNames) {
+    const isImage = isInColumnImage(fieldName);
+    if (!isImage) return true;
+  }
+  
+  return false;
+});
 
 function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
   const col = columnEnumArray.find(c => c.name === key);
