@@ -36,9 +36,6 @@
                   />
                 </button>
               </div>
-              <div class="text-right text-gray-400 text-sm">
-                ID: {{ item.id }}
-              </div>
             </div>
           </div>
 
