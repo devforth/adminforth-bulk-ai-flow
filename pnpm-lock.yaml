@@ -19,8 +19,8 @@ importers:
         specifier: latest
         version: 25.3.3
       adminforth:
-        specifier: ^2.60.2
-        version: 2.60.2(@types/node@25.3.3)(typescript@5.9.3)
+        specifier: ^2.70.0
+        version: 2.70.0(@types/node@25.3.3)(typescript@5.9.3)
       semantic-release:
         specifier: ^24.2.1
         version: 24.2.9(typescript@5.9.3)
@@ -416,8 +416,8 @@ packages:
     resolution: {integrity: sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==}
     engines: {node: '>= 0.6'}
 
-  adminforth@2.60.2:
-    resolution: {integrity: sha512-WHttE8tZKLYNw3dpFqLOAsenyX9Ymv/3/6kfpsU8npMpZQk55H2p39MJm4vtAhUbz4aSroV37B7nPO3V/dZ5dw==}
+  adminforth@2.70.0:
+    resolution: {integrity: sha512-E/zvEtAU7Woh3nLR7xrfgaVtH0Y+NAQnbSlZhTMpSpjrwwwGPAmE6lKsEaVAD7T+y1TvNhk+yCh/Mb6me3owzA==}
     hasBin: true
 
   agent-base@7.1.4:
@@ -2978,7 +2978,7 @@ snapshots:
       mime-types: 2.1.35
       negotiator: 0.6.3
 
-  adminforth@2.60.2(@types/node@25.3.3)(typescript@5.9.3):
+  adminforth@2.70.0(@types/node@25.3.3)(typescript@5.9.3):
     dependencies:
       '@babel/parser': 7.29.0
       '@clickhouse/client': 1.18.1
