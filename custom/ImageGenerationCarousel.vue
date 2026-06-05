@@ -5,7 +5,7 @@
     :header="$t('Generate image with AI')"
     :closable="true"
     class="w-full lg:w-[1100px]"
-    :beforeCloseFunction="async () => { emit('close'); return true; }"
+    :beforeCancelFunction="async () => { emit('close'); return true; }"
     :buttons="dialogButtons"
     :click-to-close-outside="false"
   >
