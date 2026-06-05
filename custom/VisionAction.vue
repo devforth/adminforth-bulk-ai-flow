@@ -9,7 +9,7 @@
     ref="confirmDialog"
     header="Bulk AI Generation"
     class="[scrollbar-gutter:stable] max-w-full h-fit"
-    :beforeCancelFunction="handleBeforeCancel"
+    :beforeCloseFunction="handleBeforeCancel"
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
@@ -511,29 +511,6 @@ async function regenerateRecord({ recordId }) {
 
   await Promise.allSettled(promises);
 }
-}
-
-const handleBeforeClose = async (dialog?: any) => {
-  if (popupMode.value === 'generation') {
-    const confirmed = await adminforth.confirm({
-      title: t('Close without saving?'),
-      message: t('Are you sure you want to close without saving?'),
-      yes: t('Yes'),
-      no: t('Cancel'),
-    });
-
-    if (confirmed) {
-      closeDialog();
-        
-      if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
-        confirmDialog.value.hide();
-      } else if (dialog && typeof dialog.hide === 'function') {
-        dialog.hide();
-      }
-      return true;
-    }
-    return false;
-  }
 }
 
 const isSavingCurrent = ref(false);
