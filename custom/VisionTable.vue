@@ -259,7 +259,7 @@
       </div>
     </transition>
 
-    <nav v-show="totalItems > 0" class="bg-lightTableBackground dark:bg-darkTableBackground pt-2 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 pb-4 mt-4">
+    <nav v-show="totalItems > 0" class="bg-lightTableBackground dark:bg-darkTableBackground py-3 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 mt-4 rounded-default">
       <span class="text-sm font-normal text-center text-lightTablePaginationText dark:text-darkTablePaginationText sm:mb-4 md:mb-0 block w-full md:inline md:w-auto">
         {{ $t('Showing') }}
         <span class="font-semibold text-lightTablePaginationNumeration dark:text-darkTablePaginationNumeration">{{ fromIndex }}</span>
