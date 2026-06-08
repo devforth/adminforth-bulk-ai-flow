@@ -5,9 +5,9 @@
     </div>
     <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
   </div>
-  <Dialog 
+  <Dialog
     ref="confirmDialog"
-    header="Bulk AI Generation"
+    :header="t('Bulk AI Generation')"
     class="[scrollbar-gutter:stable] max-w-full h-fit"
     :beforeCancelFunction="handleBeforeCancel"
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
@@ -234,7 +234,7 @@
                   dark:focus:border-gray-700
                   focus:outline-none 
                   focus:border-gray-200"
-                  placeholder="Enter prompt instructions..."
+                  :placeholder="t('Enter prompt instructions...')"
                 ></Textarea>
               </div>
 
@@ -1069,17 +1069,17 @@ function applyJobResult(record: RecordState, job: any, actionType: GenerationAct
 }
 
 function applyJobFailure(record: RecordState, job: any, actionType: GenerationAction) {
-  registerGenerationFailure(record, actionType, job?.error || 'Unknown error');
+  registerGenerationFailure(record, actionType, job?.error || t('Unknown error'));
   if (actionType === 'generate_images') {
     record.imageGenerationFailed = true;
-    record.imageGenerationErrorMessage = job?.error || 'Unknown error';
+    record.imageGenerationErrorMessage = job?.error || t('Unknown error');
   } else if (actionType === 'analyze') {
     for (const field of Object.keys(props.meta.outputFieldsForAnalizeFromImages || {})) {
-      record.imageToTextErrorMessages[props.meta.outputFieldsForAnalizeFromImages[field]] = job?.error || 'Unknown error';
+      record.imageToTextErrorMessages[props.meta.outputFieldsForAnalizeFromImages[field]] = job?.error || t('Unknown error');
     }
   } else if (actionType === 'analyze_no_images') {
     for (const field of Object.keys(props.meta.outputPlainFields || {})) {
-      record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || 'Unknown error';
+      record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || t('Unknown error');
     }
   }
   touchRecords();
@@ -1427,12 +1427,12 @@ async function uploadImage(imgBlob, id, fieldName) {
   } catch (error) {
     console.error('Error uploading file:', error);
     adminforth.alert({
-      message: 'Sorry but the file was not be uploaded. Please try again.',
+      message: t('Sorry but the file was not be uploaded. Please try again.'),
       variant: 'danger'
     });
 
     isError.value = true;
-    errorMessage.value = `Failed to upload images. Please, try to re-run the action.`;
+    errorMessage.value = t('Failed to upload images. Please, try to re-run the action.');
     return null;
   }
 }
