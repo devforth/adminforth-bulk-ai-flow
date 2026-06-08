@@ -348,7 +348,7 @@ function canRegenerate(item: any): boolean {
   return false;
 }
 
-const DEFAULT_PAGE_SIZE = 7;
+const DEFAULT_PAGE_SIZE = 6;
 const initialPageSize = props.meta?.pageSize ?? DEFAULT_PAGE_SIZE;
 console.log(props.meta?.pageSize);
 
