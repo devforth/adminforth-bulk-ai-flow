@@ -175,7 +175,7 @@
                     : t("Prompts for image analysis")
                 }}
               </h3>
-              <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              <p class="text-xs text-gray-400 mt-0.5">
                 {{ 
                   key === "plainFieldsPrompts" ? t("Define how AI should generate content for text-based fields.") 
                   : key === "generateImages" ? t("Configure prompt rules for generating media and images.") 
@@ -219,7 +219,7 @@
                   </div>
                 </div>
 
-                <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-md bg-lightPrimary/10 text-lightPrimary dark:bg-darkPrimary/10 dark:text-darkPrimary">
+                <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-md bg-lightPrimary/10 text-lightPrimary dark:bg-darkPrimary/10 dark:text-darkPrimary dark:brightness-200">
                   {{ key === 'generateImages' ? t('Image field') : t('Text field') }}
                 </span>
               </div>
@@ -243,14 +243,14 @@
                 mode="secondary"
                 @click="resetPromptToDefault(key, promptKey)"
                 class="
-                mt-4 flex items-center gap-1.5 text-xs font-semibold bg-transparent px-2.5 py-1 w-fit rounded-default
+                mt-4 flex items-center gap-1.5 text-xs font-semibold bg-transparent px-3 py-1 w-fit rounded-default
                 border border-red-200 hover:border-red-600
                 text-red-600 hover:text-red-700 
-                dark:border-red-900/50 dark:hover:border-red-500
+                dark:border-red-900/50 dark:hover:border-red-400
                 dark:text-red-500 dark:hover:text-red-400
                 transition-colors duration-150"
               >
-                <IconUndoOutline class="w-3.5 h-3.5 dark:brightness-200" />
+                <IconUndoOutline class="w-3.5 h-3.5" />
                 {{ t('Reset') }}
               </button>
 
@@ -299,7 +299,7 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2 px-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+        <div class="flex items-center gap-2 px-1 text-xs font-medium text-gray-400 dark:text-gray-500 dark:brightness-200">
           <IconInfoCircleSolid class="w-4 h-4 " />
           <p>{{ t('This action will only apply to the fields included in your prompts.') }}</p>
         </div>
@@ -1815,14 +1815,14 @@ async function saveCurrentGenerated() {
 
 const generationStatusClass = computed(() => {
   if (isGenerationPaused.value) {
-    return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50'
+    return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-400'
   }
 
   if (displayedProcessedCount.value === totalRecords.value) {
-    return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50'
+    return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-400'
   }
 
-  return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50'
+  return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-400'
 })
 
 </script>
