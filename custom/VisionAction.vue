@@ -129,7 +129,7 @@
 
 
         <VisionTable
-          class="w-full flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]"
+          class="w-full flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent_0px,black_20px)]"
           ref="tableRef"
           :records="recordsList"
           :meta="props.meta"
