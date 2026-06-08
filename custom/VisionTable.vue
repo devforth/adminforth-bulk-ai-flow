@@ -206,7 +206,7 @@
                   <div v-else-if="typeof item.data?.[n] === 'string' || typeof item.data?.[n] === 'object'">
                     <textarea
                       :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
-                      @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = e.target.value }"
+                      @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = (e.target as HTMLInputElement).value }"
                       :disabled="cardValueMode?.[String(item.id)] === 'old'"
                       class="w-full text-sm p-2 border border-gray-200 dark:border-gray-600 rounded-default bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500"
                       :class="props.meta.isAttachFiles ? 'min-h-[42px]' : 'min-h-[120px]'"
@@ -221,7 +221,7 @@
                     <input
                       :type="cardValueMode?.[String(item.id)] === 'old' && !item.oldData?.[n] && item.oldData?.[n] !== 0 ? 'text' : 'number'"
                       :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
-                      @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = Number(e.target.value) }"
+                      @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = Number((e.target as HTMLInputElement).value) }"
                       :disabled="cardValueMode?.[String(item.id)] === 'old'"
                       class="w-full h-10 px-3 border border-gray-200 dark:border-gray-600 rounded-default bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 text-sm"
                     />
