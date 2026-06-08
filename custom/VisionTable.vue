@@ -251,13 +251,15 @@
 
     
 
-    <transition name="fade">
-      <div v-if="zoomedImage" class="zoom-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeZoom">
-        <transition name="zoom">
-          <img v-if="zoomedImage" :src="zoomedImage" class="max-w-[90vw] max-h-[90vh] rounded-default object-contain shadow-2xl" />
-        </transition>
-      </div>
-    </transition>
+    <Teleport to="body">
+      <transition name="fade">
+        <div v-if="zoomedImage" class="zoom-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click="closeZoom">
+          <transition name="zoom">
+            <img v-if="zoomedImage" :src="zoomedImage" class="max-w-[90vw] max-h-[90vh] rounded-default object-contain shadow-2xl cursor-zoom-out" @click.stop="closeZoom" />
+          </transition>
+        </div>
+      </transition>
+    </Teleport>
 
     <nav v-show="totalItems > 0" class="pagination-nav bg-lightTableBackground dark:bg-darkTableBackground py-3 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 mt-4 rounded-default">
       <span class="text-sm font-normal text-center text-lightTablePaginationText dark:text-darkTablePaginationText sm:mb-4 md:mb-0 block w-full md:inline md:w-auto">
