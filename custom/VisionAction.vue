@@ -506,9 +506,9 @@ async function regenerateRecord({ recordId }) {
         fieldName,
       })
     );
+  }
 
   await Promise.allSettled(promises);
-}
 }
 
 const handleBeforeClose = async (dialog?: any) => {
