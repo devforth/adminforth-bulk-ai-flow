@@ -319,10 +319,8 @@ import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { useCoreStore } from '@/stores/core';
-import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
-import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
+import { IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { useFiltersStore } from '@/stores/filters';
-import { Button } from '@/afcl'
 import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid, IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
 import { ProgressBar } from '@/afcl';
 
