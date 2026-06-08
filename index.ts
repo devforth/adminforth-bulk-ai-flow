@@ -642,7 +642,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           imageFieldsPrompts: this.options.fillFieldsFromImages || {},
           imageGenerationPrompts: this.options.generateImages || {},
         },
-        pageSize: this.options.pageSize || undefined
+        pageSize: this.options.pageSize
       }
     }
     
