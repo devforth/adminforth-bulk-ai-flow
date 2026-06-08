@@ -138,10 +138,7 @@
                         :src="item.data?.[n]"
                         class="w-full max-h-[280px] object-cover border cursor-pointer  hover:border-blue-500 rounded-default"
                         @error="() => { imageLoadErrors[item.id] ??= {}; imageLoadErrors[item.id][n] = true }"
-                        @click="() => {
-                          openGenerationCarousel[item.id] ??= {}
-                          openGenerationCarousel[item.id][n] = true
-                        }"
+                        @click="() => zoomImage(item.data?.[n])"
                         style="image-rendering: auto;"
                       />
                       <p
@@ -172,25 +169,6 @@
                       </div>
                     </div>
 
-                    <GenerationCarousel
-                      v-if="openGenerationCarousel[item.id]?.[n]"
-                      :images="item.carouselSaveImages?.[n]"
-                      :recordId="item.id"
-                      :meta="props.meta"
-                      :fieldName="n"
-                      :carouselImageIndex="item.carouselImageIndex?.[n]"
-                      :regenerateImagesRefreshRate="regenerateImagesRefreshRate"
-                      :sourceImage="item.images && item.images.length ? item.images : null"
-                      :imageGenerationPrompts="imageGenerationPrompts[n]"
-                      @error="handleError"
-                      @close="() => {
-                        if (openGenerationCarousel[item.id]) {
-                          openGenerationCarousel[item.id][n] = false
-                        }
-                      }"
-                      @selectImage="updateSelectedImage"
-                      @updateCarouselIndex="updateActiveIndex"
-                    />
                     <ImageCompare
                       v-if="item.openImageCompare?.[n]"
                       :meta="props.meta"
@@ -279,7 +257,7 @@
       </div>
     </transition>
 
-    <nav v-show="totalItems > 0" class="bg-lightTableBackground dark:bg-darkTableBackground pt-2 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 pb-4">
+    <nav v-show="totalItems > 0" class="bg-lightTableBackground dark:bg-darkTableBackground pt-2 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 pb-4 mt-4">
       <span class="text-sm font-normal text-center text-lightTablePaginationText dark:text-darkTablePaginationText sm:mb-4 md:mb-0 block w-full md:inline md:w-auto">
         {{ $t('Showing') }}
         <span class="font-semibold text-lightTablePaginationNumeration dark:text-darkTablePaginationNumeration">{{ fromIndex }}</span>
@@ -335,7 +313,6 @@
 <script lang="ts" setup>
 import { ref, watch, computed, reactive } from 'vue'
 import { Select, Input, Textarea, Table, Checkbox, Skeleton, Toggle, Tooltip } from '@/afcl'
-import GenerationCarousel from './ImageGenerationCarousel.vue'
 import ImageCompare from './ImageCompare.vue';
 import { IconRefreshOutline, IconExclamationCircleSolid } from '@iconify-prerendered/vue-flowbite';
 
@@ -389,7 +366,6 @@ defineExpose({
 
 const paginatedRecords = computed(() => props.records.slice(pagination.offset, pagination.offset + pagination.limit));
 
-const openGenerationCarousel = ref<Record<string, Record<string, boolean>>>({})
 const imageLoadErrors = ref<Record<string, Record<string, boolean>>>({})
 
 const totalItems = computed(() => props.records.length);
@@ -469,31 +445,6 @@ function convertColumnEnumToSelectOptions(columnEnumArray: any[], key: string) {
     label: item.label,
     value: item.value
   }));
-}
-
-function updateSelectedImage(image: string, id: any, fieldName: string) {
-  const record = props.records.find(rec => String(rec.id) === String(id));
-  if (record) {
-    record.data[fieldName] = image;
-  }
-}
-
-function handleError({ isError, errorMessage }) {
-  emit('error', {
-    isError,
-    errorMessage
-  });
-}
-
-function regenerateImages(recordId: any) {
-  emit('regenerateImages', { recordId });
-}
-
-function updateActiveIndex(newIndex: number, id: any, fieldName: string) {
-  const record = props.records.find(rec => String(rec.id) === String(id));
-  if (record) {
-    record.carouselImageIndex[fieldName] = newIndex;
-  }
 }
 
 function isValidUrl(str: string): boolean {
