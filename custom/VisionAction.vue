@@ -165,7 +165,7 @@
       <div v-else-if="popupMode === 'settings'" class="w-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 max-h-[70vh]">
         <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
         <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
-          <div class="flex items-start gap-3.5 mb-6 border-b border-gray-100 dark:border-gray-800">
+          <div class="flex items-start gap-3.5 mb-6">
             
             <div class="flex-1 min-w-0">
               <h3 class="text-base font-bold text-gray-900 dark:text-white tracking-tight">
