@@ -618,4 +618,9 @@ function validatePageInput() {
   transform: scale(0.95);
   opacity: 0;
 }
+
+.overflow-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
 </style>
