@@ -4,7 +4,7 @@
       <div 
         v-for="item in paginatedRecords" 
         :key="item.id"
-        class="bg-white border border-gray-200 rounded-default p-4 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between gap-4"
+        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-default p-4 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between gap-4"
       >
         <div class="flex flex-col h-full">
           <div class="flex items-start justify-between gap-4 mb-4">
@@ -15,7 +15,7 @@
               />
               <!-- CRITICAL WRAPPER -->
               <div class="flex-1 min-w-0 w-0">
-                <h3 class="font-bold text-gray-900 w-full truncate overflow-hidden whitespace-nowrap">
+                <h3 class="font-bold text-gray-900 dark:text-white w-full truncate overflow-hidden whitespace-nowrap">
                   {{ item.label || item.data?.name || $t('Item Record') }}
                 </h3>
               </div>
@@ -41,7 +41,7 @@
 
           <div class="flex flex-col gap-3 flex-grow">
             <div
-              class="w-full flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-200 h-full max-h-[260px] max-w-[428.5px] rounded-default text-center "
+              class="w-full flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-200 h-full max-h-[260px] max-w-[446.5px] rounded-default text-center "
             >
               <!-- HAS IMAGES -->
               <template v-if="item.images?.length">
@@ -68,9 +68,9 @@
 
               <!-- EMPTY ARRAY -->
               <template v-else-if="item.images?.length === 0">
-                <div class="text-gray-400 flex flex-col items-center justify-center w-[426.5px] h-[258px]">
+                <div class="text-gray-400 dark:text-gray-500 flex flex-col items-center justify-center w-full h-[258px]">
                   <svg
-                    class="w-20 h-20 mb-2 stroke-1 text-gray-300"
+                    class="w-20 h-20 mb-2 stroke-1 text-gray-300 dark:text-gray-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -88,9 +88,9 @@
 
               <!-- NO DATA -->
               <template v-else>
-                <div class="text-gray-400 flex flex-col items-center justify-center h-full">
+                <div class="text-gray-400 dark:text-gray-500 flex flex-col items-center justify-center h-full">
                   <svg
-                    class="w-20 h-20 mb-2 stroke-1 text-gray-300"
+                    class="w-20 h-20 mb-2 stroke-1 text-gray-300 dark:text-gray-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -116,7 +116,7 @@
                 @mouseleave="(() => { setHover(item.id, n, false) })"
               >
                 <div class="flex justify-between items-center mb-1">
-                  <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <label class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     {{ n.replace(/([A-Z])/g, ' $1').trim() }}
                   </label>
                   
@@ -130,10 +130,14 @@
 
                 <div v-if="isInColumnImage(n)">
                   <div v-if="item.aiStatus?.generatedImages" class="flex flex-col gap-2">
-                    <div v-if="isValidUrl(item.data?.[n])" class="flex items-center gap-3 relative">
-                      <img 
-                        :src="item.data?.[n]" 
+                    <div v-if="isValidUrl(item.data?.[n])" class="flex items-center gap-3 relative w-full">
+                      <Skeleton v-if="imageLoadErrors[item.id]?.[n]" type="image" class="w-full h-[280px]" />
+                      <img
+                        v-else
+                        :key="item.data?.[n]"
+                        :src="item.data?.[n]"
                         class="w-full max-h-[280px] object-cover border cursor-pointer  hover:border-blue-500 rounded-default"
+                        @error="() => { imageLoadErrors[item.id] ??= {}; imageLoadErrors[item.id][n] = true }"
                         @click="() => {
                           openGenerationCarousel[item.id] ??= {}
                           openGenerationCarousel[item.id][n] = true
@@ -150,9 +154,9 @@
                       </p>
                     </div>
                     <div v-else>
-                      <div class="text-gray-400 flex flex-col items-center justify-center w-[426.5px] h-[258px] bg-gray-50 border border-dashed border-gray-200">
+                      <div class="text-gray-400 dark:text-gray-500 flex flex-col items-center justify-center w-full h-[258px] bg-gray-50 dark:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-600">
                         <svg
-                          class="w-20 h-20 mb-2 stroke-1 text-gray-300"
+                          class="w-20 h-20 mb-2 stroke-1 text-gray-300 dark:text-gray-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -197,7 +201,7 @@
                     />
                   </div>
                   <div v-else>
-                    <Skeleton type="image" class=" w-[426.5px] h-[258px] rounded-default" />
+                    <Skeleton type="image" class="w-full h-[258px] rounded-default" />
                   </div>
                 </div>
 
@@ -216,7 +220,7 @@
                       type="text"
                       :value="item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')"
                       disabled
-                      class="w-full h-10 px-3 border border-gray-200 rounded-default bg-gray-50 text-gray-400 text-sm focus:outline-none"
+                      class="w-full h-10 px-3 border border-gray-200 dark:border-gray-600 rounded-default bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 text-sm focus:outline-none"
                     />
                   </div>
                   
@@ -225,7 +229,7 @@
                       :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
                       @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = e.target.value }"
                       :disabled="cardValueMode?.[String(item.id)] === 'old'"
-                      class="w-full min-h-[42px] text-sm p-2 border border-gray-200 rounded-default focus:outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                      class="w-full min-h-[42px] text-sm p-2 border border-gray-200 dark:border-gray-600 rounded-default bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500"
                     />
                   </div>
 
@@ -239,7 +243,7 @@
                       :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
                       @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = Number(e.target.value) }"
                       :disabled="cardValueMode?.[String(item.id)] === 'old'"
-                      class="w-full h-10 px-3 border border-gray-200 rounded-default focus:outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400 text-sm"
+                      class="w-full h-10 px-3 border border-gray-200 dark:border-gray-600 rounded-default bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 text-sm"
                     />
                   </div>
                 </div>
@@ -257,7 +261,7 @@
           <button
             @click="() => canRegenerate(item) && regenerateRecord(item.id)"
             :disabled="!canRegenerate(item)"
-            class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-default hover:bg-gray-50 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+            class="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-default hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-700"
           >
             <IconRefreshOutline class="w-3.5 h-3.5" /> {{ $t('Regenerate') }}
           </button>
@@ -386,6 +390,7 @@ defineExpose({
 const paginatedRecords = computed(() => props.records.slice(pagination.offset, pagination.offset + pagination.limit));
 
 const openGenerationCarousel = ref<Record<string, Record<string, boolean>>>({})
+const imageLoadErrors = ref<Record<string, Record<string, boolean>>>({})
 
 const totalItems = computed(() => props.records.length);
 const currentPage = computed(() => Math.floor(pagination.offset / pagination.limit) + 1);

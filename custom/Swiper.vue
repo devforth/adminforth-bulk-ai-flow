@@ -1,7 +1,7 @@
 <template>
   <swiper-container class="flex items-center justify-center w-full h-full">
     <swiper-slide v-for="(image, index) in images" :key="index">
-        <img :src="image" class="object-contain w-full h-full" />
+        <img :src="image" class="object-cover w-full h-full" />
     </swiper-slide>
   </swiper-container>
 </template>

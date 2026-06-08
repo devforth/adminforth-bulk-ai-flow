@@ -25,7 +25,7 @@
             <img
               v-if="attachmentFiles[0]"
               :src="attachmentFiles[0]"
-              class="w-full h-full object-contain"
+              class="w-full h-full object-cover"
             />
             <div v-else class="flex flex-col items-center justify-center gap-2 text-gray-400">
               <svg class="w-12 h-12 text-gray-300 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,7 +73,8 @@
               <p class="text-red-500 dark:text-red-400 text-sm font-semibold px-4 text-center">{{ errorMessage }}</p>
             </div>
 
-            <Swiper ref="sliderRef" :images="images" class="h-full" />
+            <Skeleton v-if="!images.length && !loading && !loadingTimer && !errorMessage" type="image" class="w-full h-full" />
+            <Swiper v-else ref="sliderRef" :images="images" class="h-full" />
           </div>
         </div>
       </div>
@@ -88,7 +89,7 @@ import { ref, onMounted, nextTick, Ref, computed } from 'vue'
 import { callAdminForthApi } from '@/utils';
 import { useI18n } from 'vue-i18n';
 import adminforth from '@/adminforth';
-import { ProgressBar, Dialog, Textarea, Spinner } from '@/afcl';
+import { ProgressBar, Dialog, Textarea, Spinner, Skeleton } from '@/afcl';
 import Swiper from './Swiper.vue';
 
 const { t } = useI18n();
