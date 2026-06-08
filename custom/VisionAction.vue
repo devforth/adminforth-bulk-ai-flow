@@ -1,24 +1,32 @@
 <template>
   <div class="flex items-end justify-start gap-2 cursor-pointer">
-    <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-md text-sm px-1 text-center">
+    <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-lightPrimary via-lightPrimary/90 to-lightPrimary/80 hover:opacity-90 focus:ring-4 focus:outline-none focus:ring-lightPrimary/30 dark:focus:ring-darkPrimary/30 font-medium rounded-md text-sm px-1 text-center dark:bg-none dark:bg-darkPrimary/10 dark:text-darkPrimary dark:brightness-200">
       {{t('AI')}}
     </div>
     <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
   </div>
-  <Dialog 
+  <Dialog
     ref="confirmDialog"
-    header="Bulk AI Generation"
-    class="[scrollbar-gutter:stable] !max-w-full w-fit h-fit"
+    :header="t('Bulk AI Generation')"
+    class="[scrollbar-gutter:stable] max-w-full h-fit"
+    :beforeCancelFunction="handleBeforeCancel"
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
-    :beforeCloseFunction="handleBeforeClose"
-    :closable="false"
+    :closable="true"
     :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
+          {
+            label: t('Cancel'),
+            options: {
+              class: 'afcl-button w-1/6',
+              mode: 'secondary'
+            },
+            onclick: () => { popupMode = 'confirmation'; }
+          },
           {
             label: t('Save settings'),
             options: {
-              class: 'w-fit'
+              class: 'afcl-button w-1/6',
             },
             onclick: (dialog) => { saveSettings(); }
           },
@@ -27,29 +35,36 @@
             {
               label: t('Cancel'),
               options: {
-                class: 'w-2/5 bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
+                class: 'afcl-button w-1/2',
+                mode: 'secondary'
               },
               onclick: (dialog) => confirmDialog.tryToHideModal()
             },
             {
               label: t('Start generation'),
               options: {
-                class: 'w-3/5 px-5 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 rounded-md text-white border-none',
+                class: 'afcl-button w-1/2',
                 loader: isCheckingRateLimits
               },
-              onclick: (dialog) => { runAiActions(); }
+              onclick: async () => { await runAiActions(); }
             }
           ]"
     :click-to-close-outside="false"
   >
-    <div class="bulk-vision-table flex flex-col items-center gap-3 md:gap-4 overflow-y-auto">
+    <div
+      class="bulk-vision-table flex flex-col gap-3 w-full"
+      :class="{
+        'h-[830px]': popupMode === 'generation',
+        'h-auto max-h-[720px]': popupMode !== 'generation'
+      }"
+    >
       <template v-if="recordsList.length && popupMode === 'generation'" >
-        <div class="w-full">
-          <p :class="isGenerationPaused ? '' : 'opacity-0'" class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
+        <div class="w-full min-w-[980px]">
           <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
+            <p class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
             <div class="flex items-center gap-2">
               <button
-                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 border-none ml-2"
+                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-lightPrimary to-lightPrimary/80 text-white border-none ml-2"
                 @click="resumeGeneration"
               >
                 {{ t('Resume generation') }}
@@ -62,36 +77,59 @@
               </button>
             </div>
           </div>
-          <div
-            v-if="!isGenerationPaused"
-            class="w-full h-8 rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden relative"
-            :class="isGenerationPaused ? 'opacity-80' : ''"
-            role="progressbar"
-            :aria-valuenow="displayedProcessedCount"
-            :aria-valuemin="0"
-            :aria-valuemax="totalRecords"
-          >
-            <div
-              class="h-full bg-gradient-to-r from-lightPrimary/70 via-lightPrimary/80 to-lightPrimary/90 dark:from-darkPrimary/70 dark:via-darkPrimary/80 dark:to-darkPrimary/90 transition-all duration-200 "
-              :style="{ width: `${displayedProgressPercent}%` }"
-            ></div>
-            <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white drop-shadow">
-              <template v-if="isProcessingAny || isGenerationPaused">
-                {{ Math.floor((displayedProcessedCount  /  totalRecords) * 100) }}%
-              </template>
-              <template v-else-if="isGenerationCancelled">
-                {{ t('Generation cancelled') }}
-              </template>
-              <template v-else>
-                {{ t('Processed') }}
-              </template>
+
+          <div class="generation-progress-panel w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 m-1 rounded-2xl shadow-sm flex flex-col gap-4">
+            <div class="generation-status-header flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div 
+                  class="p-2 rounded-xl shrink-0"
+                  :class="generationStatusClass"
+                >
+                  <IconShieldCheckOutline v-if="displayedProcessedCount === totalRecords" class="w-5 h-5" />
+                  <IconRefreshOutline v-else :class="isProcessingAny ? 'animate-spin' : ''" class="w-5 h-5" />
+                </div>
+                
+                <div>
+                  <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 tracking-tight">
+                    {{ displayedProcessedCount }} {{ t('of') }} {{ totalRecords }} {{ t('fields ready to save') }}
+                  </h4>
+                </div>
+              </div>
+
+              <span
+                class="px-2.5 py-1 text-xs rounded-default border flex items-center gap-1.5"
+                :class="generationStatusClass"
+              >
+                <span 
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="isGenerationPaused ? 'bg-yellow-500' : displayedProcessedCount === totalRecords ? 'bg-green-500' : 'bg-blue-500'"
+                ></span>
+                {{ 
+                  isGenerationPaused ? t('On pause') 
+                  : displayedProcessedCount === totalRecords ? t('Ready') 
+                  : t('Processing') 
+                }}
+              </span>
             </div>
+
+            <ProgressBar
+              class="progress-bar w-full"
+              :class="isGenerationPaused ? 'opacity-80' : ''"
+              :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
+              :max-value="100" 
+              :min-value="0"
+              :showAnimation="isProcessingAny && !isGenerationPaused"
+              :showLabels="false"
+              :showValues="false"
+              :show-progress="false"
+            />
+
           </div>
         </div>
 
 
         <VisionTable
-          class="md:max-h-[75vh] max-w-[1560px] w-full h-full"
+          class="w-full flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent_0px,black_20px)]"
           ref="tableRef"
           :records="recordsList"
           :meta="props.meta"
@@ -105,62 +143,167 @@
           :outputImageFields="props.meta.outputImageFields"
           :outputFieldsForAnalizeFromImages="props.meta.outputFieldsForAnalizeFromImages"
           :outputPlainFields="props.meta.outputPlainFields"
+          :overwriteExistingValues="overwriteExistingValues"
           @error="handleTableError"
           @regenerate-images="regenerateImages"
-          @regenerate-cell="regenerateCell"
+          @regenerate-record="regenerateRecord"
         />
-        <div class="text-red-600 flex items-center w-full">
+        <div class="mt-2 flex items-center text-lightPrimary dark:text-darkPrimary bg-lightPrimary/10 dark:bg-darkPrimary/10 px-4 py-3 rounded-default border border-lightPrimary/20 dark:border-darkPrimary/20 text-sm">
+          <IconInfoCircleSolid class="w-5 h-5 me-2 shrink-0 text-lightPrimary dark:text-darkPrimary dark:brightness-200" />
+          <p class="text-lightPrimary dark:text-darkPrimary dark:brightness-200">
+            <span class="font-semibold text-lightPrimary dark:text-darkPrimary dark:brightness-200">{{ t('Only checked fields will be saved.') }}</span> 
+            {{ t('You can regenerate fields before saving if needed.') }}
+          </p>
+        </div>
+        <div class="af-error-message flex items-center w-full text-red-600">
           <p v-if="isError === true">{{ errorMessage }}</p>
         </div>
       </template>
       <template v-else-if="!recordsList.length && popupMode === 'generation'">
-        <p>No data to save. Feel free to click "Cancel"</p>
+        <p>{{ t('No data to save. Feel free to click "Cancel"') }}</p>
       </template>
-      <div 
-        v-else-if="popupMode === 'settings'" 
-        v-for="(promptsCategory, key) in generationPrompts" 
-        :key="key" 
-        class="w-full"
-      >
-        <div v-if="Object.keys(promptsCategory).length > 0" class="gap-4 mb-6 ml-1">
-          <p class="text-start w-full text-xl font-bold mb-2">{{
-           key === "plainFieldsPrompts" ? "Prompts for non-image fields" 
-            : key === "generateImages" ? "Prompts for image fields" 
-              : "Prompts for image analysis"
-          }}</p>
-          <div class="grid grid-cols-2 gap-4">
-            <div v-for="(prompt, promptKey) in promptsCategory" :key="promptKey">
-              {{ formatLabel(promptKey) }} {{ t('prompt') }}:
-              <Textarea 
-                v-model="generationPrompts[key][promptKey]" 
-                class="w-full h-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              ></Textarea>
-              <p class="text-red-500 hover:underline hover:cursor-pointer mt-2" @click="resetPromptToDefault(key, promptKey)">reset to default</p>
+      <div v-else-if="popupMode === 'settings'" class="af-settings-panel w-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 max-h-[70vh]">
+        <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
+        <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
+          <div class="flex items-start gap-3.5 mb-6">
+            
+            <div class="flex-1 min-w-0">
+              <h3 class="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                {{
+                 key === "plainFieldsPrompts" ? t("Prompts for non-image fields") 
+                  : key === "generateImages" ? t("Prompts for image fields") 
+                    : t("Prompts for image analysis")
+                }}
+              </h3>
+              <p class="text-xs text-gray-400 mt-0.5">
+                {{ 
+                  key === "plainFieldsPrompts" ? t("Define how AI should generate content for text-based fields.") 
+                  : key === "generateImages" ? t("Configure prompt rules for generating media and images.") 
+                    : t("Instructions for extracting text specifications from images.")
+                }}
+              </p>
+            </div>
+          </div>
+
+          <div class="grid gap-6" :class="Object.keys(promptsCategory).length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'">
+            <div 
+              v-for="(prompt, promptKey) in promptsCategory" 
+              :key="promptKey" 
+              class="
+              flex flex-col bg-white dark:bg-gray-900 border border-gray-200/80 p-5 rounded-default shadow-sm transition-all duration-200
+              hover:shadow-md hover:border-gray-300
+              dark:border-gray-800
+              dark:hover:border-gray-700"
+            >
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="p-2 bg-lightPrimary/10 text-lightPrimary rounded-lg shrink-0
+                    dark:bg-darkPrimary/20
+                    dark:text-darkPrimary ">
+                    <IconImageSolid 
+                      v-if="key === 'generateImages'" 
+                      class="w-5 h-5 dark:brightness-200" 
+                    />
+                    <IconFileLinesOutline 
+                      v-else 
+                      class="w-5 h-5 dark:brightness-200" 
+                    />
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 capitalize tracking-tight">
+                      {{ formatLabel(promptKey) }}
+                    </h4>
+                    <p class="text-[11px] text-gray-400 dark:text-gray-500">
+                      {{ key === 'generateImages' ? t('Generate source media') : t('Generate a detailed content') }}
+                    </p>
+                  </div>
+                </div>
+
+                <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-md bg-lightPrimary/10 text-lightPrimary dark:bg-darkPrimary/10 dark:text-darkPrimary dark:brightness-200">
+                  {{ key === 'generateImages' ? t('Image field') : t('Text field') }}
+                </span>
+              </div>
+
+              <div class="relative flex-1">
+                <Textarea 
+                  v-model="generationPrompts[key][promptKey]" 
+                  class="w-full h-56 p-3.5 text-sm leading-relaxed border border-gray-200 bg-gray-50/30 text-gray-800 shadow-sm resize-none font-sans
+                  dark:border-gray-700  
+                  dark:bg-gray-800/40  
+                  dark:text-gray-100 rounded-xl 
+                  dark:focus:border-gray-700
+                  focus:outline-none 
+                  focus:border-gray-200"
+                  :placeholder="t('Enter prompt instructions...')"
+                ></Textarea>
+              </div>
+
+              <button 
+                type="button"
+                mode="secondary"
+                @click="resetPromptToDefault(key, promptKey)"
+                class="
+                mt-4 flex items-center gap-1.5 text-xs font-semibold bg-transparent px-3 py-1 w-fit rounded-default
+                border border-red-200 hover:border-red-600
+                text-red-600 hover:text-red-700 
+                dark:border-red-900/50 dark:hover:border-red-400
+                dark:text-red-500 dark:hover:text-red-400
+                transition-colors duration-150"
+              >
+                <IconUndoOutline class="w-3.5 h-3.5" />
+                {{ t('Reset') }}
+              </button>
+
             </div>
           </div>
         </div>
+      </template>
       </div>
-      <div v-else class="flex flex-col gap-2 mt-2 w-full h-full">
-        <div class="flex items-center justify-between mb-2 w-full">
-          <div class="flex items-center justify-center gap-2">
-            <IconShieldSolid class="w-6 h-6 text-lightPrimary dark:text-darkPrimary" />
-            <p class="sm:text-base text-sm">{{ t('Overwrite existing values') }}</p>
-            <Tooltip>
-                <IconInfoCircleSolid class="w-5 h-5 me-2 text-lightPrimary dark:text-darkPrimary"/>
-                <template #tooltip>
-                  <p class="max-w-64">{{ t('When enabled, the AI will overwrite content for fields that already have data. When off - this helps to preserve existing information and avoid overwriting valuable content.') }}</p>
-                </template>
-            </Tooltip>
+      <div v-else class="af-confirmation-panel flex flex-col gap-4 w-full h-full">
+        <div class="af-overwrite-settings-card flex flex-col p-5 rounded-default border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
+                <IconShieldCheckOutline class="w-5 h-5 dark:brightness-200"  />
+              </div>
+              <div class="min-w-0">
+                <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Overwrite existing values') }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words pr-2">{{ t('AI-generated data will replace existing values.') }}</p>
+              </div>
+            </div>
+            <div class="shrink-0 pt-1">
+              <Toggle v-model="overwriteExistingValues" />
+            </div>
           </div>
-          <Toggle
-            v-model="overwriteExistingValues"
-          />
+
+          <div v-if="overwriteExistingValues" class="mt-4 flex items-start text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 text-sm">
+            <IconInfoCircleSolid class="w-4 h-4 me-2 shrink-0 mt-0.5 " />
+            <p>{{ t('Warning: Existing values will be overwritten.') }}</p>
+          </div>
         </div>
-        <div :class="overwriteExistingValues === true ? 'opacity-100' : 'opacity-0'" class="flex items-center text-yellow-800 bg-yellow-100 p-2 rounded-md border border-yellow-300">
-          <IconExclamationTriangle class="w-6 h-6 me-2"/>
-          <p class="sm:text-base text-sm">{{ t('Warning: Existing values will be overwritten.') }}</p>
+
+        <div 
+          @click="clickSettingsButton()"
+          class="af-configure-prompts-card
+          flex items-center justify-between p-5 rounded-default border border-gray-100 bg-white shadow-sm cursor-pointer transition-all duration-150
+          dark:border-gray-800 dark:bg-gray-900/40 "
+        >
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
+              <IconMessageCaptionOutline class="w-5 h-5 dark:brightness-200" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Configure prompts')}}</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">{{ t('Change the instructions for AI to generate actual data.')}}</p>
+            </div>
+          </div>
         </div>
-        <p class="w-fit flex justify-start text-lightPrimary dark:text-white hover:underline cursor-pointer" @click="clickSettingsButton()">{{ t('Configure prompts') }}</p>
+
+        <div class="flex items-center gap-2 px-1 text-xs font-medium text-gray-400 dark:text-gray-500 dark:brightness-200">
+          <IconInfoCircleSolid class="w-4 h-4 " />
+          <p>{{ t('This action will only apply to the fields included in your prompts.') }}</p>
+        </div>
+    
       </div>
     </div>
   </Dialog>
@@ -176,9 +319,10 @@ import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { useCoreStore } from '@/stores/core';
-import { IconShieldSolid, IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
-import { IconExclamationTriangle } from '@iconify-prerendered/vue-humbleicons';
+import { IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { useFiltersStore } from '@/stores/filters';
+import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid, IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
+import { ProgressBar } from '@/afcl';
 
 
 const coreStore = useCoreStore();
@@ -309,16 +453,18 @@ const generationModeButtons = computed(() => {
       label: checkedCount.value > 1 ? t('Save fields') : t('Save field'), 
       options: { 
         disabled: isLoading.value || checkedCount.value < 1 || isFetchingRecords.value || isProcessingAny.value || isGenerationPaused.value, 
-        loader: isLoading.value, class: 'w-fit' 
+        loader: isLoading.value, 
+        class: 'afcl-button w-1/6'
       }, 
-      onclick: async (dialog) => { await saveData(); dialog.hide(); } 
+      onclick: async (dialog) => { await saveData(); closeDialog(); dialog.hide(false); } 
     },
     { 
       label: t('Cancel'), 
       options: {
-        class: 'bg-white hover:!bg-gray-100 !text-gray-900 hover:!text-gray-800 dark:!bg-gray-800 dark:!text-gray-100 dark:hover:!bg-gray-700 !border-gray-200 dark:!border-gray-600'
+        class: 'afcl-button w-1/6',
+        mode: 'secondary'
       }, 
-      onclick: async (dialog) => { await handleBeforeClose(dialog); } 
+      onclick: async (dialog) => { await dialog.hide(true); } 
     },
   ]
 
@@ -327,13 +473,43 @@ const generationModeButtons = computed(() => {
       label: t('Save processed'),
       options: {
         disabled: isLoading.value || isSavingCurrent.value || completedRecordIds.value.size < 1,
-        loader: isSavingCurrent.value, class: 'w-fit'
+        loader: isSavingCurrent.value,
+        class: 'afcl-button w-1/6',
       },
       onclick: async () => { await saveCurrentGenerated(); }
     })
   }
   return arrayToReturn;
 });
+
+async function regenerateRecord({ recordId }) {
+
+  const promises = [];
+
+  if (props.meta.isImageGeneration) {
+    promises.push(regenerateImages({ recordId }));
+  }
+
+  for (const fieldName of props.meta.outputFieldsForAnalizeFromImages || []) {
+    promises.push(
+      regenerateCell({
+        recordId,
+        fieldName,
+      })
+    );
+  }
+
+  for (const fieldName of props.meta.outputPlainFields || []) {
+    promises.push(
+      regenerateCell({
+        recordId,
+        fieldName,
+      })
+    );
+  }
+
+  await Promise.allSettled(promises);
+}
 
 const handleBeforeClose = async (dialog?: any) => {
   if (popupMode.value === 'generation') {
@@ -344,16 +520,16 @@ const handleBeforeClose = async (dialog?: any) => {
       no: t('Cancel'),
     });
 
-  if (confirmed) {
-    closeDialog();
-      
-    if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
-      confirmDialog.value.hide();
-    } else if (dialog && typeof dialog.hide === 'function') {
-      dialog.hide();
+    if (confirmed) {
+      closeDialog();
+
+      if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
+        confirmDialog.value.hide();
+      } else if (dialog && typeof dialog.hide === 'function') {
+        dialog.hide();
+      }
+      return true;
     }
-    return true; 
-  }
     return false;
   }
 }
@@ -383,6 +559,25 @@ const openDialog = async () => {
     runAiActions();
   }
 }
+
+const handleBeforeCancel = async () => {
+  if (popupMode.value === 'generation') {
+    const confirmed = await adminforth.confirm({
+      title: t('Close without saving?'),
+      message: t('Are you sure you want to close without saving?'),
+      yes: t('Yes'),
+      no: t('Cancel'),
+    });
+
+    if (confirmed) {
+      closeDialog();
+      return true;
+    }
+    return false;
+  }
+  closeDialog();
+  return true;
+};
 
 async function getListOfIds() {
   if ( props.meta.recordSelector === 'filtered' ) {
@@ -490,7 +685,7 @@ function registerGenerationFailure(record: RecordState, actionType: GenerationAc
 }
 
 function showGenerationFailureSummary() {
-  for (const group of generationFailureGroups.values()) {
+  for (const group of Array.from(generationFailureGroups.values())) {
     const failedCount = group.recordIds.size;
     const firstRecordId = Array.from(group.recordIds)[0];
     adminforth.alert({
@@ -754,7 +949,7 @@ async function checkRateLimits() {
   return true;
 }
 
-async function runActionForRecord(record: RecordState, actionType: GenerationAction) {
+async function runActionForRecord(record: RecordState, actionType: GenerationAction, forceFilterFilledFields?: boolean) {
   if (!checkIfDialogOpen()) {
     return;
   }
@@ -786,7 +981,7 @@ async function runActionForRecord(record: RecordState, actionType: GenerationAct
         actionType,
         recordId: record.id,
         ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
-        filterFilledFields: !overwriteExistingValues.value,
+        filterFilledFields: forceFilterFilledFields !== undefined ? forceFilterFilledFields: !overwriteExistingValues.value,
       },
       silentError: true,
     });
@@ -874,17 +1069,17 @@ function applyJobResult(record: RecordState, job: any, actionType: GenerationAct
 }
 
 function applyJobFailure(record: RecordState, job: any, actionType: GenerationAction) {
-  registerGenerationFailure(record, actionType, job?.error || 'Unknown error');
+  registerGenerationFailure(record, actionType, job?.error || t('Unknown error'));
   if (actionType === 'generate_images') {
     record.imageGenerationFailed = true;
-    record.imageGenerationErrorMessage = job?.error || 'Unknown error';
+    record.imageGenerationErrorMessage = job?.error || t('Unknown error');
   } else if (actionType === 'analyze') {
     for (const field of Object.keys(props.meta.outputFieldsForAnalizeFromImages || {})) {
-      record.imageToTextErrorMessages[props.meta.outputFieldsForAnalizeFromImages[field]] = job?.error || 'Unknown error';
+      record.imageToTextErrorMessages[props.meta.outputFieldsForAnalizeFromImages[field]] = job?.error || t('Unknown error');
     }
   } else if (actionType === 'analyze_no_images') {
     for (const field of Object.keys(props.meta.outputPlainFields || {})) {
-      record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || 'Unknown error';
+      record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || t('Unknown error');
     }
   }
   touchRecords();
@@ -1232,17 +1427,17 @@ async function uploadImage(imgBlob, id, fieldName) {
   } catch (error) {
     console.error('Error uploading file:', error);
     adminforth.alert({
-      message: 'Sorry but the file was not be uploaded. Please try again.',
+      message: t('Sorry but the file was not be uploaded. Please try again.'),
       variant: 'danger'
     });
 
     isError.value = true;
-    errorMessage.value = `Failed to upload images. Please, try to re-run the action.`;
+    errorMessage.value = t('Failed to upload images. Please, try to re-run the action.');
     return null;
   }
 }
 
-function regenerateImages({ recordId }: { recordId: any }) {
+async function regenerateImages({ recordId }: { recordId: any }) {
   if (coreStore.isInternetError) {
     adminforth.alert({
       message: t('Cannot regenerate images while internet connection is lost. Please check your connection and try again.'),
@@ -1256,11 +1451,27 @@ function regenerateImages({ recordId }: { recordId: any }) {
     return;
   }
   record.aiStatus.generatedImages = false;
+  record.status = 'processing';
   touchRecords();
-  runActionForRecord(record, 'generate_images').catch(() => {
+
+  try {
+    await runActionForRecord(
+      record,
+      'generate_images',
+      false
+    );
+
+    record.status = 'completed';
+    completedRecordIds.value.add(String(recordId));
+
     record.aiStatus.generatedImages = true;
     touchRecords();
-  });
+
+  } catch (e) {
+    record.aiStatus.generatedImages = true;
+    record.status = 'failed';
+    touchRecords();
+  }
 }
 
 async function findPreviewURLForImages() {
@@ -1326,10 +1537,14 @@ async function getGenerationPrompts() {
   const calculatedGenerationPrompts: any = {};
   const savedPrompts = localStorage.getItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`);
   if (props.meta.generationPrompts.plainFieldsPrompts) {
-    calculatedGenerationPrompts.plainFieldsPrompts = props.meta.generationPrompts.plainFieldsPrompts;
+    calculatedGenerationPrompts.plainFieldsPrompts = {
+      ...props.meta.generationPrompts.plainFieldsPrompts
+    };
   }
   if (props.meta.generationPrompts.imageFieldsPrompts) {
-    calculatedGenerationPrompts.imageFieldsPrompts = props.meta.generationPrompts.imageFieldsPrompts;
+    calculatedGenerationPrompts.imageFieldsPrompts = {
+      ...props.meta.generationPrompts.imageFieldsPrompts
+    };
   }
   if (props.meta.generationPrompts.imageGenerationPrompts) {
     let imageFields = {};
@@ -1595,5 +1810,17 @@ async function saveCurrentGenerated() {
   tableRef.value.refresh();
   props.updateList();
 }
+
+const generationStatusClass = computed(() => {
+  if (isGenerationPaused.value) {
+    return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-400'
+  }
+
+  if (displayedProcessedCount.value === totalRecords.value) {
+    return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-400'
+  }
+
+  return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-400'
+})
 
 </script>

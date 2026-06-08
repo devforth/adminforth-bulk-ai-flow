@@ -153,4 +153,10 @@ export interface PluginOptions extends PluginsCommonOptions {
    */
   askConfirmation?: ({ afterRecords: number } | { everyRecords: number })[]
 
+  /**
+   * Number of cards to show per page in the VisionTable component.
+   * If omitted, the component falls back to 6.
+   */
+  pageSize?: number;
+
 }
