@@ -42,7 +42,7 @@
           <div class="flex flex-col gap-3 flex-grow">
             <div
               v-if="props.meta.isAttachFiles"
-              class="w-full flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-200 h-full max-h-[260px] max-w-[446.5px] rounded-default text-center "
+              class="w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-600 h-full max-h-[260px] max-w-[446.5px] rounded-default text-center "
             >
               <!-- HAS IMAGES -->
               <template v-if="item.images?.length">
