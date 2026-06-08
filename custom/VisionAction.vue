@@ -185,7 +185,7 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="grid gap-6" :class="Object.keys(promptsCategory).length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'">
             <div 
               v-for="(prompt, promptKey) in promptsCategory" 
               :key="promptKey" 
