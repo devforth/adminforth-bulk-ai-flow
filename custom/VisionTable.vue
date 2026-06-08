@@ -41,6 +41,7 @@
 
           <div class="flex flex-col gap-3 flex-grow">
             <div
+              v-if="props.meta.isAttachFiles"
               class="w-full flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-200 h-full max-h-[260px] max-w-[446.5px] rounded-default text-center "
             >
               <!-- HAS IMAGES -->
@@ -207,7 +208,8 @@
                       :value="cardValueMode?.[String(item.id)] === 'old' ? (item.oldData?.[n] || item.oldData?.[n] === 0 ? item.oldData[n] : $t('no old value')) : item.data[n]"
                       @input="(e) => { if (cardValueMode?.[String(item.id)] !== 'old') item.data[n] = e.target.value }"
                       :disabled="cardValueMode?.[String(item.id)] === 'old'"
-                      class="w-full min-h-[42px] text-sm p-2 border border-gray-200 dark:border-gray-600 rounded-default bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500"
+                      class="w-full text-sm p-2 border border-gray-200 dark:border-gray-600 rounded-default bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500"
+                      :class="props.meta.isAttachFiles ? 'min-h-[42px]' : 'min-h-[120px]'"
                     />
                   </div>
 
