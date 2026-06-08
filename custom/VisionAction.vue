@@ -78,8 +78,8 @@
             </div>
           </div>
 
-          <div class="w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 m-1 rounded-2xl shadow-sm flex flex-col gap-4">
-            <div class="flex items-center justify-between">
+          <div class="generation-progress-panel w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 m-1 rounded-2xl shadow-sm flex flex-col gap-4">
+            <div class="generation-status-header flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div 
                   class="p-2 rounded-xl shrink-0"
@@ -112,8 +112,8 @@
               </span>
             </div>
 
-            <ProgressBar 
-              class="w-full"
+            <ProgressBar
+              class="progress-bar w-full"
               :class="isGenerationPaused ? 'opacity-80' : ''"
               :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
               :max-value="100" 
@@ -155,14 +155,14 @@
             {{ t('You can regenerate fields before saving if needed.') }}
           </p>
         </div>
-        <div class="text-red-600 flex items-center w-full">
+        <div class="af-error-message flex items-center w-full text-red-600">
           <p v-if="isError === true">{{ errorMessage }}</p>
         </div>
       </template>
       <template v-else-if="!recordsList.length && popupMode === 'generation'">
         <p>{{ t('No data to save. Feel free to click "Cancel"') }}</p>
       </template>
-      <div v-else-if="popupMode === 'settings'" class="w-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 max-h-[70vh]">
+      <div v-else-if="popupMode === 'settings'" class="af-settings-panel w-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 max-h-[70vh]">
         <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
         <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
           <div class="flex items-start gap-3.5 mb-6">
@@ -259,8 +259,8 @@
         </div>
       </template>
       </div>
-      <div v-else class="flex flex-col gap-4 w-full h-full">
-        <div class="flex flex-col p-5 rounded-default border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
+      <div v-else class="af-confirmation-panel flex flex-col gap-4 w-full h-full">
+        <div class="af-overwrite-settings-card flex flex-col p-5 rounded-default border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
           <div class="flex items-start justify-between gap-4">
             <div class="flex items-start gap-3 min-w-0">
               <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
@@ -284,7 +284,7 @@
 
         <div 
           @click="clickSettingsButton()"
-          class="
+          class="af-configure-prompts-card
           flex items-center justify-between p-5 rounded-default border border-gray-100 bg-white shadow-sm cursor-pointer transition-all duration-150
           dark:border-gray-800 dark:bg-gray-900/40 "
         >

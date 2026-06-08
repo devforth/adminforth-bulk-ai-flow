@@ -1,13 +1,13 @@
 <template>
-  <div class="overflow-auto pr-2" style="max-height: calc(100vh - 260px);">
-    <div class="p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+  <div class="vision-table-container overflow-auto pr-2" style="max-height: calc(100vh - 260px);">
+    <div class="records-grid p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
       <div 
         v-for="item in paginatedRecords" 
         :key="item.id"
-        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-default p-4 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between gap-4"
+        class="record-card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-default p-4 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between gap-4"
       >
         <div class="flex flex-col h-full">
-          <div class="flex items-start justify-between gap-4 mb-4">
+          <div class="record-card-header flex items-start justify-between gap-4 mb-4">
             <div class="flex items-center gap-3 w-full min-w-0">
               <Checkbox 
                 v-model="item.isChecked" 
@@ -42,7 +42,7 @@
           <div class="flex flex-col gap-3 flex-grow">
             <div
               v-if="props.meta.isAttachFiles"
-              class="w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-600 h-full max-h-[260px] max-w-[446.5px] rounded-default text-center "
+              class="source-images-section w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-600 h-full max-h-[260px] max-w-[446.5px] rounded-default text-center "
             >
               <!-- HAS IMAGES -->
               <template v-if="item.images?.length">
@@ -108,9 +108,9 @@
               </template>
             </div>
             
-            <div class="flex flex-col gap-3">
-              <div 
-                v-for="n in customFieldNames" 
+            <div class="fields-section flex flex-col gap-3">
+              <div
+                v-for="n in customFieldNames"
                 :key="n"
                 class="flex flex-col relative"
                 @mouseenter="(() => { setHover(item.id, n, true) })" 
@@ -237,7 +237,7 @@
           </div>
         </div>
 
-        <div class="flex justify-end shrink-0">
+        <div class="record-actions flex justify-end shrink-0">
           <button
             @click="() => canRegenerate(item) && regenerateRecord(item.id)"
             :disabled="!canRegenerate(item)"
@@ -252,14 +252,14 @@
     
 
     <transition name="fade">
-      <div v-if="zoomedImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeZoom">
+      <div v-if="zoomedImage" class="zoom-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeZoom">
         <transition name="zoom">
           <img v-if="zoomedImage" :src="zoomedImage" class="max-w-[90vw] max-h-[90vh] rounded-default object-contain shadow-2xl" />
         </transition>
       </div>
     </transition>
 
-    <nav v-show="totalItems > 0" class="bg-lightTableBackground dark:bg-darkTableBackground py-3 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 mt-4 rounded-default">
+    <nav v-show="totalItems > 0" class="pagination-nav bg-lightTableBackground dark:bg-darkTableBackground py-3 flex flex-col gap-2 items-center sm:flex-row justify-center sm:justify-between px-4 mt-4 rounded-default">
       <span class="text-sm font-normal text-center text-lightTablePaginationText dark:text-darkTablePaginationText sm:mb-4 md:mb-0 block w-full md:inline md:w-auto">
         {{ $t('Showing') }}
         <span class="font-semibold text-lightTablePaginationNumeration dark:text-darkTablePaginationNumeration">{{ fromIndex }}</span>
