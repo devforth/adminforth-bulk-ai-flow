@@ -25,7 +25,7 @@
   "description": "Bulk AI workflow plugin for AdminForth for batch field generation and image processing",
   "devDependencies": {
     "@types/node": "latest",
-    "adminforth": "^2.71.0",
+    "adminforth": "^2.71.1",
     "semantic-release": "^24.2.1",
     "semantic-release-slack-bot": "^4.0.2",
     "typescript": "^5.7.3"
@@ -35,7 +35,7 @@
     "handlebars": "^4.7.8"
   },
   "peerDependencies": {
-    "adminforth": "^2.70.0"
+    "adminforth": "^2.71.1"
   },
   "release": {
     "plugins": [
