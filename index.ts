@@ -13,6 +13,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   totalCalls: number;
   totalDuration: number;
   rateLimiters: Record<string, RateLimiter> = {};
+  sessionIds: Set<string> = new Set();
 
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
@@ -21,6 +22,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     // for calculating average time
     this.totalCalls = 0;
     this.totalDuration = 0;
+
+    // for rate limiting
+    this.sessionIds = new Set();
   }
 
   // Compile Handlebars templates in outputFields using record fields as context
@@ -970,7 +974,19 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
       handler: async ({ body, adminUser, headers }) => {
-        const { actionType, recordId, customPrompt, filterFilledFields } = body;
+        const { actionType, recordId, customPrompt, filterFilledFields, sessionIds } = body;
+        if (this.options.rateLimits) {
+          if (sessionIds && sessionIds.length > 0) {
+            for (const sessionId of sessionIds) {
+              if (!this.sessionIds.has(sessionId)) {
+                return { ok: false, error: "Invalid session id" };
+              }
+              this.sessionIds.delete(sessionId);
+            }
+          } else {
+            return { ok: false, error: "Missing session ids" };
+          }
+        }
         const jobId = randomUUID();
         jobs.set(jobId, { status: "in_progress" });
         if (!actionType) {
@@ -1056,6 +1072,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/update-rate-limits`,
       handler: async ({ body, adminUser, headers }) => {
         const actionType = body.actionType;
+        const sessionId = randomUUID();
+        this.sessionIds.add(sessionId);
         if (actionType === 'analyze' && this.options.rateLimits?.fillFieldsFromImages) {
           if (await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
             return {ok: false, error: "Rate limit exceeded for image analyze" };
@@ -1071,8 +1089,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             return {ok: false, error: "Rate limit exceeded for image generation" };
           }
         }
-
-        return { ok: true };
+        setTimeout(() => this.sessionIds.delete(sessionId), 300_000);
+        return { ok: true, sessionId };
       }
     });
 

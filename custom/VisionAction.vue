@@ -482,7 +482,7 @@ const generationModeButtons = computed(() => {
   return arrayToReturn;
 });
 
-async function regenerateRecord({ recordId }) {
+async function regenerateRecord({ recordId }: { recordId: string }) {
 
   const promises = [];
 
@@ -610,7 +610,8 @@ async function getListOfIds() {
  
 
 async function runAiActions() {
-  if (!await checkRateLimits()) {
+  const { ok, sessionIds } = await checkRateLimits();
+  if (!ok || !sessionIds) {
     confirmDialog.value.close();
     return;
   }
@@ -625,7 +626,7 @@ async function runAiActions() {
   tableRef.value?.refresh();
   const limit = pLimit(props.meta.concurrencyLimit || 10);
   const tasks = recordIds.value
-    .map(id => limit(() => processOneRecord(String(id))));
+    .map(id => limit(() => processOneRecord(String(id), sessionIds)));
   await Promise.all(tasks);
   showGenerationFailureSummary();
   isActiveGeneration.value = false;
@@ -825,7 +826,7 @@ function createEmptyRecord(recordId: string | number): RecordState {
   };
 }
 
-async function processOneRecord(recordId: string) {
+async function processOneRecord(recordId: string, sessionIds: string[]) {
   if (!checkIfDialogOpen()) {
     return;
   }
@@ -898,7 +899,7 @@ async function processOneRecord(recordId: string) {
     actions.push('analyze_no_images');
   }
 
-  const results = await Promise.allSettled(actions.map(actionType => runActionForRecord(record, actionType)));
+  const results = await Promise.allSettled(actions.map(actionType => runActionForRecord(record, actionType, sessionIds)));
   if (!checkIfDialogOpen()) {
     return;
   }
@@ -908,17 +909,22 @@ async function processOneRecord(recordId: string) {
   touchRecords();
 }
 
-async function checkRateLimits() {
+async function checkRateLimits(actions?: GenerationAction[]): Promise<{ ok: boolean; sessionIds?: string[] }> {
+  let sessionIds: string[] = [];
   isCheckingRateLimits.value = true;
   const actionsToCheck: GenerationAction[] = [];
-  if (props.meta.isImageGeneration) {
-    actionsToCheck.push('generate_images');
-  }
-  if (props.meta.isFieldsForAnalizeFromImages) {
-    actionsToCheck.push('analyze');
-  }
-  if (props.meta.isFieldsForAnalizePlain) {
-    actionsToCheck.push('analyze_no_images');
+  if (actions) {
+    actionsToCheck.push(...actions);
+  } else {
+    if (props.meta.isImageGeneration) {
+      actionsToCheck.push('generate_images');
+    }
+    if (props.meta.isFieldsForAnalizeFromImages) {
+      actionsToCheck.push('analyze');
+    }
+    if (props.meta.isFieldsForAnalizePlain) {
+      actionsToCheck.push('analyze_no_images');
+    }
   }
   for (const actionType of actionsToCheck) {
     try {
@@ -933,8 +939,9 @@ async function checkRateLimits() {
           variant: 'danger',
           timeout: 'unlimited',
         });
-        return false;
+        return { ok: false };
       }
+      sessionIds.push(rateLimitRes.sessionId);
     } catch (e) {
       adminforth.alert({
         message: t(`Error checking rate limit for "${getActionLabel(actionType)}" action.`),
@@ -942,14 +949,14 @@ async function checkRateLimits() {
         timeout: 'unlimited',
       });
       isCheckingRateLimits.value = false;
-      return false;
+      return { ok: false };
     }
   }
   isCheckingRateLimits.value = false;
-  return true;
+  return { ok: true, sessionIds };
 }
 
-async function runActionForRecord(record: RecordState, actionType: GenerationAction, forceFilterFilledFields?: boolean) {
+async function runActionForRecord(record: RecordState, actionType: GenerationAction, sessionIds: string[], forceFilterFilledFields?: boolean) {
   if (!checkIfDialogOpen()) {
     return;
   }
@@ -982,6 +989,7 @@ async function runActionForRecord(record: RecordState, actionType: GenerationAct
         recordId: record.id,
         ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
         filterFilledFields: forceFilterFilledFields !== undefined ? forceFilterFilledFields: !overwriteExistingValues.value,
+        sessionIds
       },
       silentError: true,
     });
@@ -1438,6 +1446,10 @@ async function uploadImage(imgBlob, id, fieldName) {
 }
 
 async function regenerateImages({ recordId }: { recordId: any }) {
+  const {ok, sessionIds} = await checkRateLimits(['generate_images']);
+  if (!ok || !sessionIds) {
+    return;
+  }
   if (coreStore.isInternetError) {
     adminforth.alert({
       message: t('Cannot regenerate images while internet connection is lost. Please check your connection and try again.'),
@@ -1458,6 +1470,7 @@ async function regenerateImages({ recordId }: { recordId: any }) {
     await runActionForRecord(
       record,
       'generate_images',
+      sessionIds,
       false
     );
 
@@ -1616,6 +1629,12 @@ async function regenerateCell(recordInfo: any) {
     });
     return;
   }
+
+  const {ok, sessionIds} = await checkRateLimits(['analyze_no_images', 'analyze']);
+  if (!ok || !sessionIds) {
+    return;
+  }
+
   const record = recordsById.get(String(recordInfo.recordId));
   if (!record) {
     return;
@@ -1658,6 +1677,7 @@ async function regenerateCell(recordInfo: any) {
         action: actionType,
         actionType: "regenerate_cell",
         prompt: generationPromptsForField[recordInfo.fieldName] || null,
+        sessionIds
       },
       silentError: true,
     });
