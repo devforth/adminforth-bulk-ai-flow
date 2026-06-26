@@ -54,9 +54,10 @@
     <div
       class="bulk-vision-table flex flex-col gap-3 w-full"
       :class="{
-        'h-[830px]': popupMode === 'generation',
-        'h-auto max-h-[720px]': popupMode !== 'generation'
+        'h-[calc(100vh_-_200px)] max-h-[830px]': popupMode === 'generation',
+        'h-auto': popupMode !== 'generation'
       }"
+      :style="popupMode !== 'generation' ? { maxHeight: 'min(720px, calc(100vh - 200px))' } : {}"
     >
       <template v-if="recordsList.length && popupMode === 'generation'" >
         <div class="w-full min-w-[980px]">
@@ -113,7 +114,7 @@
             </div>
 
             <ProgressBar
-              class="progress-bar w-full"
+              class="w-full"
               :class="isGenerationPaused ? 'opacity-80' : ''"
               :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
               :max-value="100" 
@@ -567,6 +568,7 @@ const handleBeforeCancel = async () => {
       message: t('Are you sure you want to close without saving?'),
       yes: t('Yes'),
       no: t('Cancel'),
+      dangerous: true,
     });
 
     if (confirmed) {

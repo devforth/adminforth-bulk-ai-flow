@@ -142,14 +142,6 @@
                         @click="() => zoomImage(item.data?.[n])"
                         style="image-rendering: auto;"
                       />
-                      <p
-                        v-if="isImageHasPreviewUrl[n]"
-                        class="text-xs text-blue-500 hover:underline cursor-pointer transition-opacity"
-                        :class="{ 'opacity-0': !isHovered(item.id, n) }"
-                        @click="() => { item.openImageCompare[n] = true }"  
-                      >
-                        {{ $t('old image') }}
-                      </p>
                     </div>
                     <div v-else>
                       <div class="text-gray-400 dark:text-gray-500 flex flex-col items-center justify-center w-full h-[258px] bg-gray-50 dark:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-600">
@@ -342,6 +334,8 @@ function regenerateRecord(recordId: any) {
 }
 
 function canRegenerate(item: any): boolean {
+  if (item.status === 'processing') return false;
+  if (item.status === 'completed' || item.status === 'failed') return true;
   if (props.overwriteExistingValues) return true;
   for (const n of props.customFieldNames) {
     const val = item.data?.[n];
