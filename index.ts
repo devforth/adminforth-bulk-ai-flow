@@ -780,6 +780,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
       handler: async ( body ) => {
+        if (!Array.isArray(body.body?.record)) {
+          return { records: [] };
+        }
         let records = [];
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
         records = await this.adminforth.resource(this.resourceConfig.resourceId).list([Filters.IN(primaryKeyColumn.name, body.body.record)]);
