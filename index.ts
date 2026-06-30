@@ -1,4 +1,4 @@
-import { AdminForthFilterOperators, AdminForthPlugin, Filters } from "adminforth";
+import { AdminForthFilterOperators, AdminForthPlugin, parseBody, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource } from "adminforth";
 import { suggestIfTypo, filtersTools } from "adminforth";
 import type { PluginOptions } from './types.js';
@@ -828,28 +828,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return `${this.pluginOptions.actionName}`;
   }
 
-  private parseBody<T>(
-    schema: z.ZodType<T>,
-    body: unknown,
-    response: { setStatus: (code: number, message: string) => void },
-  ): { ok: true; data: T } | { ok: false; error: { error: string; details: unknown } } {
-    const parsed = schema.safeParse(body ?? {});
-    if (!parsed.success) {
-      response.setStatus(400, '');
-      return {
-        ok: false,
-        error: { error: 'Request body validation failed', details: parsed.error.issues },
-      };
-    }
-    return { ok: true, data: parsed.data };
-  }
-
   setupEndpoints(server: IHttpServer) {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
       handler: async ({ body, response }) => {
-        const parsed = this.parseBody(getRecordsBodySchema, body, response);
+        const parsed = parseBody(getRecordsBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         if (!Array.isArray(data.record)) {
@@ -877,7 +861,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_old_data`,
       handler: async ({ body, response }) => {
-        const parsed = this.parseBody(getOldDataBodySchema, body, response);
+        const parsed = parseBody(getOldDataBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const recordId = data.recordId;
@@ -900,7 +884,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
       handler: async ({ body, response }) => {
-        const parsed = this.parseBody(getImagesBodySchema, body, response);
+        const parsed = parseBody(getImagesBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         let images = [];
@@ -922,7 +906,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = this.parseBody(updateFieldsBodySchema, body, response);
+        const parsed = parseBody(updateFieldsBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         let isAllowedToSave: any = { ok: true, error: '' };
@@ -1032,7 +1016,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_image_generation_prompts`,
       handler: async ({ body, headers, response }) => {
-        const parsed = this.parseBody(getImageGenerationPromptsBodySchema, body, response);
+        const parsed = parseBody(getImageGenerationPromptsBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const Id = data.recordId || [];
@@ -1061,7 +1045,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = this.parseBody(createJobBodySchema, body, response);
+        const parsed = parseBody(createJobBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const { actionType, recordId, customPrompt, filterFilledFields, sessionIds } = data;
@@ -1123,7 +1107,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get-job-status`,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = this.parseBody(jobStatusBodySchema, body, response);
+        const parsed = parseBody(jobStatusBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const jobId = data.jobId;
@@ -1164,7 +1148,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update-rate-limits`,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = this.parseBody(updateRateLimitsBodySchema, body, response);
+        const parsed = parseBody(updateRateLimitsBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const actionType = data.actionType;
@@ -1195,7 +1179,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/compile_old_image_link`,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = this.parseBody(compileOldImageLinkBodySchema, body, response);
+        const parsed = parseBody(compileOldImageLinkBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const image = data.image;
@@ -1228,7 +1212,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_filtered_ids`,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
-        const parsed = this.parseBody(getFilteredIdsBodySchema, body, response);
+        const parsed = parseBody(getFilteredIdsBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const resource = this.resourceConfig;
