@@ -1,4 +1,4 @@
-import { AdminForthFilterOperators, AdminForthPlugin, parseBody, Filters } from "adminforth";
+import { AdminForthFilterOperators, AdminForthPlugin, Filters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource } from "adminforth";
 import { suggestIfTypo, filtersTools } from "adminforth";
 import type { PluginOptions } from './types.js';
@@ -32,7 +32,7 @@ const getImageGenerationPromptsBodySchema = z.object({
 
 const createJobBodySchema = z.object({
   actionType: z.string().nullish(),
-  recordId: z.any().optional(),
+  recordId: z.union([z.string(), z.number()]).nullish(),
   customPrompt: z.string().nullish(),
   filterFilledFields: z.boolean().nullish(),
   sessionIds: z.array(z.string()).nullish(),
@@ -163,7 +163,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return prompt;
   }
 
-  private async analyze_image(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async analyze_image(jobId: string, recordId: string | number, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.fillFieldsFromImages && await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -248,7 +248,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   }
 
-  private async analyzeNoImages(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async analyzeNoImages(jobId: string, recordId: string | number, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.fillPlainFields && await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -312,7 +312,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async initialImageGenerate(jobId: string, recordId: string, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async initialImageGenerate(jobId: string, recordId: string | number, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.generateImages && await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -424,7 +424,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
    
-  private async regenerateImage(jobId: string, recordId: string, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
+  private async regenerateImage(jobId: string, recordId: string | number, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
     const Id = recordId;
     let isError = false;
     // TODO: need to do correct check of rate limit
@@ -832,10 +832,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_records`,
+      request_schema: getRecordsBodySchema,
       handler: async ({ body, response }) => {
-        const parsed = parseBody(getRecordsBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof getRecordsBodySchema>;
         if (!Array.isArray(data.record)) {
           return { records: [] };
         }
@@ -860,10 +859,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_old_data`,
+      request_schema: getOldDataBodySchema,
       handler: async ({ body, response }) => {
-        const parsed = parseBody(getOldDataBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof getOldDataBodySchema>;
         const recordId = data.recordId;
         if (recordId === undefined || recordId === null) {
           return { ok: false, error: "Missing recordId" };
@@ -883,10 +881,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
+      request_schema: getImagesBodySchema,
       handler: async ({ body, response }) => {
-        const parsed = parseBody(getImagesBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof getImagesBodySchema>;
         let images = [];
         if(data.record){
           for( const record of data.record ) {
@@ -905,10 +902,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
+      request_schema: updateFieldsBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = parseBody(updateFieldsBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof updateFieldsBodySchema>;
         let isAllowedToSave: any = { ok: true, error: '' };
         if(this.options.isAllowedToSave) {
           isAllowedToSave = await this.options.isAllowedToSave({ record: {}, adminUser: adminUser, resource: this.resourceConfig });
@@ -1015,10 +1011,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_image_generation_prompts`,
+      request_schema: getImageGenerationPromptsBodySchema,
       handler: async ({ body, headers, response }) => {
-        const parsed = parseBody(getImageGenerationPromptsBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof getImageGenerationPromptsBodySchema>;
         const Id = data.recordId || [];
         const customPrompt = data.customPrompt || null;
         const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
@@ -1044,10 +1039,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
+      request_schema: createJobBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = parseBody(createJobBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof createJobBodySchema>;
         const { actionType, recordId, customPrompt, filterFilledFields, sessionIds } = data;
         if (this.options.rateLimits) {
           if (sessionIds && sessionIds.length > 0) {
@@ -1106,10 +1100,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get-job-status`,
+      request_schema: jobStatusBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = parseBody(jobStatusBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof jobStatusBodySchema>;
         const jobId = data.jobId;
         if (!jobId) {
           response.setStatus(400);
@@ -1147,10 +1140,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update-rate-limits`,
+      request_schema: updateRateLimitsBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = parseBody(updateRateLimitsBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof updateRateLimitsBodySchema>;
         const actionType = data.actionType;
         const sessionId = randomUUID();
         this.sessionIds.add(sessionId);
@@ -1178,10 +1170,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/compile_old_image_link`,
+      request_schema: compileOldImageLinkBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
-        const parsed = parseBody(compileOldImageLinkBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof compileOldImageLinkBodySchema>;
         const image = data.image;
         const columnName = data.columnName;
         if (!image) {
@@ -1211,10 +1202,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_filtered_ids`,
+      request_schema: getFilteredIdsBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
-        const parsed = parseBody(getFilteredIdsBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
         const resource = this.resourceConfig;
 
         for (const hook of resource.hooks?.list?.beforeDatasourceRequest || []) {
