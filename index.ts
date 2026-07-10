@@ -831,33 +831,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   setupEndpoints(server: IHttpServer) {
     server.endpoint({
       method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/get_records`,
-      request_schema: getRecordsBodySchema,
-      handler: async ({ body, response }) => {
-        const data = body as z.infer<typeof getRecordsBodySchema>;
-        if (!Array.isArray(data.record)) {
-          return { records: [] };
-        }
-        let records = [];
-        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        records = await this.adminforth.resource(this.resourceConfig.resourceId).list([Filters.IN(primaryKeyColumn.name, data.record)]);
-        for( const [index, record] of records.entries() ) {
-          records[index]._label = this.resourceConfig.recordLabel(records[index]);
-        }
-        const order = Object.fromEntries(data.record.map((id, i) => [id, i]));
-
-        const sortedRecords = records.sort(
-          (a, b) => order[a.id] - order[b.id]
-        );
-        return {
-          records: sortedRecords,
-        };
-      }
-    });
-
-
-    server.endpoint({
-      method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_old_data`,
       request_schema: getOldDataBodySchema,
       handler: async ({ body, response }) => {
