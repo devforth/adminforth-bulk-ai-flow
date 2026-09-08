@@ -601,7 +601,7 @@ async function getListOfIds() {
     if (!res?.ok || !res?.recordIds) {
       console.error('Failed to get records for filtered selector, response error:', res);
       isError.value = true;
-      errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+      errorMessage.value = res?.error || t(`Failed to fetch records. Please, try to re-run the action.`);
       return [];
     }
     return res.recordIds;
@@ -1168,9 +1168,14 @@ async function fetchImages(record: RecordState, oldRecord: Record<string, any>) 
       path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
       method: 'POST',
       body: {
-        record: [oldRecord],
+        recordIds: [oldRecord[primaryKey] ?? record.id],
       },
     });
+    if (res?.error) {
+      isError.value = true;
+      errorMessage.value = res.error;
+      return;
+    }
     record.images = res.images?.[0] || [];
     touchRecords();
   } catch (error) {
