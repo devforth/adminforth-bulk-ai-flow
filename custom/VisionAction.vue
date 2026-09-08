@@ -1168,9 +1168,14 @@ async function fetchImages(record: RecordState, oldRecord: Record<string, any>) 
       path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
       method: 'POST',
       body: {
-        record: [oldRecord],
+        recordIds: [oldRecord[primaryKey] ?? record.id],
       },
     });
+    if (res?.error) {
+      isError.value = true;
+      errorMessage.value = res.error;
+      return;
+    }
     record.images = res.images?.[0] || [];
     touchRecords();
   } catch (error) {

@@ -107,9 +107,9 @@ onMounted(async () => {
   for (const img of props.images || []) {
     images.value.push(img);
   }
-  const temp = await getGenerationPrompt() || '';
+  const temp = await getGenerationPrompt();
   attachmentFiles.value = props.sourceImage || [];
-  prompt.value = Object.keys(JSON.parse(temp))[0];
+  prompt.value = temp ? Object.keys(JSON.parse(temp))[0] : '';
   await nextTick();
 
   const currentIndex = props.carouselImageIndex || 0;
@@ -210,11 +210,12 @@ async function getGenerationPrompt() {
         customPrompt: JSON.stringify(json) || {},
       },
     });
-    if(!resp) {
+    if (!resp || resp.error) {
       emit('error', {
         isError: true,
-        errorMessage: "Error getting generation prompts."
-    });
+        errorMessage: resp?.error || "Error getting generation prompts."
+      });
+      return null;
     }
     return resp?.prompt || null;
   } catch (e) {
