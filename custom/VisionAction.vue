@@ -601,7 +601,7 @@ async function getListOfIds() {
     if (!res?.ok || !res?.recordIds) {
       console.error('Failed to get records for filtered selector, response error:', res);
       isError.value = true;
-      errorMessage.value = t(`Failed to fetch records. Please, try to re-run the action.`);
+      errorMessage.value = res?.error || t(`Failed to fetch records. Please, try to re-run the action.`);
       return [];
     }
     return res.recordIds;

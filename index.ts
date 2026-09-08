@@ -1,4 +1,4 @@
-import { AdminForthFilterOperators, AdminForthPlugin, Filters, interpretResource, ActionCheckSource, AllowedActionsEnum } from "adminforth";
+import { AdminForthFilterOperators, AdminForthPlugin, Filters, interpretResource, ActionCheckSource, AllowedActionsEnum, rejectApiRawFilters } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource, AdminUser } from "adminforth";
 import { suggestIfTypo, filtersTools } from "adminforth";
 import type { PluginOptions } from './types.js';
@@ -1323,6 +1323,24 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       request_schema: getFilteredIdsBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const resource = this.resourceConfig;
+
+        // before the permission rules and the hooks: they may add raw SQL server-side, the client must not
+        const rawFilterError = rejectApiRawFilters(body.filters);
+        if (rawFilterError) {
+          return rawFilterError;
+        }
+
+        const { allowedActions } = await interpretResource(
+          adminUser,
+          resource,
+          { requestBody: body, pk: undefined },
+          ActionCheckSource.ListRequest,
+          this.adminforth,
+        );
+        const listAllowed = allowedActions[AllowedActionsEnum.list] as boolean | string | undefined;
+        if (listAllowed !== true) {
+          return { error: typeof listAllowed === 'string' ? listAllowed : 'You are not allowed to list records in this resource' };
+        }
 
         for (const hook of resource.hooks?.list?.beforeDatasourceRequest || []) {
           const filterTools = filtersTools.get(body);
