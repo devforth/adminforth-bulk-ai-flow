@@ -1,5 +1,5 @@
-import { AdminForthFilterOperators, AdminForthPlugin, Filters, interpretResource, ActionCheckSource, AllowedActionsEnum } from "adminforth";
-import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource, AdminUser } from "adminforth";
+import { AdminForthFilterOperators, AdminForthPlugin, Filters, interpretResource, ActionCheckSource, AllowedActionsEnum, columnWriteError } from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource, AdminUser, ColumnAccessContext } from "adminforth";
 import { suggestIfTypo, filtersTools } from "adminforth";
 import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
@@ -58,32 +58,6 @@ const compileOldImageLinkBodySchema = z.object({
 const getFilteredIdsBodySchema = z.object({
   filters: z.any(),
 }).passthrough();
-
-type AccessCheckContext = {
-  adminUser: AdminUser;
-  resource: AdminForthResource;
-  meta: any;
-  source: ActionCheckSource;
-  adminforth: IAdminForth;
-};
-
-async function resolveBoolOrFn(val: any, ctx: AccessCheckContext): Promise<boolean> {
-  if (typeof val === 'function') {
-    return !!(await val(ctx));
-  }
-  return !!val;
-}
-
-async function isShownInEdit(column: AdminForthResource['columns'][number], ctx: AccessCheckContext): Promise<boolean> {
-  const showIn = (column.showIn as any) || {};
-  if (showIn.edit !== undefined) {
-    return await resolveBoolOrFn(showIn.edit, ctx);
-  }
-  if (showIn.all !== undefined) {
-    return await resolveBoolOrFn(showIn.all, ctx);
-  }
-  return true;
-}
 
 function valueIsUnchanged(newValue: any, oldValue: any): boolean {
   if (newValue === oldValue) {
@@ -888,7 +862,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     fields: Record<string, any>,
   }): Promise<string | null> {
     const meta = { requestBody, newRecord: fields, oldRecord, pk: recordId };
-    const ctx: AccessCheckContext = {
+    const ctx: ColumnAccessContext = {
       adminUser,
       resource: this.resourceConfig,
       meta,
@@ -924,14 +898,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       if (column.primaryKey) {
         return `Field "${fieldName}" cannot be modified as it is a primary key`;
       }
-      if (await resolveBoolOrFn(column.backendOnly, ctx)) {
-        return `Field "${fieldName}" cannot be modified as it is restricted from editing (backendOnly is true).`;
-      }
-      if (column.editReadonly) {
-        return `Field "${fieldName}" cannot be modified as it is restricted from editing (editReadonly is true).`;
-      }
-      if (!(await isShownInEdit(column, ctx)) && !column.allowModifyWhenNotShowInEdit) {
-        return `Field "${fieldName}" cannot be modified as it is restricted from editing (showIn.edit is false). If you need to allow updating this hidden field, set column.allowModifyWhenNotShowInEdit = true.`;
+      const writeError = await columnWriteError(column, 'edit', ctx);
+      if (writeError) {
+        return writeError;
       }
     }
 
