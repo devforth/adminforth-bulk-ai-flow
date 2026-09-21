@@ -884,7 +884,7 @@ async function processOneRecord(recordId: string, sessionIds: string[]) {
   record.label = oldDataResult._label || record.label;
   initializeRecordData(record, oldDataResult);
   if (props.meta.isAttachFiles) {
-    await fetchImages(record, oldDataResult);
+    await fetchImages(record, recordId);
     if (!checkIfDialogOpen()) {
       return;
     }
@@ -1162,16 +1162,14 @@ function normalizeEnumValue(key: string, value: any) {
   return match ? value : null;
 }
 
-async function fetchImages(record: RecordState, oldRecord: Record<string, any>) {
+async function fetchImages(record: RecordState, recordId: string) {
   try {
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/get_images`,
       method: 'POST',
-      body: {
-        record: [oldRecord],
-      },
+      body: { recordId },
     });
-    record.images = res.images?.[0] || [];
+    record.images = res.images || [];
     touchRecords();
   } catch (error) {
     console.error('Failed to get images:', error);
