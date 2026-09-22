@@ -123,22 +123,31 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     this.sessionIds = new Set();
   }
 
-  // Compile Handlebars templates in outputFields using record fields as context
+  /**
+   * Compiles Handlebars templates from `source`.
+   *
+   * `record` is the raw row and is always what `provideAdditionalContextForRecord` sees, but the
+   * templates themselves are rendered against `record` only when they come from `PluginOptions`:
+   * those are written by the app author and may reference any column. Templates which arrived in
+   * the request body are rendered against the record as the caller is allowed to read it, so a
+   * hand-written `{{column}}` cannot pull a backendOnly column out of the row.
+   */
   private async compileTemplates<T extends Record<string, any>>(
     source: T,
-    record: any,
+    { record, ctx, clientSupplied }: { record: any, ctx: AccessCheckContext, clientSupplied: boolean },
     valueSelector: (value: T[keyof T]) => string
   ): Promise<Record<string, string>> {
+    let templateContext = clientSupplied ? await this.stripBackendOnlyColumns(record, ctx) : record;
     if (this.options.provideAdditionalContextForRecord) {
-      const additionalFields = await this.options.provideAdditionalContextForRecord({ record, adminUser: null, resource: this.resourceConfig });
-      record = { ...record, ...additionalFields };
+      const additionalFields = await this.options.provideAdditionalContextForRecord({ record, adminUser: ctx.adminUser, resource: this.resourceConfig });
+      templateContext = { ...templateContext, ...additionalFields };
     }
     const compiled: Record<string, string> = {};
     for (const [key, value] of Object.entries(source)) {
       const templateStr = valueSelector(value);
       try {
         const tpl = Handlebars.compile(templateStr);
-        compiled[key] = tpl(record);
+        compiled[key] = tpl(templateContext);
       } catch {
         compiled[key] = templateStr;
       }
@@ -146,16 +155,16 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
-  private async compileOutputFieldsTemplates(record: any, customPrompt? : string) {
-    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) :this.options.fillFieldsFromImages, record, v => String(v));
+  private async compileOutputFieldsTemplates(record: any, ctx: AccessCheckContext, customPrompt? : string, clientSupplied: boolean = !!customPrompt) {
+    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) :this.options.fillFieldsFromImages, { record, ctx, clientSupplied }, v => String(v));
   }
 
-  private async compileOutputFieldsTemplatesNoImage(record: any, customPrompt? : string) {
-    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.fillPlainFields, record, v => String(v));
+  private async compileOutputFieldsTemplatesNoImage(record: any, ctx: AccessCheckContext, customPrompt? : string, clientSupplied: boolean = !!customPrompt) {
+    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.fillPlainFields, { record, ctx, clientSupplied }, v => String(v));
   }
 
-  private async compileGenerationFieldTemplates(record: any, customPrompt? : string) {
-    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.generateImages, record, v => String(customPrompt ? v : v.prompt));
+  private async compileGenerationFieldTemplates(record: any, ctx: AccessCheckContext, customPrompt? : string, clientSupplied: boolean = !!customPrompt) {
+    return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.generateImages, { record, ctx, clientSupplied }, v => String(customPrompt ? v : v.prompt));
   }
 
   private removeFromPromptFilledFields(compiledOutputFields: Record<string, string>, record: Record<string, any>): Record<string, string> {
@@ -206,17 +215,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return prompt;
   }
 
-  private async analyze_image(jobId: string, recordId: string | number, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async analyze_image(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.fillFieldsFromImages && await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
     //   return { error: "Rate limit exceeded" };
     // }
-    const selectedId = recordId;
     let isError = false;
-    // Fetch the record using the provided ID
-    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(primaryKeyColumn.name, selectedId)] );
 
     //recieve image URLs to analyze
     const attachmentFiles = await this.options.attachFiles({ record: record });
@@ -241,7 +246,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { ok: false, error: 'One of the image URLs is not valid' };
       }
       //create prompt for OpenAI
-      const compiledOutputFields = await this.compileOutputFieldsTemplates(record, customPrompt);
+      const compiledOutputFields = await this.compileOutputFieldsTemplates(record, ctx, customPrompt);
       const filteredCompiledOutputFields = filterFilledFields ? this.removeFromPromptFilledFields(compiledOutputFields, record) : compiledOutputFields;
       
       if (Object.keys(filteredCompiledOutputFields).length === 0) {
@@ -291,13 +296,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   }
 
-  private async analyzeNoImages(jobId: string, recordId: string | number, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async analyzeNoImages(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.fillPlainFields && await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
     //   return { error: "Rate limit exceeded" };
     // }
-    const selectedId = recordId;
     let isError = false;
     if (STUB_MODE) {
       const fakeError = Math.random() < 0.005; // 0.05% chance of error
@@ -310,10 +314,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { ok: true };
       }
     } else {
-      const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-      const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, selectedId)] );
-
-      const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, customPrompt);
+      const compiledOutputFields = await this.compileOutputFieldsTemplatesNoImage(record, ctx, customPrompt);
 
       const filteredCompiledOutputFields = filterFilledFields ? this.removeFromPromptFilledFields(compiledOutputFields, record) : compiledOutputFields;
 
@@ -355,16 +356,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async initialImageGenerate(jobId: string, recordId: string | number, adminUser: any, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async initialImageGenerate(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.generateImages && await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
     //   return { error: "Rate limit exceeded" };
     // }
-    const selectedId = recordId;
     let isError = false;
     const start = +new Date();
-    const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, selectedId)]);
     let attachmentFiles
     if(!this.options.attachFiles){
       attachmentFiles = [];
@@ -395,7 +394,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           } 
         };
       }
-      const prompt = (await this.compileGenerationFieldTemplates(record, customPrompt))[key];
+      const prompt = (await this.compileGenerationFieldTemplates(record, ctx, customPrompt))[key];
       let images;
         if (this.options.attachFiles && attachmentFiles.length === 0) {
           isError = true;
@@ -467,8 +466,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
    
-  private async regenerateImage(jobId: string, recordId: string | number, fieldName: string, prompt: string, adminUser: any, headers: Record<string, string | string[] | undefined>) {
-    const Id = recordId;
+  private async regenerateImage(jobId: string, record: any, fieldName: string, prompt: string, headers: Record<string, string | string[] | undefined>) {
     let isError = false;
     // TODO: need to do correct check of rate limit
     // if (await this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
@@ -476,7 +474,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     //   return { error: "Rate limit exceeded" };
     // }
     const start = +new Date();
-    const record = await this.adminforth.resource(this.resourceConfig.resourceId).get([Filters.EQ(this.resourceConfig.columns.find(c => c.primaryKey)?.name, Id)]);
     let attachmentFiles
       if(!this.options.attachFiles){
         attachmentFiles = [];
@@ -536,11 +533,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async regenerateCell(jobId, fieldToRegenerate, recordId, actionType, prompt) {
-    if (!fieldToRegenerate || !recordId || !actionType ) {
+  private async regenerateCell(jobId, fieldToRegenerate, record: any, ctx: AccessCheckContext, actionType, prompt) {
+    if (!fieldToRegenerate || !actionType ) {
       jobs.set(jobId, { status: 'failed', error: 'Missing parameters' });
       //return { ok: false, error: "Missing parameters" };
     }
+    // a prompt which arrived in the request body is client-authored even though it is wrapped into
+    // `promptToPass` below, while the PluginOptions fallback is written by the app author
+    const clientSupplied = !!prompt;
     if ( !prompt ) {
       if (actionType === 'analyze') {
         prompt = this.options.fillFieldsFromImages ? (this.options.fillFieldsFromImages as any)[fieldToRegenerate] : null;
@@ -548,9 +548,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         prompt = this.options.fillPlainFields ? (this.options.fillPlainFields as any)[fieldToRegenerate] : null;
       }
     }
-    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    const record = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, recordId)] );
-
     let promptToPass = JSON.stringify({[fieldToRegenerate]: prompt});
     if (STUB_MODE) {
       await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 20000) + 1000));
@@ -558,7 +555,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       jobs.set(jobId, { status: 'completed', result: {[fieldToRegenerate]: "stub value"} });
     } else {
       if ( actionType === 'analyze') {
-        const compiledPropmt = await this.compileOutputFieldsTemplates(record, promptToPass);
+        const compiledPropmt = await this.compileOutputFieldsTemplates(record, ctx, promptToPass, clientSupplied);
         const finalPrompt = this.getPromptForImageAnalysis(compiledPropmt);
         const attachmentFiles = await this.options.attachFiles({ record: record });
         if (attachmentFiles.length === 0) {
@@ -595,7 +592,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         jobs.set(jobId, { status: 'completed', result: resData });
 
       } else if ( actionType === 'analyze_no_images') {
-        const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, promptToPass);
+        const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, ctx, promptToPass, clientSupplied);
         const finalPrompt = this.getPromptForPlainFields(compiledPropmt);
         const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
         let resp;
@@ -1039,6 +1036,22 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return scoped;
   }
 
+  /**
+   * The row as the caller is allowed to read it: columns which are not declared on the resource and
+   * columns whose `backendOnly` resolves true for this request are dropped, exactly the way the
+   * core show route drops them before a row reaches the browser.
+   */
+  private async stripBackendOnlyColumns(record: any, ctx: AccessCheckContext): Promise<Record<string, any>> {
+    const visible: Record<string, any> = {};
+    for (const column of this.resourceConfig.columns) {
+      if (await resolveBoolOrFn(column.backendOnly, ctx)) {
+        continue;
+      }
+      visible[column.name] = record[column.name];
+    }
+    return visible;
+  }
+
   setupEndpoints(server: IHttpServer) {
     server.endpoint({
       method: 'POST',
@@ -1225,7 +1238,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
         const data = body as z.infer<typeof getImageGenerationPromptsBodySchema>;
         const customPrompt = data.customPrompt || null;
-        const { record, error } = await this.getRecordForShow({
+        const { record, ctx, error } = await this.getRecordForShow({
           adminUser,
           recordId: data.recordId,
           extra: { body, query, headers, cookies, requestUrl },
@@ -1233,7 +1246,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         if (error) {
           return { ok: false, error };
         }
-        const compiledGenerationOptions = await this.compileGenerationFieldTemplates(record, JSON.stringify({"prompt": customPrompt}));
+        const compiledGenerationOptions = await this.compileGenerationFieldTemplates(record, ctx, JSON.stringify({"prompt": customPrompt}));
         return compiledGenerationOptions;
       }
     });
@@ -1256,7 +1269,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
       request_schema: createJobBodySchema,
-      handler: async ({ body, adminUser, headers, response }) => {
+      handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof createJobBodySchema>;
         const { actionType, recordId, customPrompt, filterFilledFields, sessionIds } = data;
         if (this.options.rateLimits) {
@@ -1271,40 +1284,47 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             return { ok: false, error: "Missing session ids" };
           }
         }
+        if (!actionType) {
+          return { ok: false, error: "Missing action type" };
+        }
+        if (!recordId && typeof recordId !== 'number') {
+          return { ok: false, error: "Missing record id" };
+        }
+        // every worker below compiles this record into an AI prompt whose answer is handed back
+        // through get-job-status, so the record is read here, behind the same show check and
+        // row-level scoping the other read endpoints use, and the row itself is what gets dispatched
+        const { record, ctx, error } = await this.getRecordForShow({
+          adminUser,
+          recordId,
+          extra: { body, query, headers, cookies, requestUrl },
+        });
+        if (error) {
+          return { ok: false, error };
+        }
         const jobId = randomUUID();
         jobs.set(jobId, { status: "in_progress" });
-        if (!actionType) {
-          jobs.set(jobId, { status: "failed", error: "Missing action type" });
-          //return { error: "Missing action type" };
-        }
-        else if (!recordId && typeof recordId !== 'number') {
-          jobs.set(jobId, { status: "failed", error: "Missing record id" });
-          //return { error: "Missing record id" };
-        } else {
-          switch(actionType) {
-            case 'generate_images':
-              this.initialImageGenerate(jobId, recordId, adminUser, headers, customPrompt, filterFilledFields);
-            break;
-            case 'analyze_no_images':
-              this.analyzeNoImages(jobId, recordId, adminUser, headers, customPrompt, filterFilledFields);
-            break;
-            case 'analyze':
-              this.analyze_image(jobId, recordId, adminUser, headers, customPrompt, filterFilledFields);
-            break;
-            case 'regenerate_images':
-              if (!data.prompt || !data.fieldName) {
-                jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
-                break;
-              }
-              this.regenerateImage(jobId, recordId, data.fieldName, data.prompt, adminUser, headers);
-            break;
-            case 'regenerate_cell':
-              const fieldToRegenerate = data.fieldToRegenerate;
-              this.regenerateCell(jobId, fieldToRegenerate, recordId, data.action, data.prompt);
-            break;
-            default:
-              jobs.set(jobId, { status: "failed", error: "Unknown action type" });
-          } 
+        switch(actionType) {
+          case 'generate_images':
+            this.initialImageGenerate(jobId, record, ctx, headers, customPrompt, filterFilledFields);
+          break;
+          case 'analyze_no_images':
+            this.analyzeNoImages(jobId, record, ctx, headers, customPrompt, filterFilledFields);
+          break;
+          case 'analyze':
+            this.analyze_image(jobId, record, ctx, headers, customPrompt, filterFilledFields);
+          break;
+          case 'regenerate_images':
+            if (!data.prompt || !data.fieldName) {
+              jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
+              break;
+            }
+            this.regenerateImage(jobId, record, data.fieldName, data.prompt, headers);
+          break;
+          case 'regenerate_cell':
+            this.regenerateCell(jobId, data.fieldToRegenerate, record, ctx, data.action, data.prompt);
+          break;
+          default:
+            jobs.set(jobId, { status: "failed", error: "Unknown action type" });
         }
         setTimeout(() => jobs.delete(jobId), 1_800_000);
         setTimeout(() => jobs.set(jobId, { status: "failed", error: "Job timed out" }), 180_000);
