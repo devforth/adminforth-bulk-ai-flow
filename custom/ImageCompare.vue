@@ -1,6 +1,6 @@
 <template>
   <!-- Popup Overlay -->
-  <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50" @click.self="closePopup">
+  <div class="fixed inset-0 z-40 flex items-center justify-center bg-lightScrim dark:bg-darkScrim" @click.self="closePopup">
     <div class="image-compare-container shadow-sm p-4 border-white dark:border-black max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg bg-white dark:bg-gray-800">
       <!-- Close Button -->
       <div class="flex justify-end mb-4">
