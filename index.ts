@@ -1,6 +1,6 @@
 import { AdminForthFilterOperators, AdminForthPlugin, Filters, interpretResource, ActionCheckSource, AllowedActionsEnum } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource, AdminUser } from "adminforth";
-import { suggestIfTypo, filtersTools } from "adminforth";
+import { suggestIfTypo, filtersTools, rejectApiRawFilters } from "adminforth";
 import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
@@ -1452,6 +1452,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const listAllowed = allowedActions[AllowedActionsEnum.list] as boolean | string | undefined;
         if (listAllowed !== true) {
           return { ok: false, error: typeof listAllowed === 'string' ? listAllowed : 'You are not allowed to list records in this resource' };
+        }
+        const rawFilterError = rejectApiRawFilters(body.filters);
+        if (rawFilterError) {
+          return rawFilterError;
         }
 
         for (const hook of resource.hooks?.list?.beforeDatasourceRequest || []) {
