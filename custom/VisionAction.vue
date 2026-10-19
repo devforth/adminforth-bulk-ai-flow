@@ -13,13 +13,12 @@
     :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
       : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
         : 'lg:w-[500px] !lg:max-w-[500px]'"
-    :closable="true"
     :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
           {
             label: t('Cancel'),
             options: {
               class: 'afcl-button w-1/6',
-              mode: 'secondary'
+              variant: 'secondary'
             },
             onclick: () => { popupMode = 'confirmation'; }
           },
@@ -36,7 +35,7 @@
               label: t('Cancel'),
               options: {
                 class: 'afcl-button w-1/2',
-                mode: 'secondary'
+                variant: 'secondary'
               },
               onclick: (dialog) => confirmDialog.tryToHideModal()
             },
@@ -49,7 +48,7 @@
               onclick: async () => { await runAiActions(); }
             }
           ]"
-    :click-to-close-outside="false"
+    :close-by-click-outside="false"
   >
     <div
       class="bulk-vision-table flex flex-col gap-3 w-full"
@@ -463,7 +462,7 @@ const generationModeButtons = computed(() => {
       label: t('Cancel'), 
       options: {
         class: 'afcl-button w-1/6',
-        mode: 'secondary'
+        variant: 'secondary'
       }, 
       onclick: async (dialog) => { await dialog.hide(true); } 
     },

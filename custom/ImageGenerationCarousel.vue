@@ -3,11 +3,10 @@
   <Dialog
     ref="dialogRef"
     :header="$t('Generate image with AI')"
-    :closable="true"
     class="w-full lg:w-[1100px]"
     :beforeCancelFunction="async () => { emit('close'); return true; }"
     :buttons="dialogButtons"
-    :click-to-close-outside="false"
+    :close-by-click-outside="false"
   >
     <div class="flex flex-col gap-4">
       <Textarea
@@ -131,7 +130,7 @@ const dialogButtons = computed(() => [
     label: t('Cancel'),
     options: {
       class: 'afcl-button',
-      mode: 'secondary',
+      variant: 'secondary',
     },
     onclick: () => emit('close'),
   },
