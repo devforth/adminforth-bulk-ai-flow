@@ -1,333 +1,85 @@
 <template>
-  <div class="flex items-end justify-start gap-2 cursor-pointer">
-    <div class="flex items-center justify-center text-white bg-gradient-to-r h-[18px] from-lightPrimary via-lightPrimary/90 to-lightPrimary/80 hover:opacity-90 focus:ring-4 focus:outline-none focus:ring-lightPrimary/30 dark:focus:ring-darkPrimary/30 font-medium rounded-md text-sm px-1 text-center dark:bg-none dark:bg-darkPrimary/10 dark:text-darkPrimary dark:brightness-200">
-      {{t('AI')}}
-    </div>
-    <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">{{ props.meta.actionName }}</p>
-  </div>
+  <span class="flex items-center gap-2">
+    <IconSparkles class="w-4 h-4 shrink-0 text-lightInputIconColor dark:text-darkInputIconColor" aria-hidden="true" />
+    <span class="truncate">{{ props.meta.actionName }}</span>
+  </span>
   <Dialog
     ref="confirmDialog"
-    :header="t('Bulk AI Generation')"
-    class="[scrollbar-gutter:stable] max-w-full h-fit"
+    :header="props.meta.actionName"
+    class="w-11/12"
+    :class="popupMode === 'generation' ? 'max-w-6xl' : 'max-w-2xl'"
+    :buttons="popupMode === 'generation' ? generationModeButtons : confirmationModeButtons"
     :beforeCancelFunction="handleBeforeCancel"
-    :class="popupMode === 'generation' ? 'lg:w-auto !lg:max-w-[1600px]' 
-      : popupMode === 'settings' ? 'lg:w-[1000px] !lg:max-w-[1000px]' 
-        : 'lg:w-[500px] !lg:max-w-[500px]'"
-    :buttons="popupMode === 'generation' ? generationModeButtons : popupMode === 'settings' ? [
-          {
-            label: t('Cancel'),
-            options: {
-              class: 'afcl-button w-1/6',
-              variant: 'secondary'
-            },
-            onclick: () => { popupMode = 'confirmation'; }
-          },
-          {
-            label: t('Save settings'),
-            options: {
-              class: 'afcl-button w-1/6',
-            },
-            onclick: (dialog) => { saveSettings(); }
-          },
-        ] : 
-          [
-            {
-              label: t('Cancel'),
-              options: {
-                class: 'afcl-button w-1/2',
-                variant: 'secondary'
-              },
-              onclick: (dialog) => confirmDialog.tryToHideModal()
-            },
-            {
-              label: t('Start generation'),
-              options: {
-                class: 'afcl-button w-1/2',
-                loader: isCheckingRateLimits
-              },
-              onclick: async () => { await runAiActions(); }
-            }
-          ]"
-    :close-by-click-outside="false"
+    :closeByClickOutside="false"
+    :closeByEsc="!zoomedImage"
   >
-    <div
-      class="bulk-vision-table flex flex-col gap-3 w-full"
-      :class="{
-        'h-[calc(100vh_-_200px)] max-h-[830px]': popupMode === 'generation',
-        'h-auto': popupMode !== 'generation'
-      }"
-      :style="popupMode !== 'generation' ? { maxHeight: 'min(720px, calc(100vh - 200px))' } : {}"
-    >
-      <template v-if="recordsList.length && popupMode === 'generation'" >
-        <div class="w-full min-w-[980px]">
-          <div v-if="isGenerationPaused" class="flex flex-col gap-2 mb-2">
-            <p class="text-sm font-semibold text-yellow-800">{{ t(`Generated ${startedRecordCount} records. `) + t('Generation on pause. Resume generation?') }}</p>
-            <div class="flex items-center gap-2">
-              <button
-                class="h-8 px-3 py-1.5 text-sm rounded-md bg-gradient-to-r from-lightPrimary to-lightPrimary/80 text-white border-none ml-2"
-                @click="resumeGeneration"
-              >
-                {{ t('Resume generation') }}
-              </button>
-              <button
-                class="h-8 px-3 py-1.5 text-sm rounded-md bg-white hover:bg-gray-100 text-gray-900 border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 dark:border-gray-600"
-                @click="cancelGeneration"
-              >
-                {{ t('Cancel generation') }}
-              </button>
-            </div>
-          </div>
-
-          <div class="generation-progress-panel w-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 p-5 m-1 rounded-2xl shadow-sm flex flex-col gap-4">
-            <div class="generation-status-header flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div 
-                  class="p-2 rounded-xl shrink-0"
-                  :class="generationStatusClass"
-                >
-                  <IconShieldCheckOutline v-if="displayedProcessedCount === totalRecords" class="w-5 h-5" />
-                  <IconRefreshOutline v-else :class="isProcessingAny ? 'animate-spin' : ''" class="w-5 h-5" />
-                </div>
-                
-                <div>
-                  <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 tracking-tight">
-                    {{ displayedProcessedCount }} {{ t('of') }} {{ totalRecords }} {{ t('fields ready to save') }}
-                  </h4>
-                </div>
-              </div>
-
-              <span
-                class="px-2.5 py-1 text-xs rounded-default border flex items-center gap-1.5"
-                :class="generationStatusClass"
-              >
-                <span 
-                  class="w-1.5 h-1.5 rounded-full"
-                  :class="isGenerationPaused ? 'bg-yellow-500' : displayedProcessedCount === totalRecords ? 'bg-green-500' : 'bg-blue-500'"
-                ></span>
-                {{ 
-                  isGenerationPaused ? t('On pause') 
-                  : displayedProcessedCount === totalRecords ? t('Ready') 
-                  : t('Processing') 
-                }}
-              </span>
-            </div>
-
-            <ProgressBar
-              class="w-full"
-              :class="isGenerationPaused ? 'opacity-80' : ''"
-              :current-value="Math.floor((displayedProcessedCount / totalRecords) * 100)" 
-              :max-value="100" 
-              :min-value="0"
-              :showAnimation="isProcessingAny && !isGenerationPaused"
-              :showLabels="false"
-              :showValues="false"
-              :show-progress="false"
-            />
-
-          </div>
-        </div>
-
-
-        <VisionTable
-          class="w-full flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent_0px,black_20px)]"
-          ref="tableRef"
+    <GenerationSetup
+      v-if="popupMode === 'confirmation'"
+      v-model:prompts="generationPrompts"
+      v-model:overwrite="overwriteExistingValues"
+      :meta="props.meta"
+      :defaultPrompts="defaultPrompts"
+      :savedPrompts="savedPrompts"
+      @save="savePrompt"
+    />
+    <div v-else class="bulk-vision-table flex flex-col gap-3">
+      <template v-if="recordsList.length">
+        <ReviewQueue
           :records="recordsList"
           :meta="props.meta"
-          :tableHeaders="tableHeaders"
-          :customFieldNames="customFieldNames"
-          :isError="isError"
-          :errorMessage="errorMessage"
-          :regenerateImagesRefreshRate="props.meta.refreshRates?.regenerateImages"
-          :isImageHasPreviewUrl="isImageHasPreviewUrl"
-          :imageGenerationPrompts="generationPrompts.generateImages"
-          :outputImageFields="props.meta.outputImageFields"
-          :outputFieldsForAnalizeFromImages="props.meta.outputFieldsForAnalizeFromImages"
-          :outputPlainFields="props.meta.outputPlainFields"
-          :overwriteExistingValues="overwriteExistingValues"
-          @error="handleTableError"
-          @regenerate-images="regenerateImages"
-          @regenerate-record="regenerateRecord"
+          :processed="displayedProcessedCount"
+          :total="totalRecords"
+          :isProcessing="isProcessingAny"
+          :isPaused="isGenerationPaused"
+          @regenerateRecord="regenerateRecord"
+          @regenerateImages="regenerateImages"
+          @regenerateCell="regenerateCell"
+          @zoom="(url) => zoomedImage = url"
+          @stop="cancelGeneration"
+          @resume="resumeGeneration"
         />
-        <div class="mt-2 flex items-center text-lightPrimary dark:text-darkPrimary bg-lightPrimary/10 dark:bg-darkPrimary/10 px-4 py-3 rounded-default border border-lightPrimary/20 dark:border-darkPrimary/20 text-sm">
-          <IconInfoCircleSolid class="w-5 h-5 me-2 shrink-0 text-lightPrimary dark:text-darkPrimary dark:brightness-200" />
-          <p class="text-lightPrimary dark:text-darkPrimary dark:brightness-200">
-            <span class="font-semibold text-lightPrimary dark:text-darkPrimary dark:brightness-200">{{ t('Only checked fields will be saved.') }}</span> 
-            {{ t('You can regenerate fields before saving if needed.') }}
-          </p>
-        </div>
-        <div class="af-error-message flex items-center w-full text-red-600">
-          <p v-if="isError === true">{{ errorMessage }}</p>
-        </div>
+        <p class="flex items-start gap-2 text-xs text-lightInputIconColor dark:text-darkInputIconColor">
+          <IconInfo class="mt-px w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          {{ t('Only checked records are saved. You can edit or regenerate values before saving.') }}
+        </p>
       </template>
-      <template v-else-if="!recordsList.length && popupMode === 'generation'">
-        <p>{{ t('No data to save. Feel free to click "Cancel"') }}</p>
-      </template>
-      <div v-else-if="popupMode === 'settings'" class="af-settings-panel w-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 max-h-[70vh]">
-        <template v-for="(promptsCategory, key) in generationPrompts" :key="key">
-        <div v-if="Object.keys(promptsCategory).length > 0" class="w-full flex flex-col">
-          <div class="flex items-start gap-3.5 mb-6">
-            
-            <div class="flex-1 min-w-0">
-              <h3 class="text-base font-bold text-gray-900 dark:text-white tracking-tight">
-                {{
-                 key === "plainFieldsPrompts" ? t("Prompts for non-image fields") 
-                  : key === "generateImages" ? t("Prompts for image fields") 
-                    : t("Prompts for image analysis")
-                }}
-              </h3>
-              <p class="text-xs text-gray-400 mt-0.5">
-                {{ 
-                  key === "plainFieldsPrompts" ? t("Define how AI should generate content for text-based fields.") 
-                  : key === "generateImages" ? t("Configure prompt rules for generating media and images.") 
-                    : t("Instructions for extracting text specifications from images.")
-                }}
-              </p>
-            </div>
-          </div>
-
-          <div class="grid gap-6" :class="Object.keys(promptsCategory).length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'">
-            <div 
-              v-for="(prompt, promptKey) in promptsCategory" 
-              :key="promptKey" 
-              class="
-              flex flex-col bg-white dark:bg-gray-900 border border-gray-200/80 p-5 rounded-default shadow-sm transition-all duration-200
-              hover:shadow-md hover:border-gray-300
-              dark:border-gray-800
-              dark:hover:border-gray-700"
-            >
-              <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-3">
-                  <div class="p-2 bg-lightPrimary/10 text-lightPrimary rounded-lg shrink-0
-                    dark:bg-darkPrimary/20
-                    dark:text-darkPrimary ">
-                    <IconImageSolid 
-                      v-if="key === 'generateImages'" 
-                      class="w-5 h-5 dark:brightness-200" 
-                    />
-                    <IconFileLinesOutline 
-                      v-else 
-                      class="w-5 h-5 dark:brightness-200" 
-                    />
-                  </div>
-                  <div>
-                    <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 capitalize tracking-tight">
-                      {{ formatLabel(promptKey) }}
-                    </h4>
-                    <p class="text-[11px] text-gray-400 dark:text-gray-500">
-                      {{ key === 'generateImages' ? t('Generate source media') : t('Generate a detailed content') }}
-                    </p>
-                  </div>
-                </div>
-
-                <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-md bg-lightPrimary/10 text-lightPrimary dark:bg-darkPrimary/10 dark:text-darkPrimary dark:brightness-200">
-                  {{ key === 'generateImages' ? t('Image field') : t('Text field') }}
-                </span>
-              </div>
-
-              <div class="relative flex-1">
-                <Textarea 
-                  v-model="generationPrompts[key][promptKey]" 
-                  class="w-full h-56 p-3.5 text-sm leading-relaxed border border-gray-200 bg-gray-50/30 text-gray-800 shadow-sm resize-none font-sans
-                  dark:border-gray-700  
-                  dark:bg-gray-800/40  
-                  dark:text-gray-100 rounded-xl 
-                  dark:focus:border-gray-700
-                  focus:outline-none 
-                  focus:border-gray-200"
-                  :placeholder="t('Enter prompt instructions...')"
-                ></Textarea>
-              </div>
-
-              <button 
-                type="button"
-                mode="secondary"
-                @click="resetPromptToDefault(key, promptKey)"
-                class="
-                mt-4 flex items-center gap-1.5 text-xs font-semibold bg-transparent px-3 py-1 w-fit rounded-default
-                border border-red-200 hover:border-red-600
-                text-red-600 hover:text-red-700 
-                dark:border-red-900/50 dark:hover:border-red-400
-                dark:text-red-500 dark:hover:text-red-400
-                transition-colors duration-150"
-              >
-                <IconUndoOutline class="w-3.5 h-3.5" />
-                {{ t('Reset') }}
-              </button>
-
-            </div>
-          </div>
-        </div>
-      </template>
+      <Skeleton v-else-if="isFetchingRecords" type="input" class="h-[20rem] w-full rounded-lg" />
+      <div v-else class="flex flex-col items-center gap-2 rounded-lg border border-dashed border-lightFormBorder px-6 py-10 text-center dark:border-darkFormBorder">
+        <IconInbox class="w-6 h-6 text-lightInputPlaceholderText dark:text-darkInputPlaceholderText" aria-hidden="true" />
+        <p class="text-sm text-lightInputIconColor dark:text-darkInputIconColor">{{ t('No data to save. Feel free to click "Cancel"') }}</p>
       </div>
-      <div v-else class="af-confirmation-panel flex flex-col gap-4 w-full h-full">
-        <div class="af-overwrite-settings-card flex flex-col p-5 rounded-default border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/40">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex items-start gap-3 min-w-0">
-              <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
-                <IconShieldCheckOutline class="w-5 h-5 dark:brightness-200"  />
-              </div>
-              <div class="min-w-0">
-                <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Overwrite existing values') }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words pr-2">{{ t('AI-generated data will replace existing values.') }}</p>
-              </div>
-            </div>
-            <div class="shrink-0 pt-1">
-              <Toggle v-model="overwriteExistingValues" />
-            </div>
-          </div>
 
-          <div v-if="overwriteExistingValues" class="mt-4 flex items-start text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 text-sm">
-            <IconInfoCircleSolid class="w-4 h-4 me-2 shrink-0 mt-0.5 " />
-            <p>{{ t('Warning: Existing values will be overwritten.') }}</p>
-          </div>
-        </div>
-
-        <div 
-          @click="clickSettingsButton()"
-          class="af-configure-prompts-card
-          flex items-center justify-between p-5 rounded-default border border-gray-100 bg-white shadow-sm cursor-pointer transition-all duration-150
-          dark:border-gray-800 dark:bg-gray-900/40 "
-        >
-          <div class="flex items-start gap-3 min-w-0">
-            <div class="p-2 bg-lightPrimary/10 dark:bg-darkPrimary/10 rounded-xl text-lightPrimary dark:text-darkPrimary shrink-0 mt-0.5">
-              <IconMessageCaptionOutline class="w-5 h-5 dark:brightness-200" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-base font-semibold text-gray-900 dark:text-white leading-tight">{{ t('Configure prompts')}}</p>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">{{ t('Change the instructions for AI to generate actual data.')}}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 px-1 text-xs font-medium text-gray-400 dark:text-gray-500 dark:brightness-200">
-          <IconInfoCircleSolid class="w-4 h-4 " />
-          <p>{{ t('This action will only apply to the fields included in your prompts.') }}</p>
-        </div>
-    
-      </div>
+      <p v-if="isError" class="af-error-message flex items-start gap-1.5 text-sm text-lightDanger dark:text-darkDanger">
+        <IconCircleAlert class="mt-0.5 w-4 h-4 shrink-0" aria-hidden="true" />
+        {{ errorMessage }}
+      </p>
     </div>
   </Dialog>
+  <ImageLightbox v-model="zoomedImage" />
 </template>
 
 <script lang="ts" setup>
 import { callAdminForthApi } from '@/utils';
-import { ref, computed, nextTick } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import pLimit from 'p-limit';
-import { Dialog, Textarea, Toggle, Tooltip } from '@/afcl';
-import VisionTable from './VisionTable.vue'
+import { Dialog, Skeleton } from '@/afcl';
+import { IconCircleAlert, IconInbox, IconInfo, IconSparkles } from '@iconify-prerendered/vue-lucide';
+import GenerationSetup from './GenerationSetup.vue';
+import ReviewQueue from './ReviewQueue.vue';
+import ImageLightbox from './ImageLightbox.vue';
 import adminforth from '@/adminforth';
 import { useI18n } from 'vue-i18n';
 import { AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import { useCoreStore } from '@/stores/core';
-import { IconInfoCircleSolid } from '@iconify-prerendered/vue-flowbite';
 import { useFiltersStore } from '@/stores/filters';
-import { IconMessageCaptionOutline, IconShieldCheckOutline, IconFileLinesOutline, IconUndoOutline, IconImageSolid, IconRefreshOutline } from '@iconify-prerendered/vue-flowbite';
-import { ProgressBar } from '@/afcl';
+import { PROMPT_CATEGORY, isRegenerating, recordError, type GenerationAction, type PromptCategory, type RecordState } from './reviewModel';
 
+const DURATION_RE = /\b\d+\.\d+s\b/g;
+const RETRY_IN_RE = /Please retry in [\d.]+s\.?/g;
+const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
 const coreStore = useCoreStore();
 const filtersStore = useFiltersStore();
-const showCloseConfirmModal = ref(false);
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -339,37 +91,10 @@ const props = defineProps<{
   clearCheckboxes?: () => any,
 }>();
 
-type RecordStatus = 'pending' | 'processing' | 'completed' | 'failed';
-type GenerationAction = 'analyze' | 'analyze_no_images' | 'generate_images';
-
-type RecordState = {
-  id: string | number;
-  status: RecordStatus;
-  isChecked: boolean;
-  label: string;
-  data: Record<string, any>;
-  oldData: Record<string, any>;
-  images: any[];
-  aiStatus: {
-    generatedImages: boolean;
-    analyzedImages: boolean;
-    analyzedNoImages: boolean;
-  };
-  openGenerationCarousel: Record<string, boolean>;
-  openImageCompare: Record<string, boolean>;
-  carouselSaveImages: Record<string, any[]>;
-  carouselImageIndex: Record<string, number>;
-  imageGenerationErrorMessage: string;
-  imageGenerationFailed: boolean;
-  imageToTextErrorMessages: Record<string, string>;
-  textToTextErrorMessages: Record<string, string>;
-  regeneratingFieldsStatus: Record<string, boolean>;
-  listOfImageNotGenerated: Record<string, any>;
-};
+type Prompts = Record<PromptCategory, Record<string, string>>;
 
 const recordIds = ref<Array<string | number>>([]);
 const recordsById = new Map<string, RecordState>();
-const uncheckedRecordIds = new Set<string>();
 
 defineExpose({
   click
@@ -377,18 +102,24 @@ defineExpose({
 
 const confirmDialog = ref<any>(null);
 const primaryKey = props.meta.primaryKey;
+const promptsStorageKey = `bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`;
+const defaultPrompts: Prompts = {
+  imageFieldsPrompts: props.meta.generationPrompts.imageFieldsPrompts,
+  plainFieldsPrompts: props.meta.generationPrompts.plainFieldsPrompts,
+  generateImages: props.meta.generationPrompts.imageGenerationPrompts,
+};
 const isLoading = ref(false);
 const isFetchingRecords = ref(false);
 const isError = ref(false);
 const errorMessage = ref('');
 const isDialogOpen = ref(false);
-const isImageHasPreviewUrl = ref<Record<string, boolean>>({});
-const popupMode = ref<'generation' | 'confirmation' | 'settings'>('confirmation');
-const generationPrompts = ref<any>({});
-const isDataSaved = ref(false);
+const popupMode = ref<'generation' | 'confirmation'>('confirmation');
+// prompts kept in this browser (the plugin config for the ones never saved) and the ones on the screen
+const savedPrompts = ref<Prompts>(promptsWithSaved({}));
+const generationPrompts = ref<Prompts>(promptsWithSaved({}));
 const overwriteExistingValues = ref<boolean>(false);
+const zoomedImage = ref<string | null>(null);
 
-const checkedCount = computed(() => recordIds.value.length - uncheckedRecordIds.size);
 const totalRecords = computed(() => recordIds.value.length);
 const isGenerationPaused = ref(false);
 const isGenerationCancelled = ref(false);
@@ -399,16 +130,18 @@ const pauseBreakpoints = computed(() => props.meta.askConfirmation || []);
 const startedRecordCount = ref(0);
 const isCheckingRateLimits = ref(false);
 let startGate = Promise.resolve();
-const tableRef = ref<any>(null);
 const generationFailureGroups = new Map<string, {
   actionType: GenerationAction;
   error: string;
   recordIds: Set<string>;
 }>();
-const processedCount = computed(() => {
-  recordsVersion.value;
-  return Array.from(recordsById.values()).filter(record => record.status === 'completed' || record.status === 'failed').length;
+const recordsList = computed(() => {
+  const ids = isGenerationCancelled.value
+    ? recordIds.value.filter(id => completedRecordIds.value.has(String(id)))
+    : recordIds.value;
+  return ids.map(id => getOrCreateRecord(id));
 });
+const processedCount = computed(() => recordsList.value.filter(record => record.status === 'completed' || record.status === 'failed').length);
 const progressStep = computed(() => {
   if (!totalRecords.value || totalRecords.value < 100) {
     return 1;
@@ -425,64 +158,52 @@ const displayedProcessedCount = computed(() => {
   }
   return Math.floor(processedCount.value / step) * step;
 });
-const displayedProgressPercent = computed(() => {
-  if (!totalRecords.value) {
-    return 0;
-  }
-  return Math.min(100, Math.round((displayedProcessedCount.value / totalRecords.value) * 100));
-});
-const isProcessingAny = computed(() => {
-  recordsVersion.value;
-  return Array.from(recordsById.values()).some(record => record.status === 'processing');
-});
+const isProcessingAny = computed(() => recordsList.value.some(record => record.status === 'processing'));
+const checkedCount = computed(() => recordsList.value.filter(record => record.isChecked).length);
+const checkedProcessedCount = computed(() => recordsList.value.filter(record => record.isChecked && completedRecordIds.value.has(String(record.id))).length);
 
-const tableHeaders = computed(() => generateTableHeaders(props.meta.outputFields));
-const customFieldNames = computed(() => tableHeaders.value.slice((props.meta.isAttachFiles) ? 3 : 2).map(h => h.fieldName));
-const recordsVersion = ref(0);
-const recordsList = computed(() => {
-  recordsVersion.value;
-  const ids = isGenerationCancelled.value
-    ? recordIds.value.filter(id => completedRecordIds.value.has(String(id)))
-    : recordIds.value;
-  return ids.map(id => getOrCreateRecord(id));
-});
-
-const generationModeButtons = computed(() => {
-  const arrayToReturn = [
-    { 
-      label: checkedCount.value > 1 ? t('Save fields') : t('Save field'), 
-      options: { 
-        disabled: isLoading.value || checkedCount.value < 1 || isFetchingRecords.value || isProcessingAny.value || isGenerationPaused.value, 
-        loader: isLoading.value, 
-        class: 'afcl-button w-1/6'
-      }, 
-      onclick: async (dialog) => { await saveData(); closeDialog(); dialog.hide(false); } 
+const confirmationModeButtons = computed(() => [
+  {
+    label: t('Cancel'),
+    options: { variant: 'secondary' },
+    onclick: (dialog) => dialog.hide(true),
+  },
+  {
+    label: t('Generate for {count} record | Generate for {count} records', totalRecords.value),
+    options: {
+      disabled: isFetchingRecords.value || isCheckingRateLimits.value || totalRecords.value < 1,
+      loader: isCheckingRateLimits.value,
     },
-    { 
-      label: t('Cancel'), 
-      options: {
-        class: 'afcl-button w-1/6',
-        variant: 'secondary'
-      }, 
-      onclick: async (dialog) => { await dialog.hide(true); } 
+    onclick: async () => { await runAiActions(); },
+  },
+]);
+
+const generationModeButtons = computed(() => [
+  {
+    label: t('Cancel'),
+    options: { variant: 'secondary' },
+    onclick: (dialog) => dialog.hide(true),
+  },
+  ...(isProcessingAny.value ? [{
+    label: t('Save processed ({count})', { count: checkedProcessedCount.value }),
+    options: {
+      variant: 'secondary',
+      disabled: isLoading.value || isSavingCurrent.value || checkedProcessedCount.value < 1,
+      loader: isSavingCurrent.value,
     },
-  ]
+    onclick: async () => { await saveCurrentGenerated(); },
+  }] : []),
+  {
+    label: t('Save {count} record | Save {count} records', checkedCount.value),
+    options: {
+      disabled: isLoading.value || checkedCount.value < 1 || isFetchingRecords.value || isProcessingAny.value || isGenerationPaused.value,
+      loader: isLoading.value,
+    },
+    onclick: async (dialog) => { await saveData(); closeDialog(); dialog.hide(false); },
+  },
+]);
 
-  if (isProcessingAny.value) {
-    arrayToReturn.splice(1, 0, {
-      label: t('Save processed'),
-      options: {
-        disabled: isLoading.value || isSavingCurrent.value || completedRecordIds.value.size < 1,
-        loader: isSavingCurrent.value,
-        class: 'afcl-button w-1/6',
-      },
-      onclick: async () => { await saveCurrentGenerated(); }
-    })
-  }
-  return arrayToReturn;
-});
-
-async function regenerateRecord({ recordId }: { recordId: string }) {
+async function regenerateRecord({ recordId }: { recordId: string | number }) {
 
   const promises = [];
 
@@ -490,16 +211,7 @@ async function regenerateRecord({ recordId }: { recordId: string }) {
     promises.push(regenerateImages({ recordId }));
   }
 
-  for (const fieldName of props.meta.outputFieldsForAnalizeFromImages || []) {
-    promises.push(
-      regenerateCell({
-        recordId,
-        fieldName,
-      })
-    );
-  }
-
-  for (const fieldName of props.meta.outputPlainFields || []) {
+  for (const fieldName of [...props.meta.outputFieldsForAnalizeFromImages, ...props.meta.outputPlainFields]) {
     promises.push(
       regenerateCell({
         recordId,
@@ -511,50 +223,19 @@ async function regenerateRecord({ recordId }: { recordId: string }) {
   await Promise.allSettled(promises);
 }
 
-const handleBeforeClose = async (dialog?: any) => {
-  if (popupMode.value === 'generation') {
-    const confirmed = await adminforth.confirm({
-      title: t('Close without saving?'),
-      message: t('Are you sure you want to close without saving?'),
-      yes: t('Yes'),
-      no: t('Cancel'),
-    });
-
-    if (confirmed) {
-      closeDialog();
-
-      if (confirmDialog.value && typeof confirmDialog.value.hide === 'function') {
-        confirmDialog.value.hide();
-      } else if (dialog && typeof dialog.hide === 'function') {
-        dialog.hide();
-      }
-      return true;
-    }
-    return false;
-  }
-}
-
 const isSavingCurrent = ref(false);
 function checkIfDialogOpen() {
   return isDialogOpen.value === true;
 }
 
 const openDialog = async () => {
-  window.addEventListener('beforeunload', beforeUnloadHandler);
-  if (props.meta.askConfirmationBeforeGenerating) {
-    popupMode.value = 'confirmation';
-  } else {
-    popupMode.value = 'generation';
-  }
+  popupMode.value = props.meta.askConfirmationBeforeGenerating ? 'confirmation' : 'generation';
+  loadGenerationPrompts();
   isDialogOpen.value = true;
   confirmDialog.value.open();
   isFetchingRecords.value = true;
   await initializeGlobalState();
-  await findPreviewURLForImages();
   isFetchingRecords.value = false;
-  if (!generationPrompts.value || Object.keys(generationPrompts.value).length === 0) {
-    await getGenerationPrompts();
-  }
   if (!props.meta.askConfirmationBeforeGenerating) {
     runAiActions();
   }
@@ -608,14 +289,17 @@ async function getListOfIds() {
    return props.checkboxes;
   }
 }
- 
+
 
 async function runAiActions() {
   const { ok, sessionIds } = await checkRateLimits();
   if (!ok || !sessionIds) {
+    closeDialog();
     confirmDialog.value.close();
     return;
   }
+  // from here a page reload loses the generated values and the generation in progress
+  window.addEventListener('beforeunload', beforeUnloadHandler);
   popupMode.value = 'generation';
   isGenerationCancelled.value = false;
   isGenerationPaused.value = false;
@@ -623,8 +307,6 @@ async function runAiActions() {
   completedRecordIds.value = new Set();
   startedRecordCount.value = 0;
   generationFailureGroups.clear();
-  await nextTick();
-  tableRef.value?.refresh();
   const limit = pLimit(props.meta.concurrencyLimit || 10);
   const tasks = recordIds.value
     .map(id => limit(() => processOneRecord(String(id), sessionIds)));
@@ -640,7 +322,6 @@ const closeDialog = () => {
   errorMessage.value = '';
   isDialogOpen.value = false;
   popupMode.value = 'confirmation';
-  isDataSaved.value = false;
   if (isGenerationPaused.value || isGenerationCancelled.value) {
     resolvePause();
   }
@@ -648,15 +329,13 @@ const closeDialog = () => {
 
 async function initializeGlobalState() {
   const ids = await getListOfIds();
-  recordIds.value = ids;
   recordsById.clear();
-  uncheckedRecordIds.clear();
+  recordIds.value = ids;
 }
 
 function resetGlobalState() {
   recordIds.value = [];
   recordsById.clear();
-  uncheckedRecordIds.clear();
   generationFailureGroups.clear();
 }
 
@@ -666,9 +345,9 @@ function getActionLabel(actionType: GenerationAction) {
 
 function getGenerationFailureGroupKey(actionType: GenerationAction, error: string) {
   const normalizedError = error
-    .replace(/Please retry in [\d.]+s\.?/g, 'Please retry later.')
-    .replace(/\b\d+\.\d+s\b/g, '<duration>')
-    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<uuid>');
+    .replace(RETRY_IN_RE, 'Please retry later.')
+    .replace(DURATION_RE, '<duration>')
+    .replace(UUID_RE, '<uuid>');
   return `${actionType}:${normalizedError}`;
 }
 
@@ -700,19 +379,15 @@ function showGenerationFailureSummary() {
   }
 }
 
+// records are reactive, so the review rerenders on every result, edit and checkbox
 function getOrCreateRecord(recordId: string | number): RecordState {
   const key = String(recordId);
   let record = recordsById.get(key);
   if (!record) {
-    record = createEmptyRecord(recordId);
-    record.isChecked = !uncheckedRecordIds.has(key);
+    record = reactive(createEmptyRecord(recordId)) as RecordState;
     recordsById.set(key, record);
   }
   return record;
-}
-
-function touchRecords() {
-  recordsVersion.value += 1;
 }
 
 function waitForResumeIfPaused() {
@@ -754,7 +429,7 @@ function resumeGeneration() {
   resolvePause();
 }
 
-async function cancelGeneration() {
+function cancelGeneration() {
   if (isGenerationCancelled.value) {
     return;
   }
@@ -768,14 +443,6 @@ async function cancelGeneration() {
       recordsById.delete(key);
     }
   }
-  for (const key of Array.from(uncheckedRecordIds)) {
-    if (!generatedIds.has(key)) {
-      uncheckedRecordIds.delete(key);
-    }
-  }
-  touchRecords();
-  await nextTick();
-  tableRef.value?.refresh();
 }
 
 async function withStartGate<T>(fn: () => Promise<T>) {
@@ -792,14 +459,6 @@ async function withStartGate<T>(fn: () => Promise<T>) {
   }
 }
 
-function createImageFieldMap<T>(factory: () => T): Record<string, T> {
-  const result: Record<string, T> = {};
-  for (const field of props.meta.outputImageFields || []) {
-    result[field] = factory();
-  }
-  return result;
-}
-
 function createEmptyRecord(recordId: string | number): RecordState {
   return {
     id: recordId,
@@ -808,16 +467,13 @@ function createEmptyRecord(recordId: string | number): RecordState {
     label: '',
     data: {},
     oldData: {},
+    oldImagePreviews: {},
     images: [],
     aiStatus: {
       generatedImages: !props.meta.isImageGeneration,
       analyzedImages: !props.meta.isFieldsForAnalizeFromImages,
       analyzedNoImages: !props.meta.isFieldsForAnalizePlain,
     },
-    openGenerationCarousel: createImageFieldMap(() => false),
-    openImageCompare: createImageFieldMap(() => false),
-    carouselSaveImages: createImageFieldMap(() => []),
-    carouselImageIndex: createImageFieldMap(() => 0),
     imageGenerationErrorMessage: '',
     imageGenerationFailed: false,
     imageToTextErrorMessages: {},
@@ -825,6 +481,13 @@ function createEmptyRecord(recordId: string | number): RecordState {
     regeneratingFieldsStatus: {},
     listOfImageNotGenerated: {},
   };
+}
+
+// a regeneration can fix the last error of a record or add a new one
+function settleRecordStatus(record: RecordState) {
+  if (!isRegenerating(record)) {
+    record.status = recordError(record) ? 'failed' : 'completed';
+  }
 }
 
 async function processOneRecord(recordId: string, sessionIds: string[]) {
@@ -855,11 +518,10 @@ async function processOneRecord(recordId: string, sessionIds: string[]) {
     return;
   }
   const record = getOrCreateRecord(recordId);
-  if (!record || !record.isChecked) {
+  if (!record.isChecked) {
     return;
   }
   record.status = 'processing';
-  touchRecords();
   record.imageGenerationFailed = false;
   record.imageGenerationErrorMessage = '';
   record.imageToTextErrorMessages = {};
@@ -877,11 +539,11 @@ async function processOneRecord(recordId: string, sessionIds: string[]) {
     record.aiStatus.generatedImages = true;
     record.aiStatus.analyzedImages = true;
     record.aiStatus.analyzedNoImages = true;
-    touchRecords();
     return;
   }
-  record.label = oldDataResult._label || record.label;
-  initializeRecordData(record, oldDataResult);
+  record.label = oldDataResult.record._label || record.label;
+  record.oldImagePreviews = oldDataResult.imagePreviews;
+  initializeRecordData(record, oldDataResult.record);
   if (props.meta.isAttachFiles) {
     await fetchImages(record, recordId);
     if (!checkIfDialogOpen()) {
@@ -907,7 +569,6 @@ async function processOneRecord(recordId: string, sessionIds: string[]) {
   const hasError = results.some(result => result.status === 'rejected');
   record.status = hasError ? 'failed' : 'completed';
   completedRecordIds.value.add(String(recordId));
-  touchRecords();
 }
 
 async function checkRateLimits(actions?: GenerationAction[]): Promise<{ ok: boolean; sessionIds?: string[] }> {
@@ -940,6 +601,7 @@ async function checkRateLimits(actions?: GenerationAction[]): Promise<{ ok: bool
           variant: 'danger',
           timeout: 'unlimited',
         });
+        isCheckingRateLimits.value = false;
         return { ok: false };
       }
       sessionIds.push(rateLimitRes.sessionId);
@@ -968,27 +630,15 @@ async function runActionForRecord(record: RecordState, actionType: GenerationAct
       : 'analyzedNoImages';
   record.aiStatus[responseFlag] = false;
 
-  let customPrompt;
-  if (actionType === 'generate_images') {
-    customPrompt = generationPrompts.value.imageGenerationPrompts || generationPrompts.value.generateImages;
-  } else if (actionType === 'analyze') {
-    customPrompt = generationPrompts.value.imageFieldsPrompts;
-  } else if (actionType === 'analyze_no_images') {
-    customPrompt = generationPrompts.value.plainFieldsPrompts;
-  }
-
   let createJobResponse;
   try {
-    if (!checkIfDialogOpen()) {
-      return;
-    }
     createJobResponse = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
       method: 'POST',
       body: {
         actionType,
         recordId: record.id,
-        ...(customPrompt !== undefined ? { customPrompt: JSON.stringify(customPrompt) } : {}),
+        customPrompt: JSON.stringify(generationPrompts.value[PROMPT_CATEGORY[actionType]]),
         filterFilledFields: forceFilterFilledFields !== undefined ? forceFilterFilledFields: !overwriteExistingValues.value,
         sessionIds
       },
@@ -996,7 +646,7 @@ async function runActionForRecord(record: RecordState, actionType: GenerationAct
     });
   } catch (e) {
     record.aiStatus[responseFlag] = true;
-    registerGenerationFailure(record, actionType, e instanceof Error ? e.message : String(e));
+    applyJobFailure(record, actionType, e instanceof Error ? e.message : String(e));
     throw e;
   }
 
@@ -1006,7 +656,7 @@ async function runActionForRecord(record: RecordState, actionType: GenerationAct
 
   if (createJobResponse?.error || !createJobResponse?.jobId) {
     record.aiStatus[responseFlag] = true;
-    registerGenerationFailure(record, actionType, createJobResponse?.error || `Failed to ${getActionLabel(actionType)}. Please, try to re-run the action.`);
+    applyJobFailure(record, actionType, createJobResponse?.error || `Failed to ${getActionLabel(actionType)}. Please, try to re-run the action.`);
     throw new Error(createJobResponse?.error || 'Failed to create job');
   }
 
@@ -1031,67 +681,57 @@ async function pollJob(
       await waitForRefresh(actionType);
       continue;
     }
-    if (jobResponse?.error) {
+    // a failed job comes back as { ok: false, error }
+    if (jobResponse.error) {
       record.aiStatus[responseFlag] = true;
-      registerGenerationFailure(record, actionType, jobResponse.error);
+      applyJobFailure(record, actionType, jobResponse.error);
       throw new Error(jobResponse.error);
     }
-    const jobStatus = jobResponse?.job?.status;
-    if (jobStatus === 'in_progress') {
+    if (jobResponse.job.status === 'in_progress') {
       await waitForRefresh(actionType);
       continue;
     }
-    if (jobStatus === 'completed') {
-      applyJobResult(record, jobResponse.job, actionType);
-      record.aiStatus[responseFlag] = true;
-      isInProgress = false;
-      continue;
-    }
-    if (jobStatus === 'failed') {
-      applyJobFailure(record, jobResponse.job, actionType);
-      record.aiStatus[responseFlag] = true;
-      throw new Error(jobResponse.job?.error || 'Job failed');
-    }
+    applyJobResult(record, jobResponse.job, actionType);
+    record.aiStatus[responseFlag] = true;
+    isInProgress = false;
   }
 }
 
 function applyJobResult(record: RecordState, job: any, actionType: GenerationAction) {
   if (actionType === 'generate_images') {
-    for (const fieldName of props.meta.outputImageFields || []) {
-      const resultValue = job?.result?.[fieldName];
+    for (const fieldName of props.meta.outputImageFields) {
+      const resultValue = job.result[fieldName];
       if (resultValue !== undefined) {
         record.data[fieldName] = resultValue;
       }
-      record.carouselSaveImages[fieldName] = resultValue ? [resultValue] : [];
-      if (job?.recordMeta?.[`${fieldName}_meta`]) {
-        record.carouselSaveImages[fieldName] = [job.recordMeta[`${fieldName}_meta`].originalImage];
-        record.listOfImageNotGenerated[fieldName] = job.recordMeta[`${fieldName}_meta`];
+      const imageMeta = job.recordMeta?.[`${fieldName}_meta`];
+      if (imageMeta) {
+        record.listOfImageNotGenerated[fieldName] = imageMeta;
+      } else {
+        delete record.listOfImageNotGenerated[fieldName];
       }
     }
   } else {
     record.data = {
       ...record.data,
-      ...(job?.result || {}),
+      ...job.result,
     };
   }
-  touchRecords();
 }
 
-function applyJobFailure(record: RecordState, job: any, actionType: GenerationAction) {
-  registerGenerationFailure(record, actionType, job?.error || t('Unknown error'));
+function applyJobFailure(record: RecordState, actionType: GenerationAction, error: string) {
+  registerGenerationFailure(record, actionType, error);
   if (actionType === 'generate_images') {
     record.imageGenerationFailed = true;
-    record.imageGenerationErrorMessage = job?.error || t('Unknown error');
-  } else if (actionType === 'analyze') {
-    for (const field of Object.keys(props.meta.outputFieldsForAnalizeFromImages || {})) {
-      record.imageToTextErrorMessages[props.meta.outputFieldsForAnalizeFromImages[field]] = job?.error || t('Unknown error');
-    }
-  } else if (actionType === 'analyze_no_images') {
-    for (const field of Object.keys(props.meta.outputPlainFields || {})) {
-      record.textToTextErrorMessages[props.meta.outputPlainFields[field]] = job?.error || t('Unknown error');
-    }
+    record.imageGenerationErrorMessage = error;
+    return;
   }
-  touchRecords();
+  const [fields, messages] = actionType === 'analyze'
+    ? [props.meta.outputFieldsForAnalizeFromImages, record.imageToTextErrorMessages]
+    : [props.meta.outputPlainFields, record.textToTextErrorMessages];
+  for (const field of fields) {
+    messages[field] = error;
+  }
 }
 
 async function waitForRefresh(actionType: GenerationAction) {
@@ -1104,7 +744,7 @@ async function waitForRefresh(actionType: GenerationAction) {
   }
 }
 
-async function fetchOldData(recordId: string) {
+async function fetchOldData(recordId: string): Promise<{ record: Record<string, any>, imagePreviews: Record<string, string | null> } | null> {
   try {
     const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/get_old_data`,
@@ -1120,7 +760,7 @@ async function fetchOldData(recordId: string) {
       });
       return null;
     }
-    return res.record;
+    return res;
   } catch (error) {
     console.error('Failed to get old record:', error);
     isError.value = true;
@@ -1132,24 +772,16 @@ async function fetchOldData(recordId: string) {
 function initializeRecordData(record: RecordState, oldRecord: Record<string, any>) {
   const newData: Record<string, any> = {};
   const newOldData: Record<string, any> = {};
-  for (const key in props.meta.outputFields || {}) {
+  for (const key of props.meta.outputFields) {
     const normalizedValue = normalizeEnumValue(key, oldRecord[key] ?? null);
     newData[key] = normalizedValue;
     newOldData[key] = normalizedValue;
-  }
-  if (props.meta.outputImageFields) {
-    for (const key of props.meta.outputImageFields) {
-      const normalizedValue = normalizeEnumValue(key, oldRecord[key] ?? null);
-      newData[key] = normalizedValue;
-      newOldData[key] = normalizedValue;
-    }
   }
   newData[primaryKey] = oldRecord[primaryKey] ?? record.id;
   newOldData[primaryKey] = oldRecord[primaryKey] ?? record.id;
   newOldData._label = oldRecord._label;
   record.data = newData;
   record.oldData = newOldData;
-  touchRecords();
 }
 
 function normalizeEnumValue(key: string, value: any) {
@@ -1169,74 +801,11 @@ async function fetchImages(record: RecordState, recordId: string) {
       body: { recordId },
     });
     record.images = res.images || [];
-    touchRecords();
   } catch (error) {
     console.error('Failed to get images:', error);
     isError.value = true;
     errorMessage.value = t(`Failed to fetch images. Please, try to re-run the action.`);
   }
-}
-
-function formatLabel(str) {
-  const labelsMap = props.meta?.columnLabels || {};
-  let labelFromMeta = labelsMap[str];
-  if (!labelFromMeta) {
-    const match = Object.keys(labelsMap).find(k => k.toLowerCase() === String(str).toLowerCase());
-    if (match) labelFromMeta = labelsMap[match];
-  }
-  if (labelFromMeta) return labelFromMeta;
-  return str
-    .split('_')                   
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');      
-}
-
-function generateTableHeaders(outputFields) {
-  const headers = [];
-
-  headers.push({ label: 'Checkboxes', fieldName: 'checkboxes' });
-  headers.push({ label: 'Field name', fieldName: 'label' });
-  if (props.meta.isAttachFiles) {
-    headers.push({ label: 'Source Images', fieldName: 'images' });
-  }
-  for (const key in outputFields) {
-    headers.push({
-      label: formatLabel(key),
-      fieldName: key,
-    });
-  }
-  return headers;
-}
-function handleTableError(errorData) {
-  isError.value = errorData.isError;
-  errorMessage.value = errorData.errorMessage;
-}
-async function prepareDataForSave() {
-  const checkedRecords = recordIds.value
-    .map(id => getOrCreateRecord(id))
-    .filter(record => record.isChecked === true);
-  const checkedItems = checkedRecords.map(record => ({
-    ...record.data,
-    [primaryKey]: record.id,
-  }));
-
-  const promises: Promise<void>[] = [];
-  checkedRecords.forEach((record, index) => {
-    if (record.imageGenerationFailed) {
-      return;
-    }
-    for (const [key, value] of Object.entries(checkedItems[index])) {
-      if (props.meta.outputImageFields?.includes(key)) {
-        const p = convertImages(key, value).then(result => {
-          checkedItems[index][key] = result;
-        });
-        promises.push(p);
-      }
-    }
-  });
-
-  await Promise.all(promises);
-  return [checkedItems, checkedRecords] as const;
 }
 
 async function prepareDataForRecords(records: RecordState[]) {
@@ -1251,7 +820,7 @@ async function prepareDataForRecords(records: RecordState[]) {
       return;
     }
     for (const [key, value] of Object.entries(checkedItems[index])) {
-      if (props.meta.outputImageFields?.includes(key)) {
+      if (props.meta.outputImageFields.includes(key)) {
         const p = convertImages(key, value).then(result => {
           checkedItems[index][key] = result;
         });
@@ -1293,7 +862,7 @@ async function uploadImagesForRecords(reqData: Record<string, any>[], checkedRec
     const item = reqData[index];
     const record = checkedRecords[index];
     for (const [key, value] of Object.entries(item)) {
-      if (props.meta.outputImageFields?.includes(key)) {
+      if (props.meta.outputImageFields.includes(key)) {
         if (!value) {
           continue;
         }
@@ -1315,12 +884,11 @@ async function uploadImagesForRecords(reqData: Record<string, any>[], checkedRec
   await Promise.all(imagesToUpload);
 }
 
-
 async function saveData() {
   const errorText = 'Failed to save some records. Not all data may be saved'
   try {
     isLoading.value = true;
-  const [reqData, checkedRecords] = await prepareDataForSave();
+    const [reqData, checkedRecords] = await prepareDataForRecords(recordsList.value.filter(record => record.isChecked));
     if (checkedRecords.length < 1) {
       adminforth.alert({ message: t('No items selected'), variant: 'warning' });
       return;
@@ -1369,14 +937,13 @@ async function saveData() {
     props.updateList();
     props.clearCheckboxes?.();
     isLoading.value = false;
-    isDataSaved.value = true;
     window.removeEventListener('beforeunload', beforeUnloadHandler);
   }
 }
 async function uploadImage(imgBlob, id, fieldName) {
   const file = new File([imgBlob], `generated_${fieldName}_${id}.${imgBlob.type.split('/').pop()}`, { type: imgBlob.type });
   const { name, size, type } = file;
-  
+
   const extension = name.split('.').pop();
   const nameNoExtension = name.replace(`.${extension}`, '');
 
@@ -1403,14 +970,8 @@ async function uploadImage(imgBlob, id, fieldName) {
 
     const xhr = new XMLHttpRequest();
     const success = await new Promise((resolve) => {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-        }
-      };
       xhr.addEventListener('loadend', () => {
-        const success = xhr.readyState === 4 && xhr.status === 200;
-        // try to read response
-        resolve(success);
+        resolve(xhr.readyState === 4 && xhr.status === 200);
       });
       xhr.open('PUT', uploadUrl, true);
       xhr.setRequestHeader('Content-Type', type);
@@ -1444,7 +1005,7 @@ async function uploadImage(imgBlob, id, fieldName) {
   }
 }
 
-async function regenerateImages({ recordId }: { recordId: any }) {
+async function regenerateImages({ recordId }: { recordId: string | number }) {
   const {ok, sessionIds} = await checkRateLimits(['generate_images']);
   if (!ok || !sessionIds) {
     return;
@@ -1457,13 +1018,10 @@ async function regenerateImages({ recordId }: { recordId: any }) {
     });
     return;
   }
-  const record = recordsById.get(String(recordId));
-  if (!record) {
-    return;
-  }
-  record.aiStatus.generatedImages = false;
+  const record = recordsById.get(String(recordId))!;
   record.status = 'processing';
-  touchRecords();
+  record.imageGenerationFailed = false;
+  record.imageGenerationErrorMessage = '';
 
   try {
     await runActionForRecord(
@@ -1472,41 +1030,10 @@ async function regenerateImages({ recordId }: { recordId: any }) {
       sessionIds,
       false
     );
-
-    record.status = 'completed';
-    completedRecordIds.value.add(String(recordId));
-
-    record.aiStatus.generatedImages = true;
-    touchRecords();
-
-  } catch (e) {
-    record.aiStatus.generatedImages = true;
-    record.status = 'failed';
-    touchRecords();
-  }
-}
-
-async function findPreviewURLForImages() {
-  if (props.meta.outputImageFields){
-    for (const fieldName of props.meta.outputImageFields) {
-      try {
-        const res = await callAdminForthApi({
-          path: `/plugin/${props.meta.pluginInstanceId}/compile_old_image_link`,
-          method: 'POST',
-          body: {
-          image: "test",
-          columnName: fieldName,
-          },
-        });
-        if (res?.ok) {
-          isImageHasPreviewUrl.value[fieldName] = true;
-        } else {
-          isImageHasPreviewUrl.value[fieldName] = false;
-        }
-      } catch (e) {
-        console.error("Error finding preview URL for field", fieldName, e);
-      }
-    }
+  } catch {
+    // the error is already shown on the image fields of the record
+  } finally {
+    settleRecordStatus(record);
   }
 }
 
@@ -1514,112 +1041,40 @@ function click() {
   openDialog();
 }
 
-function saveSettings() {
-  const promptsToSaveGenerateImages = Object.fromEntries(
-    Object.entries(generationPrompts.value.generateImages).filter(
-      ([key, value]) => value !== props.meta.generationPrompts.imageGenerationPrompts[key].prompt
-    )
+// a saved prompt is kept in this browser, only the ones which differ from the plugin config are stored
+function savePrompt(category: PromptCategory, field: string) {
+  savedPrompts.value[category][field] = generationPrompts.value[category][field];
+  const changedPrompts = Object.fromEntries(
+    Object.entries(savedPrompts.value)
+      .map(([category, prompts]) => [
+        category,
+        Object.fromEntries(Object.entries(prompts).filter(([field, prompt]) => prompt !== defaultPrompts[category][field])),
+      ])
+      .filter(([, prompts]) => Object.keys(prompts).length > 0),
   );
-
-  const promptsToSaveAnalyzeImages = Object.fromEntries(
-    Object.entries(generationPrompts.value.imageFieldsPrompts).filter(
-      ([key, value]) => value !== props.meta.generationPrompts.imageFieldsPrompts[key]
-    )
-  );
-
-  const promptsToSaveAnalyzeNoImages = Object.fromEntries(
-    Object.entries(generationPrompts.value.plainFieldsPrompts).filter(
-      ([key, value]) => value !== props.meta.generationPrompts.plainFieldsPrompts[key]
-    )
-  );
-
-  const promptsToSave = {
-    ...(Object.keys(promptsToSaveAnalyzeNoImages).length > 0 ? { plainFieldsPrompts: promptsToSaveAnalyzeNoImages } : {}),
-    ...(Object.keys(promptsToSaveAnalyzeImages).length > 0 ? { imageFieldsPrompts: promptsToSaveAnalyzeImages } : {}),
-    ...(Object.keys(promptsToSaveGenerateImages).length > 0 ? { generateImages: promptsToSaveGenerateImages } : {}),
-  };
-
-  console.log('Saving prompts:', promptsToSave);
-
-  localStorage.setItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`, JSON.stringify(promptsToSave));
-  popupMode.value = 'confirmation';
+  localStorage.setItem(promptsStorageKey, JSON.stringify(changedPrompts));
 }
 
-async function getGenerationPrompts() {
-  const calculatedGenerationPrompts: any = {};
-  const savedPrompts = localStorage.getItem(`bulkAiFlowGenerationPrompts_${props.meta.pluginInstanceId}`);
-  if (props.meta.generationPrompts.plainFieldsPrompts) {
-    calculatedGenerationPrompts.plainFieldsPrompts = {
-      ...props.meta.generationPrompts.plainFieldsPrompts
-    };
-  }
-  if (props.meta.generationPrompts.imageFieldsPrompts) {
-    calculatedGenerationPrompts.imageFieldsPrompts = {
-      ...props.meta.generationPrompts.imageFieldsPrompts
-    };
-  }
-  if (props.meta.generationPrompts.imageGenerationPrompts) {
-    let imageFields = {};
-    for (const [key, value] of Object.entries(props.meta.generationPrompts.imageGenerationPrompts)) {
-      // value might be typed as unknown; cast to any to access prompt safely
-      imageFields[key] = (value as any).prompt;
-    }
-    calculatedGenerationPrompts.generateImages = imageFields;
-  }
-  if (savedPrompts && props.meta.askConfirmationBeforeGenerating) {
-    
-    generationPrompts.value = checkAndAddNewFieldsToPrompts(JSON.parse(savedPrompts), calculatedGenerationPrompts);
-    
-    return;
-  }
-  generationPrompts.value = calculatedGenerationPrompts;
+// fields which were removed from the plugin config drop out of the saved prompts, new fields get their defaults
+function promptsWithSaved(saved: Partial<Prompts>): Prompts {
+  return Object.fromEntries(
+    Object.entries(defaultPrompts).map(([category, prompts]) => [
+      category,
+      Object.fromEntries(Object.entries(prompts).map(([field, prompt]) => [field, saved[category]?.[field] ?? prompt])),
+    ]),
+  ) as Prompts;
 }
 
-function resetPromptToDefault(categoryKey, promptKey) {
-  console.log('Resetting prompt:', categoryKey, promptKey);
-  console.log('Default prompt:', props.meta.generationPrompts);
-  if (categoryKey === 'generateImages') {
-    generationPrompts.value[categoryKey][promptKey] = props.meta.generationPrompts.imageGenerationPrompts[promptKey].prompt;
-    return;
-  }
-  console.log('Resetting prompt to the:', props.meta.generationPrompts[categoryKey][promptKey]);
-  generationPrompts.value[categoryKey][promptKey] = props.meta.generationPrompts[categoryKey][promptKey];
+// only a user who sees the setup screen can edit prompts, so only then the saved ones apply
+function loadGenerationPrompts() {
+  const saved = props.meta.askConfirmationBeforeGenerating
+    ? JSON.parse(localStorage.getItem(promptsStorageKey) || '{}')
+    : {};
+  savedPrompts.value = promptsWithSaved(saved);
+  generationPrompts.value = promptsWithSaved(saved);
 }
 
-function clickSettingsButton() {
-  getGenerationPrompts();
-  popupMode.value = 'settings';
-}
-
-
-function checkAndAddNewFieldsToPrompts(savedPrompts, defaultPrompts) {
-  for (const categoryKey in defaultPrompts) {
-    if (!savedPrompts.hasOwnProperty(categoryKey)) {
-      savedPrompts[categoryKey] = defaultPrompts[categoryKey];
-    } else {
-      for (const promptKey in defaultPrompts[categoryKey]) {
-        if (!savedPrompts[categoryKey].hasOwnProperty(promptKey)) {
-          savedPrompts[categoryKey][promptKey] = defaultPrompts[categoryKey][promptKey];
-        }
-      }
-    }
-  }
-  //remove deprecated fields
-  for (const categoryKey in savedPrompts) {
-    if (!defaultPrompts.hasOwnProperty(categoryKey)) {
-      delete savedPrompts[categoryKey];
-    } else {
-      for (const promptKey in savedPrompts[categoryKey]) {
-        if (!defaultPrompts[categoryKey].hasOwnProperty(promptKey)) {
-          delete savedPrompts[categoryKey][promptKey];
-        }
-      }
-    }
-  }
-  return savedPrompts;
-}
-
-async function regenerateCell(recordInfo: any) {
+async function regenerateCell({ recordId, fieldName }: { recordId: string | number, fieldName: string }) {
   if (coreStore.isInternetError) {
     adminforth.alert({
       message: t('Cannot regenerate column while internet connection is lost. Please check your connection and try again.'),
@@ -1629,135 +1084,84 @@ async function regenerateCell(recordInfo: any) {
     return;
   }
 
-  const {ok, sessionIds} = await checkRateLimits(['analyze_no_images', 'analyze']);
+  const actionType: GenerationAction = props.meta.outputFieldsForAnalizeFromImages.includes(fieldName) ? 'analyze' : 'analyze_no_images';
+  const { ok, sessionIds } = await checkRateLimits([actionType]);
   if (!ok || !sessionIds) {
     return;
   }
 
-  const record = recordsById.get(String(recordInfo.recordId));
-  if (!record) {
-    return;
-  }
-  if (!record.regeneratingFieldsStatus[recordInfo.fieldName]) {
-    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
-  }
-  record.regeneratingFieldsStatus[recordInfo.fieldName] = true;
-  touchRecords();
-  const actionType = props.meta.outputFieldsForAnalizeFromImages?.includes(recordInfo.fieldName)
-    ? 'analyze'
-    : props.meta.outputPlainFields?.includes(recordInfo.fieldName)
-      ? 'analyze_no_images'
-      : null;
-  if (!actionType) {
-    console.error(`Field ${recordInfo.fieldName} is not configured for analysis.`);
-    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
-    touchRecords();
-    return;
-  }
-  
-  let generationPromptsForField = {};
-  if (actionType === 'analyze') {
-    generationPromptsForField = generationPrompts.value.imageFieldsPrompts || {};
-    record.aiStatus.analyzedImages = false;
-  } else if (actionType === 'analyze_no_images') {
-    generationPromptsForField = generationPrompts.value.plainFieldsPrompts || {};
-    record.aiStatus.analyzedNoImages = false;
-  }
-  
-  let jobId;
-  let res;
+  const record = recordsById.get(String(recordId))!;
+  const errorMessages = actionType === 'analyze' ? record.imageToTextErrorMessages : record.textToTextErrorMessages;
+  const refreshRate = actionType === 'analyze' ? props.meta.refreshRates.fillFieldsFromImages : props.meta.refreshRates.fillPlainFields;
+  record.regeneratingFieldsStatus[fieldName] = true;
+
   try {
-    res = await callAdminForthApi({
+    const res = await callAdminForthApi({
       path: `/plugin/${props.meta.pluginInstanceId}/create-job`,
       method: 'POST',
       body: {
-        fieldToRegenerate: recordInfo.fieldName,
-        recordId: recordInfo.recordId,
+        fieldToRegenerate: fieldName,
+        recordId,
         action: actionType,
         actionType: "regenerate_cell",
-        prompt: generationPromptsForField[recordInfo.fieldName] || null,
+        prompt: generationPrompts.value[PROMPT_CATEGORY[actionType]][fieldName] || null,
         sessionIds
       },
       silentError: true,
     });
-  } catch (e) {
-    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
-    console.error(`Error during cell regeneration for record ${recordInfo.recordId}, field ${recordInfo.fieldName}:`, e);
-  }
-  if ( res.ok === false) {
-    adminforth.alert({
-      message: res.error,
-      variant: 'danger',
-    });
-    isError.value = true;
-    errorMessage.value = t(`Failed to regenerate field`);
-    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
-    return;
-  }
-  jobId = res.jobId;
-  res = {}
-  do {
-    res = await callAdminForthApi({
-      path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
-      method: 'POST',
-      body: { jobId },
-      silentError: true,
-    });
-    if (actionType === 'analyze') {
-      await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillFieldsFromImages));
-    } else if (actionType === 'analyze_no_images') {
-      await new Promise(resolve => setTimeout(resolve, props.meta.refreshRates?.fillPlainFields));
+    if (res.ok === false) {
+      adminforth.alert({
+        message: res.error,
+        variant: 'danger',
+      });
+      isError.value = true;
+      errorMessage.value = t(`Failed to regenerate field`);
+      return;
     }
-  } while (res.job?.status === 'in_progress');
-  if (res.job?.status === 'failed' || !res.ok || !res) {
-    adminforth.alert({
-      message: t(`Regeneration action failed for record: ${recordInfo.recordId}. Error: ${res.job?.error || 'Unknown error'}`),
-      variant: 'danger',
-      timeout: 'unlimited',
-    });
-    if (actionType === 'analyze') {
-      record.imageToTextErrorMessages[recordInfo.fieldName] = res.job?.error || 'Unknown error';
-      record.aiStatus.analyzedImages = true;
-    } else if (actionType === 'analyze_no_images') {
-      record.textToTextErrorMessages[recordInfo.fieldName] = res.job?.error || 'Unknown error';
-      record.aiStatus.analyzedNoImages = true;
+
+    let jobResponse;
+    do {
+      await new Promise(resolve => setTimeout(resolve, refreshRate));
+      jobResponse = await callAdminForthApi({
+        path: `/plugin/${props.meta.pluginInstanceId}/get-job-status`,
+        method: 'POST',
+        body: { jobId: res.jobId },
+        silentError: true,
+      });
+    } while (jobResponse?.job?.status === 'in_progress');
+
+    // a failed job comes back as { ok: false, error }
+    if (!jobResponse?.ok) {
+      const error = jobResponse?.error || t('Unknown error');
+      adminforth.alert({
+        message: t(`Regeneration action failed for record: ${recordId}. Error: ${error}`),
+        variant: 'danger',
+        timeout: 'unlimited',
+      });
+      errorMessages[fieldName] = error;
+      return;
     }
-    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
-    touchRecords();
-    return;
-  } else if (res.job?.status === 'completed') {
     record.data = {
       ...record.data,
-      ...res.job.result,
+      ...jobResponse.job.result,
     };
-    if (actionType === 'analyze') {
-      record.imageToTextErrorMessages[recordInfo.fieldName] = '';
-      record.aiStatus.analyzedImages = true;
-    } else if (actionType === 'analyze_no_images') {
-      record.textToTextErrorMessages[recordInfo.fieldName] = '';
-      record.aiStatus.analyzedNoImages = true;
-    }
-    record.regeneratingFieldsStatus[recordInfo.fieldName] = false;
-    touchRecords();
+    delete errorMessages[fieldName];
+  } catch (e) {
+    console.error(`Error during cell regeneration for record ${recordId}, field ${fieldName}:`, e);
+  } finally {
+    record.regeneratingFieldsStatus[fieldName] = false;
+    settleRecordStatus(record);
   }
 }
 
 const beforeUnloadHandler = (event) => {
-  if (isDataSaved.value) return;
   event.preventDefault();
   event.returnValue = '';
 };
 
 async function saveCurrentGenerated() {
   const errorText = 'Failed to save some records. Not all data may be saved';
-  const generatedIds = new Set(completedRecordIds.value);
-  if (generatedIds.size < 1) {
-    return;
-  }
-  const recordsToSave = Array.from(generatedIds)
-    .map(id => recordsById.get(String(id)))
-    .filter((record): record is RecordState => Boolean(record))
-    .filter(record => record.isChecked === true);
+  const recordsToSave = recordsList.value.filter(record => record.isChecked && completedRecordIds.value.has(String(record.id)));
   if (recordsToSave.length < 1) {
     return;
   }
@@ -1802,19 +1206,17 @@ async function saveCurrentGenerated() {
 
     if (savedIds.length > 0) {
       recordIds.value = recordIds.value.filter(id => !savedIds.includes(String(id)));
-      for (let index = 0; index < savedIds.length; index++) {
-        const id = savedIds[index];
+      for (const id of savedIds) {
         recordsById.delete(id);
-        uncheckedRecordIds.delete(id);
         completedRecordIds.value.delete(id);
       }
       adminforth.alert({
         message: t('Successfully saved generated data for {count} records', { count: savedIds.length }),
         variant: 'success',
       });
-      touchRecords();
     }
     if (recordIds.value.length === 0) {
+      closeDialog();
       confirmDialog.value.close();
       return;
     }
@@ -1825,21 +1227,7 @@ async function saveCurrentGenerated() {
   } finally {
     isSavingCurrent.value = false;
   }
-  await nextTick();
-  tableRef.value.refresh();
   props.updateList();
 }
-
-const generationStatusClass = computed(() => {
-  if (isGenerationPaused.value) {
-    return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-400'
-  }
-
-  if (displayedProcessedCount.value === totalRecords.value) {
-    return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-400'
-  }
-
-  return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-400'
-})
 
 </script>

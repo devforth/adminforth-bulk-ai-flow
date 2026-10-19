@@ -50,11 +50,6 @@ const updateRateLimitsBodySchema = z.object({
   actionType: z.string().nullish(),
 }).strict();
 
-const compileOldImageLinkBodySchema = z.object({
-  image: z.string().nullish(),
-  columnName: z.string().nullish(),
-}).strict();
-
 const getFilteredIdsBodySchema = z.object({
   filters: z.any(),
 }).passthrough();
@@ -694,18 +689,26 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
 
-    const outputFields = {
-      ...this.options.fillFieldsFromImages,
-      ...this.options.fillPlainFields,
-      ...(this.options.generateImages || {})
-    };
+    const outputFields = [
+      ...outputFieldsForAnalizeFromImages,
+      ...outputPlainFields,
+      ...outputImageFields,
+    ];
 
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
     // Map of column technical names to their display labels from resource config
     const columnLabels: Record<string, string> = Object.fromEntries(
       (this.resourceConfig.columns || []).map((c: any) => [c.name, c.label || c.name])
     );
-    
+    // the review dialog picks an editor for a generated value by the type of its column
+    const columnTypes: Record<string, string> = Object.fromEntries(
+      this.resourceConfig.columns.filter((c) => outputFields.includes(c.name)).map((c) => [c.name, c.type])
+    );
+    // only the prompts go to the browser: an entry of generateImages may hold an adapter with its API key
+    const imageGenerationPrompts: Record<string, string> = Object.fromEntries(
+      Object.entries(this.options.generateImages || {}).map(([key, value]) => [key, value.prompt])
+    );
+
     const pageInjection = {
       file: this.componentPath('VisionAction.vue'),
       meta: {
@@ -714,6 +717,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         actionName: this.options.actionName,
         columnEnums: columnEnums,
         columnLabels: columnLabels,
+        columnTypes: columnTypes,
         outputImageFields: outputImageFields,
         outputFieldsForAnalizeFromImages: outputFieldsForAnalizeFromImages,
         outputPlainFields: outputPlainFields,
@@ -737,7 +741,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         generationPrompts: {
           plainFieldsPrompts: this.options.fillPlainFields || {},
           imageFieldsPrompts: this.options.fillFieldsFromImages || {},
-          imageGenerationPrompts: this.options.generateImages || {},
+          imageGenerationPrompts: imageGenerationPrompts,
         },
         pageSize: this.options.pageSize
       }
@@ -1037,6 +1041,24 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   /**
+   * Links to the stored images of the generated image columns, built by the Upload plugin of each
+   * column the same way its own previews are, so the dialog shows the current image next to the new one.
+   */
+  private async imagePreviewUrls(record: any): Promise<Record<string, string | null>> {
+    const previews: Record<string, string | null> = {};
+    for (const key of Object.keys(this.options.generateImages || {})) {
+      const uploadPlugin = this.adminforth.activatedPlugins.find(p =>
+        p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
+        p.pluginOptions.pathColumnName === key
+      ) as any;
+      const holder = { [key]: record[key] };
+      await uploadPlugin.genPreviewUrl(holder);
+      previews[key] = holder[`previewUrl_${uploadPlugin.pluginInstanceId}`] ?? null;
+    }
+    return previews;
+  }
+
+  /**
    * The row as the caller is allowed to read it: columns which are not declared on the resource and
    * columns whose `backendOnly` resolves true for this request are dropped, exactly the way the
    * core show route drops them before a row reaches the browser.
@@ -1072,7 +1094,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         if (error) {
           return { ok: false, error };
         }
-        return { ok: true, record: await this.scopeRecordForFrontend(record, ctx) };
+        return {
+          ok: true,
+          record: await this.scopeRecordForFrontend(record, ctx),
+          imagePreviews: await this.imagePreviewUrls(record),
+        };
       }
     });
 
@@ -1401,39 +1427,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     });
 
-
-    server.endpoint({
-      method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/compile_old_image_link`,
-      agent: { hiddenFromAgents: true },
-      request_schema: compileOldImageLinkBodySchema,
-      handler: async ({ body, adminUser, headers, response }) => {
-        const data = body as z.infer<typeof compileOldImageLinkBodySchema>;
-        const image = data.image;
-        const columnName = data.columnName;
-        if (!image) {
-          return { ok: false, error: "Can't find image url" };
-        }
-        if (!columnName) {
-          return { ok: false, error: "Can't find column name" };
-        }
-        try {
-          if (this.options?.generateImages) {
-            const plugin = this.adminforth.activatedPlugins.find(p =>
-              p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
-              p.pluginOptions.pathColumnName === columnName
-            );
-            if (plugin?.pluginOptions?.preview) {
-              const compiledPreviewUrl = plugin.pluginOptions.preview.previewUrl({ filePath: image });
-              return { ok: true, previewUrl: compiledPreviewUrl };
-            }
-            return { ok: false, error: "Can't find plugin for column" };
-          }
-        } catch (e) {
-          return { ok: false, error: "Error compiling preview url" };
-        }
-      }
-    });
 
     server.endpoint({
       method: 'POST',
