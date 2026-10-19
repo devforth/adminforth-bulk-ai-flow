@@ -1056,6 +1056,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_old_data`,
+      agent: { hiddenFromAgents: true },
       request_schema: getOldDataBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
         const data = body as z.infer<typeof getOldDataBodySchema>;
@@ -1079,6 +1080,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_images`,
+      agent: { hiddenFromAgents: true },
       request_schema: getImagesBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
         const data = body as z.infer<typeof getImagesBodySchema>;
@@ -1101,6 +1103,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
+      agent: { hiddenFromAgents: true },
       request_schema: updateFieldsBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
         const data = body as z.infer<typeof updateFieldsBodySchema>;
@@ -1226,6 +1229,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_image_generation_prompts`,
+      agent: { hiddenFromAgents: true },
       request_schema: getImageGenerationPromptsBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
         const data = body as z.infer<typeof getImageGenerationPromptsBodySchema>;
@@ -1260,6 +1264,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/create-job`,
+      agent: { hiddenFromAgents: true },
       request_schema: createJobBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof createJobBodySchema>;
@@ -1328,6 +1333,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get-job-status`,
+      agent: { hiddenFromAgents: true },
       request_schema: jobStatusBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
         const data = body as z.infer<typeof jobStatusBodySchema>;
@@ -1368,6 +1374,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/update-rate-limits`,
+      agent: { hiddenFromAgents: true },
       request_schema: updateRateLimitsBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
         const data = body as z.infer<typeof updateRateLimitsBodySchema>;
@@ -1398,6 +1405,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/compile_old_image_link`,
+      agent: { hiddenFromAgents: true },
       request_schema: compileOldImageLinkBodySchema,
       handler: async ({ body, adminUser, headers, response }) => {
         const data = body as z.infer<typeof compileOldImageLinkBodySchema>;
@@ -1430,6 +1438,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/get_filtered_ids`,
+      agent: { hiddenFromAgents: true },
       request_schema: getFilteredIdsBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const resource = this.resourceConfig;
