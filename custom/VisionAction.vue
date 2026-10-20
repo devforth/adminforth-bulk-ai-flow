@@ -27,7 +27,7 @@
         <ReviewQueue
           :records="recordsList"
           :meta="props.meta"
-          :processed="displayedProcessedCount"
+          :processed="processedCount"
           :total="totalRecords"
           :isProcessing="isProcessingAny"
           :isPaused="isGenerationPaused"
@@ -142,22 +142,6 @@ const recordsList = computed(() => {
   return ids.map(id => getOrCreateRecord(id));
 });
 const processedCount = computed(() => recordsList.value.filter(record => record.status === 'completed' || record.status === 'failed').length);
-const progressStep = computed(() => {
-  if (!totalRecords.value || totalRecords.value < 100) {
-    return 1;
-  }
-  return Math.max(1, Math.floor(totalRecords.value / 100));
-});
-const displayedProcessedCount = computed(() => {
-  const step = progressStep.value;
-  if (step <= 1) {
-    return processedCount.value;
-  }
-  if (processedCount.value >= totalRecords.value) {
-    return totalRecords.value;
-  }
-  return Math.floor(processedCount.value / step) * step;
-});
 const isProcessingAny = computed(() => recordsList.value.some(record => record.status === 'processing'));
 const checkedCount = computed(() => recordsList.value.filter(record => record.isChecked).length);
 const checkedProcessedCount = computed(() => recordsList.value.filter(record => record.isChecked && completedRecordIds.value.has(String(record.id))).length);
@@ -854,13 +838,14 @@ async function convertImages(fieldName, img) {
 }
 
 async function uploadImagesForRecords(reqData: Record<string, any>[], checkedRecords: RecordState[]) {
-  if (checkedRecords.some(record => record.imageGenerationFailed)) {
-    return;
-  }
   const imagesToUpload = [];
   for (let index = 0; index < reqData.length; index++) {
     const item = reqData[index];
     const record = checkedRecords[index];
+    // a record whose images failed to generate keeps its stored images
+    if (record.imageGenerationFailed) {
+      continue;
+    }
     for (const [key, value] of Object.entries(item)) {
       if (props.meta.outputImageFields.includes(key)) {
         if (!value) {
