@@ -1230,22 +1230,25 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             }
           }
 
-          const newRecord = {
-            ...oldRecord,
-            ...recordFields
-          };
           return this.adminforth.updateResourceRecord({
             resource: this.resourceConfig,
             recordId: ID,
             oldRecord: oldRecord,
-            updates: newRecord,
+            updates: recordFields,
             adminUser: adminUser,
           })
         });
+        let results;
         try {
-          await Promise.all(updates);
+          results = await Promise.all(updates);
         } catch (error) {
           return { ok: false, error: `Error updating records, because of unprocesseble data for record ID ${selectedIds}` };
+        }
+        const updateErrors = results
+          .map(({ error }, idx) => error && `Record ${selectedIds[idx]}: ${error}`)
+          .filter(Boolean);
+        if (updateErrors.length > 0) {
+          return { ok: false, error: updateErrors.join('; ') };
         }
         return { ok: true };
       }
