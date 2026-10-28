@@ -933,7 +933,7 @@ async function uploadImage(imgBlob, id, fieldName) {
   const nameNoExtension = name.replace(`.${extension}`, '');
 
   try {
-    const { uploadUrl, uploadExtraParams, filePath, error } = await callAdminForthApi({
+    const { uploadUrl, uploadExtraParams, filePath, error, contentType: uploadContentType } = await callAdminForthApi({
         path: `/plugin/${props.meta.outputImagesPluginInstanceIds[fieldName]}/get_file_upload_url`,
         method: 'POST',
         body: {
@@ -959,7 +959,7 @@ async function uploadImage(imgBlob, id, fieldName) {
         resolve(xhr.readyState === 4 && xhr.status === 200);
       });
       xhr.open('PUT', uploadUrl, true);
-      xhr.setRequestHeader('Content-Type', type);
+      xhr.setRequestHeader('Content-Type', uploadContentType || type);
       uploadExtraParams && Object.entries(uploadExtraParams).forEach(([key, value]: [string, string]) => {
         xhr.setRequestHeader(key, value);
       })
