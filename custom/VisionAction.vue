@@ -888,7 +888,6 @@ async function saveData() {
           body: {
             selectedIds: [record.id],
             fields: [reqData[index]],
-            saveImages: !record.imageGenerationFailed,
           },
         });
       })
@@ -1164,7 +1163,6 @@ async function saveCurrentGenerated() {
           body: {
             selectedIds: [record.id],
             fields: [reqData[index]],
-            saveImages: !record.imageGenerationFailed,
           },
         });
         return { recordId: String(record.id), res };

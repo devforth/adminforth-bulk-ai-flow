@@ -1,6 +1,6 @@
-import { AdminForthFilterOperators, AdminForthPlugin, Filters, interpretResource, ActionCheckSource, AllowedActionsEnum } from "adminforth";
-import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource, AdminUser } from "adminforth";
-import { suggestIfTypo, filtersTools, rejectApiRawFilters } from "adminforth";
+import { AdminForthPlugin, Filters, ActionCheckSource } from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthComponentDeclaration, AdminForthResource, AdminUser, HttpExtra } from "adminforth";
+import { suggestIfTypo } from "adminforth";
 import type { PluginOptions } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
@@ -22,7 +22,6 @@ const getOldDataBodySchema = z.object({
 const updateFieldsBodySchema = z.object({
   selectedIds: z.array(z.any()).nullish(),
   fields: z.any(),
-  saveImages: z.boolean().nullish(),
 }).strict();
 
 const getImageGenerationPromptsBodySchema = z.object({
@@ -67,17 +66,6 @@ async function resolveBoolOrFn(val: any, ctx: AccessCheckContext): Promise<boole
     return !!(await val(ctx));
   }
   return !!val;
-}
-
-async function isShownInEdit(column: AdminForthResource['columns'][number], ctx: AccessCheckContext): Promise<boolean> {
-  const showIn = (column.showIn as any) || {};
-  if (showIn.edit !== undefined) {
-    return await resolveBoolOrFn(showIn.edit, ctx);
-  }
-  if (showIn.all !== undefined) {
-    return await resolveBoolOrFn(showIn.all, ctx);
-  }
-  return true;
 }
 
 function valueIsUnchanged(newValue: any, oldValue: any): boolean {
@@ -881,34 +869,16 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
 
-  async checkUpdateAllowed({ adminUser, requestBody, recordId, oldRecord, fields }: {
+  /**
+   * The rules of this plugin on top of the core edit checks: only the fields the action generates
+   * may change, never the primary key, and `isAllowedToSave` has the last word. The resource ACL and
+   * the column rules are enforced by `asUser().update()`.
+   */
+  async checkUpdateAllowed({ adminUser, oldRecord, fields }: {
     adminUser: AdminUser,
-    requestBody: any,
-    recordId: any,
     oldRecord: any,
     fields: Record<string, any>,
   }): Promise<string | null> {
-    const meta = { requestBody, newRecord: fields, oldRecord, pk: recordId };
-    const ctx: AccessCheckContext = {
-      adminUser,
-      resource: this.resourceConfig,
-      meta,
-      source: ActionCheckSource.EditRequest,
-      adminforth: this.adminforth,
-    };
-
-    const { allowedActions } = await interpretResource(
-      adminUser,
-      this.resourceConfig,
-      meta,
-      ActionCheckSource.EditRequest,
-      this.adminforth,
-    );
-    const editAllowed = allowedActions[AllowedActionsEnum.edit] as boolean | string | undefined;
-    if (editAllowed !== true) {
-      return typeof editAllowed === 'string' ? editAllowed : 'You are not allowed to edit records in this resource';
-    }
-
     const managedFields = this.pluginManagedFields();
 
     for (const [fieldName, value] of Object.entries(fields)) {
@@ -924,15 +894,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
       if (column.primaryKey) {
         return `Field "${fieldName}" cannot be modified as it is a primary key`;
-      }
-      if (await resolveBoolOrFn(column.backendOnly, ctx)) {
-        return `Field "${fieldName}" cannot be modified as it is restricted from editing (backendOnly is true).`;
-      }
-      if (column.editReadonly) {
-        return `Field "${fieldName}" cannot be modified as it is restricted from editing (editReadonly is true).`;
-      }
-      if (!(await isShownInEdit(column, ctx)) && !column.allowModifyWhenNotShowInEdit) {
-        return `Field "${fieldName}" cannot be modified as it is restricted from editing (showIn.edit is false). If you need to allow updating this hidden field, set column.allowModifyWhenNotShowInEdit = true.`;
       }
     }
 
@@ -951,16 +912,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   }
 
   /**
-   * Reads one record the way the core show route does: the resource-level `show` permission first,
-   * then the resource's own `show.beforeDatasourceRequest` hooks so row-level scoping narrows the
-   * filters before the query runs.
-   * The returned record is the raw row, so callers which send it to the browser must pass it
+   * Reads one record for the user: `asUser().get()` enforces the `show` permission and the row
+   * scope of the resource. Prompt templates and `attachFiles` are server-side and may use backendOnly
+   * columns, so the full row is read afterwards; callers which send it to the browser must pass it
    * through `scopeRecordForFrontend` first.
    */
   private async getRecordForShow({ adminUser, recordId, extra }: {
     adminUser: AdminUser,
     recordId: any,
-    extra: { body: any, query: any, headers: any, cookies: any, requestUrl: string },
+    extra: HttpExtra,
   }): Promise<{ record?: any, ctx?: AccessCheckContext, error?: string }> {
     const meta = { requestBody: extra.body, pk: recordId };
     const ctx: AccessCheckContext = {
@@ -971,52 +931,17 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       adminforth: this.adminforth,
     };
 
-    const { allowedActions } = await interpretResource(
-      adminUser,
-      this.resourceConfig,
-      meta,
-      ActionCheckSource.ShowRequest,
-      this.adminforth,
-    );
-    const showAllowed = allowedActions[AllowedActionsEnum.show] as boolean | string | undefined;
-    if (showAllowed !== true) {
-      return { error: typeof showAllowed === 'string' ? showAllowed : 'You are not allowed to view records in this resource' };
-    }
-
+    const resource = this.adminforth.resource(this.resourceConfig.resourceId);
     const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    const hookQuery: any = {
-      resourceId: this.resourceConfig.resourceId,
-      source: 'show',
-      filters: [Filters.EQ(primaryKeyColumn.name, recordId)],
-      limit: 1,
-      offset: 0,
-      sort: [],
-    };
-    for (const hook of this.resourceConfig.hooks?.show?.beforeDatasourceRequest || []) {
-      const filterTools = filtersTools.get(hookQuery);
-      hookQuery.filtersTools = filterTools;
-      const resp = await hook({
-        resource: this.resourceConfig,
-        query: hookQuery,
-        adminUser,
-        //@ts-ignore
-        filtersTools: filterTools,
-        extra,
-        adminforth: this.adminforth,
-      });
-      if (!resp || (!resp.ok && !resp.error)) {
-        throw new Error(`Hook must return object with {ok: true} or { error: 'Error' } `);
+    const filter = Filters.EQ(primaryKeyColumn.name, recordId);
+    try {
+      if (!await resource.asUser(adminUser, { meta, extra }).get(filter)) {
+        return { error: 'Record not found' };
       }
-      if (resp.error) {
-        return { error: resp.error };
-      }
+    } catch (e) {
+      return { error: (e as Error).message };
     }
-
-    const record = await this.adminforth.resource(this.resourceConfig.resourceId).get(hookQuery.filters);
-    if (!record) {
-      return { error: 'Record not found' };
-    }
-    return { record, ctx };
+    return { record: await resource.get(filter), ctx };
   }
 
   /**
@@ -1080,7 +1005,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/get_old_data`,
       agent: { hiddenFromAgents: true },
       request_schema: getOldDataBodySchema,
-      handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
+      handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof getOldDataBodySchema>;
         const recordId = data.recordId;
         if (recordId === undefined || recordId === null) {
@@ -1089,7 +1014,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const { record, ctx, error } = await this.getRecordForShow({
           adminUser,
           recordId,
-          extra: { body, query, headers, cookies, requestUrl },
+          extra: { body, query, headers, cookies, requestUrl, response },
         });
         if (error) {
           return { ok: false, error };
@@ -1108,14 +1033,14 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/get_images`,
       agent: { hiddenFromAgents: true },
       request_schema: getImagesBodySchema,
-      handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
+      handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof getImagesBodySchema>;
         // attachFiles runs with server privileges and usually mints download URLs, so it is only
         // ever given a record loaded here after the show check, never one supplied by the client
         const { record, error } = await this.getRecordForShow({
           adminUser,
           recordId: data.recordId,
-          extra: { body, query, headers, cookies, requestUrl },
+          extra: { body, query, headers, cookies, requestUrl, response },
         });
         if (error) {
           return { ok: false, error };
@@ -1131,25 +1056,18 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/update_fields`,
       agent: { hiddenFromAgents: true },
       request_schema: updateFieldsBodySchema,
-      handler: async ({ body, adminUser, headers, response }) => {
+      handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof updateFieldsBodySchema>;
         const selectedIds = data.selectedIds || [];
         const fieldsToUpdate = data.fields || {};
-        const saveImages = data.saveImages;
-        const outputImageFields = [];
-        if (this.options.generateImages) {
-          for (const [key, value] of Object.entries(this.options.generateImages)) {
-            outputImageFields.push(key);
-          }
-        }
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
         const decimalFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'decimal').map(c => c.name);
         const integerFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'integer').map(c => c.name);
         const floatFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'float').map(c => c.name);
 
-        // authorize every record before touching anything: this endpoint writes to the same
-        // table as the core edit route, so it has to enforce the same permissions
+        // the plugin rules are checked for every record before anything is written,
+        // the permissions of the core edit route are enforced by asUser().update() below
         const managedFields = this.pluginManagedFields();
         const oldRecords: any[] = [];
         const sanitizedFields: Record<string, any>[] = [];
@@ -1164,8 +1082,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           }
           const accessError = await this.checkUpdateAllowed({
             adminUser,
-            requestBody: body,
-            recordId: ID,
             oldRecord,
             fields,
           });
@@ -1182,30 +1098,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const updates = selectedIds.map(async (ID, idx) => {
           const oldRecord = oldRecords[idx];
           const recordFields = sanitizedFields[idx];
-          for (const [key, value] of Object.entries(outputImageFields)) {
-            const columnPlugin = this.adminforth.activatedPlugins.find(p => 
-              p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
-              p.pluginOptions.pathColumnName === value
-            );
-            if (columnPlugin && saveImages) {
-              if(columnPlugin.pluginOptions.storageAdapter.objectCanBeAccesedPublicly()) {
-                if (oldRecord[value]) {
-                  // put tag to delete old file
-                  try {
-                    await columnPlugin.pluginOptions.storageAdapter.markKeyForDeletion(oldRecord[value]);
-                  } catch (e) {
-                    // file might be e.g. already deleted, so we catch error
-                    console.error(`Error setting tag to true for object ${oldRecord[value]}. File will not be auto-cleaned up`);
-                  }
-                }
-                if (recordFields[value] && recordFields[value] !== null) {
-                // remove tag from new file
-                // in this case we let it crash if it fails: this is a new file which just was uploaded. 
-                  await columnPlugin.pluginOptions.storageAdapter.markKeyForNotDeletion(recordFields[value]);
-                }
-              }
-            }
-          }
+          // the stored images of the generated image columns are tagged for cleanup by the
+          // edit.afterSave hook of the Upload plugin, once the update has been saved
 
           // Convert decimal fields to numbers
           if (decimalFieldsArray.length > 0) {
@@ -1230,13 +1124,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             }
           }
 
-          return this.adminforth.updateResourceRecord({
-            resource: this.resourceConfig,
-            recordId: ID,
-            oldRecord: oldRecord,
-            updates: recordFields,
-            adminUser: adminUser,
-          })
+          return this.adminforth.resource(this.resourceConfig.resourceId)
+            .asUser(adminUser, {
+              meta: { requestBody: body },
+              oldRecord,
+              extra: { body, query, headers, cookies, requestUrl, response },
+            })
+            .update(ID, recordFields);
         });
         let results;
         try {
@@ -1260,13 +1154,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/get_image_generation_prompts`,
       agent: { hiddenFromAgents: true },
       request_schema: getImageGenerationPromptsBodySchema,
-      handler: async ({ body, adminUser, headers, query, cookies, requestUrl }) => {
+      handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof getImageGenerationPromptsBodySchema>;
         const customPrompt = data.customPrompt || null;
         const { record, ctx, error } = await this.getRecordForShow({
           adminUser,
           recordId: data.recordId,
-          extra: { body, query, headers, cookies, requestUrl },
+          extra: { body, query, headers, cookies, requestUrl, response },
         });
         if (error) {
           return { ok: false, error };
@@ -1322,7 +1216,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const { record, ctx, error } = await this.getRecordForShow({
           adminUser,
           recordId,
-          extra: { body, query, headers, cookies, requestUrl },
+          extra: { body, query, headers, cookies, requestUrl, response },
         });
         if (error) {
           return { ok: false, error };
@@ -1437,77 +1331,20 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       agent: { hiddenFromAgents: true },
       request_schema: getFilteredIdsBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
-        const resource = this.resourceConfig;
-
-        const { allowedActions } = await interpretResource(
-          adminUser,
-          resource,
-          { requestBody: body },
-          ActionCheckSource.ListRequest,
-          this.adminforth,
-        );
-        const listAllowed = allowedActions[AllowedActionsEnum.list] as boolean | string | undefined;
-        if (listAllowed !== true) {
-          return { ok: false, error: typeof listAllowed === 'string' ? listAllowed : 'You are not allowed to list records in this resource' };
-        }
-        const rawFilterError = rejectApiRawFilters(body.filters);
-        if (rawFilterError) {
-          return rawFilterError;
-        }
-
-        for (const hook of resource.hooks?.list?.beforeDatasourceRequest || []) {
-          const filterTools = filtersTools.get(body);
-          body.filtersTools = filterTools;
-          const resp = await hook({
-            resource,
-            query: body,
-            adminUser,
-            //@ts-ignore
-            filtersTools: filterTools, 
-            extra: {
-              body, query, headers, cookies, requestUrl
-            },
-            adminforth: this.adminforth,
-          });
-          if (!resp || (!resp.ok && !resp.error)) {
-            throw new Error(`Hook must return object with {ok: true} or { error: 'Error' } `);
-          }
-          if (resp.error) {
-            return { error: resp.error };
-          }
-        }
-        const filters = body.filters;
-
-        const normalizedFilters = { operator: AdminForthFilterOperators.AND, subFilters: [] };
-        if (filters) {
-          if (typeof filters !== 'object') {
-            throw new Error(`Filter should be an array or an object`);
-          }
-          if (Array.isArray(filters)) {
-            // if filters are an array, they will be connected with "AND" operator by default
-            normalizedFilters.subFilters = filters;
-          } else if (filters.field) {
-            // assume filter is a SingleFilter
-            normalizedFilters.subFilters = [filters];
-          } else if (filters.subFilters) {
-            // assume filter is a AndOr filter
-            normalizedFilters.operator = filters.operator;
-            normalizedFilters.subFilters = filters.subFilters;
-          } else {
-            // wrong filter
-            throw new Error(`Wrong filter object value: ${JSON.stringify(filters)}`);
-          }
-        }
-
-        const records = await this.adminforth.resource(this.resourceConfig.resourceId).list(normalizedFilters);
-        if (!records) {
-          return { ok: true, recordIds: [] };
-        }
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-
-        const recordIds = records.map(record => record[primaryKeyColumn.name]);
-
-        return { ok: true, recordIds }
+        let records;
+        try {
+          // only the primary key is read, so response hooks have nothing heavy to post-process
+          records = await this.adminforth.resource(this.resourceConfig.resourceId)
+            .asUser(adminUser, {
+              meta: { requestBody: body },
+              extra: { body, query, headers, cookies, requestUrl, response },
+            })
+            .list(body.filters ?? [], null, null, [], [primaryKeyColumn.name]);
+        } catch (e) {
+          return { ok: false, error: (e as Error).message };
+        }
+        return { ok: true, recordIds: records.map((record) => record[primaryKeyColumn.name]) };
       }
     });
   }
