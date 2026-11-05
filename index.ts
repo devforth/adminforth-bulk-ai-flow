@@ -249,15 +249,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         return { ok: false, error: 'AI provider refused to analyze images' };
       }
       if (!isError) {
-        const resp: any = (chatResponse as any).response;
-        const topLevelError = (chatResponse as any).error;
-        if (topLevelError || resp?.error) {
-          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` });
-          return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
-        }
-        const textOutput = resp?.output?.[1]?.content?.[0]?.text ?? resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content ?? resp.output?.[0]?.content?.[1]?.text;
-        if (!textOutput || typeof textOutput !== 'string') {
-          jobs.set(jobId, { status: 'failed', error: 'Unexpected AI response format' });
+        const { response: textOutput, error } = chatResponse;
+        if (error) {
+          jobs.set(jobId, { status: 'failed', error: `ERROR: ${error}` });
+          return { ok: false, error: `ERROR: ${error}` };
         }
 
         //parse response and update record
@@ -519,7 +514,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   private async regenerateCell(jobId, fieldToRegenerate, record: any, ctx: AccessCheckContext, actionType, prompt) {
     if (!fieldToRegenerate || !actionType ) {
       jobs.set(jobId, { status: 'failed', error: 'Missing parameters' });
-      //return { ok: false, error: "Missing parameters" };
+      return;
     }
     // a prompt which arrived in the request body is client-authored even though it is wrapped into
     // `promptToPass` below, while the PluginOptions fallback is written by the app author
@@ -542,27 +537,20 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const finalPrompt = this.getPromptForImageAnalysis(compiledPropmt);
         const attachmentFiles = await this.options.attachFiles({ record: record });
         if (attachmentFiles.length === 0) {
-          // return { ok: false, error: "No source images found" };
           jobs.set(jobId, { status: 'failed', error: "No source images found" });
+          return;
         }
         let visionAdapterResponse;
         try {
           visionAdapterResponse = await this.options.visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
         } catch (e) {
-          // return { ok: false, error: 'AI provider refused to analyze images' };
           jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze images' });
+          return;
         }
-        const resp: any = (visionAdapterResponse as any).response;
-        const topLevelError = (visionAdapterResponse as any).error;
-        if (topLevelError || resp?.error) {
-          // return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` };
-          jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError.message || resp?.error.message)}` });
-        }
-
-        const textOutput = resp?.output?.[0]?.content?.[0]?.text ?? resp?.output_text ?? resp?.choices?.[0]?.message?.content;
-        if (!textOutput || typeof textOutput !== 'string') {
-          // return { ok: false, error: 'AI response is not valid text' };
-          jobs.set(jobId, { status: 'failed', error: 'AI response is not valid text' });
+        const { response: textOutput, error } = visionAdapterResponse;
+        if (error) {
+          jobs.set(jobId, { status: 'failed', error: `ERROR: ${error}` });
+          return;
         }
 
         let resData;
@@ -570,8 +558,8 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           resData = JSON.parse(textOutput);
         } catch (e) {
           jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON. Probably attached invalid image URL', aiResponse: textOutput });
+          return;
         }
-        // return { ok: true, result: resData };
         jobs.set(jobId, { status: 'completed', result: resData });
 
       } else if ( actionType === 'analyze_no_images') {
@@ -585,21 +573,21 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
             maxTokens: numberOfTokens,
           });
           if (topLevelError) {
-            // return { ok: false, error: `ERROR: ${JSON.stringify(topLevelError)}` };
             jobs.set(jobId, { status: 'failed', error: `ERROR: ${JSON.stringify(topLevelError)}` });
+            return;
           }
           resp = chatResponse;
         } catch (e) {
-          // return { ok: false, error: 'AI provider refused to analyze plain fields' };
           jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze plain fields' });
+          return;
         }
         let resData;
         try {
           resData = JSON.parse(resp);
         } catch (e) {
           jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON', aiResponse: resp });
+          return;
         }
-        // return { ok: true, result: resData };
         jobs.set(jobId, { status: 'completed', result: resData });
       }
     }
