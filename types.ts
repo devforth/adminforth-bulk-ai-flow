@@ -1,5 +1,5 @@
 import AdminForth, { ImageVisionAdapter, ImageGenerationAdapter, CompletionAdapter } from "adminforth";
-import  {type PluginsCommonOptions } from "adminforth";
+import  {type PluginsCommonOptions, type AdminUser, type AdminForthResource } from "adminforth";
 
 export interface PluginOptions extends PluginsCommonOptions {
     /**
@@ -94,6 +94,29 @@ export interface PluginOptions extends PluginsCommonOptions {
       generateImages?: number,
       regenerateImages?: number,
     },
+
+    /**
+     * Actions of the plugin which the user is allowed to run, a boolean or a callback.
+     */
+    allowedActions?: {
+      /**
+       * Whether the user is allowed to run AI generation. The action is hidden from users who are not
+       * allowed, and the generation requests from them are rejected.
+       * When not set, generation is disabled for all users.
+       *
+       * Example:
+       *
+       * ```ts
+       * allowedActions: {
+       *   generate: ({ adminUser }) => adminUser.dbUser.role === 'superadmin',
+       * },
+       * ```
+       */
+      generate?: boolean | (({ adminUser, resource }: {
+        adminUser: AdminUser;
+        resource: AdminForthResource;
+      }) => boolean | Promise<boolean>);
+    };
 
     /**
      * Whether the user is allowed to save the generated images
