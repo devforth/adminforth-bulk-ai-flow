@@ -1,6 +1,18 @@
 import AdminForth, { ImageVisionAdapter, ImageGenerationAdapter, CompletionAdapter } from "adminforth";
 import  {type PluginsCommonOptions, type AdminUser, type AdminForthResource } from "adminforth";
 
+/**
+ * An adapter, or a function which returns the adapter to use for a given record.
+ * The function gets the record as it is saved in the database, so on Regenerate it does not see
+ * the generated values which are not saved yet.
+ */
+export type AdapterForRecord<T> = T | AdapterResolver<T>;
+
+export type AdapterResolver<T> = ({ record, adminUser }: {
+  record: any,
+  adminUser: AdminUser,
+}) => T | Promise<T>;
+
 export interface PluginOptions extends PluginsCommonOptions {
     /**
      * Name of the action in three dots menu.
@@ -9,18 +21,21 @@ export interface PluginOptions extends PluginsCommonOptions {
 
      /**
      * The adapter to use for scaning images and filling fields basing on the image content.
+     * Can be a function of the record.
      */
-    visionAdapter?: ImageVisionAdapter,
+    visionAdapter?: AdapterForRecord<ImageVisionAdapter>,
     
     /**
      * The adapter to use for text->text generation.
+     * Can be a function of the record.
      */
-    textCompleteAdapter?: CompletionAdapter,
+    textCompleteAdapter?: AdapterForRecord<CompletionAdapter>,
 
     /**
-     * The adapter to use for image generation. 
+     * The adapter to use for image generation.
+     * Can be a function of the record.
      */
-    imageGenerationAdapter?: ImageGenerationAdapter,
+    imageGenerationAdapter?: AdapterForRecord<ImageGenerationAdapter>,
     
     /**
      * List of fields that should be filled based on the image content analysis.
@@ -53,9 +68,9 @@ export interface PluginOptions extends PluginsCommonOptions {
       prompt: string,
 
       /*
-       * Redefine the adapter for your specific generation task 
+       * Redefine the adapter for your specific generation task, can be a function of the record
        */
-      adapter?: ImageGenerationAdapter,
+      adapter?: AdapterForRecord<ImageGenerationAdapter>,
 
       /**
        * The size of the generated image.
