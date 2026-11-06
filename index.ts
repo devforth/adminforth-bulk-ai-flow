@@ -1,7 +1,7 @@
 import { AdminForthPlugin, Filters, ActionCheckSource, interpretResource } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthPageInjectionDeclarationFull, AdminForthResource, AdminUser, HttpExtra } from "adminforth";
 import { suggestIfTypo } from "adminforth";
-import type { PluginOptions } from './types.js';
+import type { PluginOptions, AdapterForRecord, AdapterResolver } from './types.js';
 import Handlebars from 'handlebars';
 import { RateLimiter } from "adminforth";
 import { randomUUID } from "crypto";
@@ -180,6 +180,24 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
+  /**
+   * Calls the adapter function of the app for the record, its failure fails the job in `create-job`.
+   */
+  private async resolveAdapter<T>(option: AdapterForRecord<T>, record: any, adminUser: AdminUser): Promise<T> {
+    if (typeof option !== 'function') {
+      return option;
+    }
+    try {
+      return await (option as AdapterResolver<T>)({ record, adminUser });
+    } catch (e) {
+      throw new Error(`Failed to select the AI adapter: ${e.message}`);
+    }
+  }
+
+  private resolveImageGenerationAdapter(fieldName: string, record: any, adminUser: AdminUser) {
+    return this.resolveAdapter(this.options.generateImages[fieldName].adapter ?? this.options.imageGenerationAdapter, record, adminUser);
+  }
+
   private getPromptForImageAnalysis(compiledOutputFields: Record<string, string>) {
     const prompt = `Analyze the following image(s) and return a single JSON in format like: {'param1': 'value1', 'param2': 'value2'}. 
       Do NOT return array of objects. Do NOT include any Markdown, code blocks, explanations, or extra text. Only return valid JSON. 
@@ -239,10 +257,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         
       const prompt = this.getPromptForImageAnalysis(filteredCompiledOutputFields);
 
+      const visionAdapter = await this.resolveAdapter(this.options.visionAdapter, record, ctx.adminUser);
       //send prompt to OpenAI and get response
       let chatResponse;
       try {
-        chatResponse = await this.options.visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
+        chatResponse = await visionAdapter.generate({ prompt, inputFileUrls: attachmentFiles });
       } catch (e) {
         isError = true;
         jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze images' });
@@ -303,9 +322,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const prompt = this.getPromptForPlainFields(filteredCompiledOutputFields);
       //send prompt to OpenAI and get response
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
+      const textCompleteAdapter = await this.resolveAdapter(this.options.textCompleteAdapter, record, ctx.adminUser);
       let resp: any;
       try {
-        const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete({
+        const { content: chatResponse, error: topLevelError } = await textCompleteAdapter.complete({
           content: prompt,
           maxTokens: numberOfTokens,
         });
@@ -389,12 +409,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               jobs.set(jobId, { status: 'failed', error: 'AI provider refused to generate image' });
             }
           } else {
-            let generationAdapter;
-            if (this.options.generateImages[key].adapter) {
-              generationAdapter = this.options.generateImages[key].adapter;
-            } else {
-              generationAdapter = this.options.imageGenerationAdapter;
-            }
+            const generationAdapter = await this.resolveImageGenerationAdapter(key, record, ctx.adminUser);
             let resp;
             try {
               resp = await generationAdapter.generate(
@@ -444,7 +459,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
    
-  private async regenerateImage(jobId: string, record: any, fieldName: string, prompt: string, headers: Record<string, string | string[] | undefined>) {
+  private async regenerateImage(jobId: string, record: any, ctx: AccessCheckContext, fieldName: string, prompt: string, headers: Record<string, string | string[] | undefined>) {
     let isError = false;
     // TODO: need to do correct check of rate limit
     // if (await this.checkRateLimit(fieldName, this.options.generateImages[fieldName].rateLimit, headers)) {
@@ -458,6 +473,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       } else {
         attachmentFiles = await this.options.attachFiles({ record });
       }
+    const generationAdapter = await this.resolveImageGenerationAdapter(fieldName, record, ctx.adminUser);
     const images = await Promise.all(
       (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
         if (this.options.attachFiles && attachmentFiles.length === 0) {
@@ -471,12 +487,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           return `https://pic.re/image`;
         }
 
-        let generationAdapter;
-        if (this.options.generateImages[fieldName].adapter) {
-          generationAdapter = this.options.generateImages[fieldName].adapter;
-        } else {
-          generationAdapter = this.options.imageGenerationAdapter;
-        }
         let resp;
         try {
           resp = await generationAdapter.generate(
@@ -540,9 +550,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           jobs.set(jobId, { status: 'failed', error: "No source images found" });
           return;
         }
+        const visionAdapter = await this.resolveAdapter(this.options.visionAdapter, record, ctx.adminUser);
         let visionAdapterResponse;
         try {
-          visionAdapterResponse = await this.options.visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
+          visionAdapterResponse = await visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
         } catch (e) {
           jobs.set(jobId, { status: 'failed', error: 'AI provider refused to analyze images' });
           return;
@@ -566,9 +577,10 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, ctx, promptToPass, clientSupplied);
         const finalPrompt = this.getPromptForPlainFields(compiledPropmt);
         const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
+        const textCompleteAdapter = await this.resolveAdapter(this.options.textCompleteAdapter, record, ctx.adminUser);
         let resp;
         try {
-          const { content: chatResponse, error: topLevelError } = await this.options.textCompleteAdapter.complete({
+          const { content: chatResponse, error: topLevelError } = await textCompleteAdapter.complete({
             content: finalPrompt,
             maxTokens: numberOfTokens,
           });
@@ -1230,25 +1242,27 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
         const jobId = randomUUID();
         jobs.set(jobId, { status: "in_progress" });
+        // the workers run in background, a failure they do not handle themselves (e.g. of an adapter function) fails the job
+        const run = (job: Promise<unknown>) => job.catch((e) => jobs.set(jobId, { status: 'failed', error: e.message }));
         switch(actionType) {
           case 'generate_images':
-            this.initialImageGenerate(jobId, record, ctx, headers, customPrompt, filterFilledFields);
+            run(this.initialImageGenerate(jobId, record, ctx, headers, customPrompt, filterFilledFields));
           break;
           case 'analyze_no_images':
-            this.analyzeNoImages(jobId, record, ctx, headers, customPrompt, filterFilledFields);
+            run(this.analyzeNoImages(jobId, record, ctx, headers, customPrompt, filterFilledFields));
           break;
           case 'analyze':
-            this.analyze_image(jobId, record, ctx, headers, customPrompt, filterFilledFields);
+            run(this.analyze_image(jobId, record, ctx, headers, customPrompt, filterFilledFields));
           break;
           case 'regenerate_images':
             if (!data.prompt || !data.fieldName) {
               jobs.set(jobId, { status: "failed", error: "Missing prompt or field name" });
               break;
             }
-            this.regenerateImage(jobId, record, data.fieldName, data.prompt, headers);
+            run(this.regenerateImage(jobId, record, ctx, data.fieldName, data.prompt, headers));
           break;
           case 'regenerate_cell':
-            this.regenerateCell(jobId, data.fieldToRegenerate, record, ctx, data.action, data.prompt);
+            run(this.regenerateCell(jobId, data.fieldToRegenerate, record, ctx, data.action, data.prompt));
           break;
           default:
             jobs.set(jobId, { status: "failed", error: "Unknown action type" });
