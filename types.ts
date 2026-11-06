@@ -102,7 +102,7 @@ export interface PluginOptions extends PluginsCommonOptions {
       /**
        * Whether the user is allowed to run AI generation. The action is hidden from users who are not
        * allowed, and the generation requests from them are rejected.
-       * When not set, generation is disabled for all users.
+       * When not set, users with the `edit` permission on the resource are allowed.
        *
        * Example:
        *

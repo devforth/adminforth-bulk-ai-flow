@@ -1,4 +1,4 @@
-import { AdminForthPlugin, Filters, ActionCheckSource, afLogger } from "adminforth";
+import { AdminForthPlugin, Filters, ActionCheckSource, interpretResource } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthPageInjectionDeclarationFull, AdminForthResource, AdminUser, HttpExtra } from "adminforth";
 import { suggestIfTypo } from "adminforth";
 import type { PluginOptions } from './types.js';
@@ -687,7 +687,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
     const pageInjection: AdminForthPageInjectionDeclarationFull = {
       file: this.componentPath('VisionAction.vue'),
-      isVisible: ({ adminUser }) => this.isAllowedToGenerate(adminUser),
+      isVisible: ({ adminUser }) => this.isAllowedToGenerate(adminUser, ActionCheckSource.DisplayButtons),
       meta: {
         pluginInstanceId: this.pluginInstanceId,
         outputFields: outputFields,
@@ -735,14 +735,18 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
 
     (resourceConfig.options.pageInjections.list.threeDotsDropdownItems as AdminForthPageInjectionDeclarationFull[]).push(pageInjection);
-
-    if (this.options.allowedActions?.generate === undefined) {
-      afLogger.warn(`BulkAiFlowPlugin "${this.options.actionName}" on resource "${resourceConfig.resourceId}": allowedActions.generate is not set, so AI generation is disabled for all users. Set allowedActions.generate in the plugin options to allow it.`);
-    }
   }
 
-  private async isAllowedToGenerate(adminUser: AdminUser): Promise<boolean> {
-    const generate = this.options.allowedActions?.generate ?? false;
+  /**
+   * `allowedActions.generate` when set, otherwise the `edit` permission of the resource:
+   * the generated values can only be saved by users who can edit.
+   */
+  private async isAllowedToGenerate(adminUser: AdminUser, source: ActionCheckSource): Promise<boolean> {
+    const generate = this.options.allowedActions?.generate;
+    if (generate === undefined) {
+      const { allowedActions } = await interpretResource(adminUser, this.resourceConfig, {}, source, this.adminforth);
+      return allowedActions.edit === true;
+    }
     return typeof generate === 'function'
       ? await generate({ adminUser, resource: this.resourceConfig })
       : generate;
@@ -1192,7 +1196,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
         const data = body as z.infer<typeof createJobBodySchema>;
         const { actionType, recordId, customPrompt, filterFilledFields, sessionIds } = data;
-        if (!await this.isAllowedToGenerate(adminUser)) {
+        if (!await this.isAllowedToGenerate(adminUser, ActionCheckSource.EditRequest)) {
           return { ok: false, error: "You are not allowed to run AI generation" };
         }
         if (this.options.rateLimits) {
