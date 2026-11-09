@@ -1,5 +1,5 @@
 import { AdminForthPlugin, Filters, ActionCheckSource, interpretResource } from "adminforth";
-import type { IAdminForth, IHttpServer, AdminForthPageInjectionDeclarationFull, AdminForthResource, AdminUser, HttpExtra } from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthPageInjectionDeclarationFull, AdminForthResource, AdminUser, HttpExtra, AdminForthDataTypes, AdminForthResourceColumn } from "adminforth";
 import { suggestIfTypo } from "adminforth";
 import type { PluginOptions, AdapterForRecord, AdapterResolver } from './types.js';
 import Handlebars from 'handlebars';
@@ -88,7 +88,7 @@ const STUB_MODE = false;
 const jobs = new Map(); 
 export default class  BulkAiFlowPlugin extends AdminForthPlugin {
   options: PluginOptions;
-  uploadPlugin: AdminForthPlugin;
+  primaryKeyColumn!: AdminForthResourceColumn;
   totalCalls: number;
   totalDuration: number;
   rateLimiters: Record<string, RateLimiter> = {};
@@ -138,15 +138,15 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return compiled;
   }
 
-  private async compileOutputFieldsTemplates(record: any, ctx: AccessCheckContext, customPrompt? : string, clientSupplied: boolean = !!customPrompt) {
+  private async compileOutputFieldsTemplates(record: any, ctx: AccessCheckContext, customPrompt? : string | null, clientSupplied: boolean = !!customPrompt) {
     return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) :this.options.fillFieldsFromImages, { record, ctx, clientSupplied }, v => String(v));
   }
 
-  private async compileOutputFieldsTemplatesNoImage(record: any, ctx: AccessCheckContext, customPrompt? : string, clientSupplied: boolean = !!customPrompt) {
+  private async compileOutputFieldsTemplatesNoImage(record: any, ctx: AccessCheckContext, customPrompt? : string | null, clientSupplied: boolean = !!customPrompt) {
     return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.fillPlainFields, { record, ctx, clientSupplied }, v => String(v));
   }
 
-  private async compileGenerationFieldTemplates(record: any, ctx: AccessCheckContext, customPrompt? : string, clientSupplied: boolean = !!customPrompt) {
+  private async compileGenerationFieldTemplates(record: any, ctx: AccessCheckContext, customPrompt? : string | null, clientSupplied: boolean = !!customPrompt) {
     return await this.compileTemplates(customPrompt ? JSON.parse(customPrompt) : this.options.generateImages, { record, ctx, clientSupplied }, v => String(customPrompt ? v : v.prompt));
   }
 
@@ -189,13 +189,29 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
     try {
       return await (option as AdapterResolver<T>)({ record, adminUser });
-    } catch (e) {
+    } catch (e: any) {
       throw new Error(`Failed to select the AI adapter: ${e.message}`);
     }
   }
 
+  private resolveVisionAdapter(record: any, adminUser: AdminUser) {
+    return this.resolveAdapter(this.options.visionAdapter!, record, adminUser);
+  }
+
+  private resolveTextCompleteAdapter(record: any, adminUser: AdminUser) {
+    return this.resolveAdapter(this.options.textCompleteAdapter!, record, adminUser);
+  }
+
+  private getImageFieldOptions(fieldName: string) {
+    return this.options.generateImages![fieldName];
+  }
+
   private resolveImageGenerationAdapter(fieldName: string, record: any, adminUser: AdminUser) {
-    return this.resolveAdapter(this.options.generateImages[fieldName].adapter ?? this.options.imageGenerationAdapter, record, adminUser);
+    return this.resolveAdapter((this.getImageFieldOptions(fieldName).adapter ?? this.options.imageGenerationAdapter)!, record, adminUser);
+  }
+
+  private getAttachmentFiles(record: any) {
+    return this.options.attachFiles!({ record });
   }
 
   private getPromptForImageAnalysis(compiledOutputFields: Record<string, string>) {
@@ -216,7 +232,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     return prompt;
   }
 
-  private async analyze_image(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async analyze_image(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string | null, filterFilledFields: boolean | null = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.fillFieldsFromImages && await this.checkRateLimit("fillFieldsFromImages" ,this.options.rateLimits.fillFieldsFromImages, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -225,7 +241,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     let isError = false;
 
     //recieve image URLs to analyze
-    const attachmentFiles = await this.options.attachFiles({ record: record });
+    const attachmentFiles = await this.getAttachmentFiles(record);
     if (STUB_MODE) {
       await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 8000) + 1000));
       const fakeError = Math.random() < 0.5; // 50% chance of error
@@ -257,7 +273,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         
       const prompt = this.getPromptForImageAnalysis(filteredCompiledOutputFields);
 
-      const visionAdapter = await this.resolveAdapter(this.options.visionAdapter, record, ctx.adminUser);
+      const visionAdapter = await this.resolveVisionAdapter(record, ctx.adminUser);
       //send prompt to OpenAI and get response
       let chatResponse;
       try {
@@ -293,7 +309,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   }
 
-  private async analyzeNoImages(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async analyzeNoImages(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string | null, filterFilledFields: boolean | null = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.fillPlainFields && await this.checkRateLimit("fillPlainFields" ,this.options.rateLimits.fillPlainFields, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -322,7 +338,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       const prompt = this.getPromptForPlainFields(filteredCompiledOutputFields);
       //send prompt to OpenAI and get response
       const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
-      const textCompleteAdapter = await this.resolveAdapter(this.options.textCompleteAdapter, record, ctx.adminUser);
+      const textCompleteAdapter = await this.resolveTextCompleteAdapter(record, ctx.adminUser);
       let resp: any;
       try {
         const { content: chatResponse, error: topLevelError } = await textCompleteAdapter.complete({
@@ -354,7 +370,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async initialImageGenerate(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string, filterFilledFields: boolean = true) {
+  private async initialImageGenerate(jobId: string, record: any, ctx: AccessCheckContext, headers: Record<string, string | string[] | undefined>, customPrompt? : string | null, filterFilledFields: boolean | null = true) {
     // TODO: need to do correct check of rate limit
     // if (this.options.rateLimits && this.options.rateLimits.generateImages && await this.checkRateLimit("generateImages" ,this.options.rateLimits.generateImages, headers)) {
     //   jobs.set(jobId, { status: 'failed', error: "Rate limit exceeded" });
@@ -362,7 +378,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     // }
     let isError = false;
     const start = +new Date();
-    let attachmentFiles
+    let attachmentFiles: string[];
     if(!this.options.attachFiles){
       attachmentFiles = [];
     } else {
@@ -382,7 +398,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           p.resourceConfig!.resourceId === this.resourceConfig.resourceId &&
           p.pluginOptions.pathColumnName === key
         );
-        const image_url = await plugin.pluginOptions.storageAdapter.getDownloadUrl(record[key]);
+        const image_url = await plugin!.pluginOptions.storageAdapter.getDownloadUrl(record[key]);
         return { 
           key,
           images: [image_url], 
@@ -417,7 +433,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
                   prompt,
                   inputFiles: attachmentFiles,
                   n: 1,
-                  size: this.options.generateImages[key].outputSize,
+                  size: this.getImageFieldOptions(key).outputSize,
                 }
               )
               if (resp.error) {
@@ -430,7 +446,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               isError = true;
               return { key, images: [] };
             }
-            images = resp.imageURLs[0];
+            images = resp.imageURLs![0];
           }
         return { key, images };
       }
@@ -467,7 +483,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     //   return { error: "Rate limit exceeded" };
     // }
     const start = +new Date();
-    let attachmentFiles
+    let attachmentFiles: string[];
       if(!this.options.attachFiles){
         attachmentFiles = [];
       } else {
@@ -475,7 +491,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     const generationAdapter = await this.resolveImageGenerationAdapter(fieldName, record, ctx.adminUser);
     const images = await Promise.all(
-      (new Array(this.options.generateImages[fieldName].countToGenerate)).fill(0).map(async () => {
+      (new Array(this.getImageFieldOptions(fieldName).countToGenerate)).fill(0).map(async () => {
         if (this.options.attachFiles && attachmentFiles.length === 0) {
           isError = true;
           jobs.set(jobId, { status: 'failed', error: "No source images found" });
@@ -494,7 +510,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               prompt,
               inputFiles: attachmentFiles,
               n: 1,
-              size: this.options.generateImages[fieldName].outputSize,
+              size: this.getImageFieldOptions(fieldName).outputSize,
             }
           )
           if (resp.error) {
@@ -507,7 +523,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
           isError = true;
           return [];
         }
-        return resp.imageURLs[0]
+        return resp.imageURLs![0]
       })
     );
 
@@ -521,7 +537,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     }
   }
 
-  private async regenerateCell(jobId, fieldToRegenerate, record: any, ctx: AccessCheckContext, actionType, prompt) {
+  private async regenerateCell(jobId: string, fieldToRegenerate: string | null | undefined, record: any, ctx: AccessCheckContext, actionType: string | null | undefined, prompt: string | null | undefined) {
     if (!fieldToRegenerate || !actionType ) {
       jobs.set(jobId, { status: 'failed', error: 'Missing parameters' });
       return;
@@ -545,12 +561,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       if ( actionType === 'analyze') {
         const compiledPropmt = await this.compileOutputFieldsTemplates(record, ctx, promptToPass, clientSupplied);
         const finalPrompt = this.getPromptForImageAnalysis(compiledPropmt);
-        const attachmentFiles = await this.options.attachFiles({ record: record });
+        const attachmentFiles = await this.getAttachmentFiles(record);
         if (attachmentFiles.length === 0) {
           jobs.set(jobId, { status: 'failed', error: "No source images found" });
           return;
         }
-        const visionAdapter = await this.resolveAdapter(this.options.visionAdapter, record, ctx.adminUser);
+        const visionAdapter = await this.resolveVisionAdapter(record, ctx.adminUser);
         let visionAdapterResponse;
         try {
           visionAdapterResponse = await visionAdapter.generate({ prompt: finalPrompt, inputFileUrls: attachmentFiles });
@@ -577,7 +593,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const compiledPropmt = await this.compileOutputFieldsTemplatesNoImage(record, ctx, promptToPass, clientSupplied);
         const finalPrompt = this.getPromptForPlainFields(compiledPropmt);
         const numberOfTokens = this.options.fillPlainFieldsMaxTokens ? this.options.fillPlainFieldsMaxTokens : 1000;
-        const textCompleteAdapter = await this.resolveAdapter(this.options.textCompleteAdapter, record, ctx.adminUser);
+        const textCompleteAdapter = await this.resolveTextCompleteAdapter(record, ctx.adminUser);
         let resp;
         try {
           const { content: chatResponse, error: topLevelError } = await textCompleteAdapter.complete({
@@ -595,7 +611,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         }
         let resData;
         try {
-          resData = JSON.parse(resp);
+          resData = JSON.parse(resp!);
         } catch (e) {
           jobs.set(jobId, { status: 'failed', error: 'AI response is not valid JSON', aiResponse: resp });
           return;
@@ -607,6 +623,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
+    this.primaryKeyColumn = resourceConfig.columns.find((col) => col.primaryKey)!;
 
     //check if options names are provided
     const columns = this.resourceConfig.columns;
@@ -656,7 +673,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       }
     }
 
-    const outputImagesPluginInstanceIds = {};
+    const outputImagesPluginInstanceIds: Record<string, string> = {};
     //check if Upload plugin is installed on all attachment fields
     if (this.options.generateImages) {
       for (const [key, value] of Object.entries(this.options.generateImages)) {
@@ -683,13 +700,12 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       ...outputImageFields,
     ];
 
-    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
     // Map of column technical names to their display labels from resource config
     const columnLabels: Record<string, string> = Object.fromEntries(
       (this.resourceConfig.columns || []).map((c: any) => [c.name, c.label || c.name])
     );
     // the review dialog picks an editor for a generated value by the type of its column
-    const columnTypes: Record<string, string> = Object.fromEntries(
+    const columnTypes: Record<string, AdminForthDataTypes | undefined> = Object.fromEntries(
       this.resourceConfig.columns.filter((c) => outputFields.includes(c.name)).map((c) => [c.name, c.type])
     );
     // only the prompts go to the browser: an entry of generateImages may hold an adapter with its API key
@@ -710,7 +726,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         outputImageFields: outputImageFields,
         outputFieldsForAnalizeFromImages: outputFieldsForAnalizeFromImages,
         outputPlainFields: outputPlainFields,
-        primaryKey: primaryKeyColumn.name,
+        primaryKey: this.primaryKeyColumn.name,
         outputImagesPluginInstanceIds: outputImagesPluginInstanceIds,
         isFieldsForAnalizeFromImages: this.options.fillFieldsFromImages ? Object.keys(this.options.fillFieldsFromImages).length > 0 : false,
         isFieldsForAnalizePlain: this.options.fillPlainFields ? Object.keys(this.options.fillPlainFields).length > 0 : false,
@@ -858,11 +874,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       if (matches) {
         matches.forEach((match) => {
           const field = match.replace(/{{|}}/g, '').trim();
-          if (!resourceConfig.columns.find((column: any) => column.name === field)) {
+          const column = resourceConfig.columns.find((column: any) => column.name === field);
+          if (!column) {
             const similar = suggestIfTypo(resourceConfig.columns.map((column: any) => column.name), field);
             throw new Error(`Field "${field}" specified in generationPrompt not found in resource "${resourceConfig.label}". ${similar ? `Did you mean "${similar}"?` : ''}`);
           } else {
-            let column = resourceConfig.columns.find((column: any) => column.name === field);
             if (column.backendOnly === true) {
               throw new Error(`Field "${field}" specified in generationPrompt is marked as backendOnly in resource "${resourceConfig.label}". Please remove backendOnly or choose another field.`);
             }
@@ -894,7 +910,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     adminUser: AdminUser,
     oldRecord: any,
     fields: Record<string, any>,
-  }): Promise<string | null> {
+  }): Promise<string | null | undefined> {
     const managedFields = this.pluginManagedFields();
 
     for (const [fieldName, value] of Object.entries(fields)) {
@@ -937,7 +953,7 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     adminUser: AdminUser,
     recordId: any,
     extra: HttpExtra,
-  }): Promise<{ record?: any, ctx?: AccessCheckContext, error?: string }> {
+  }): Promise<{ record?: any, ctx: AccessCheckContext, error?: string }> {
     const meta = { requestBody: extra.body, pk: recordId };
     const ctx: AccessCheckContext = {
       adminUser,
@@ -948,14 +964,13 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
     };
 
     const resource = this.adminforth.resource(this.resourceConfig.resourceId);
-    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-    const filter = Filters.EQ(primaryKeyColumn.name, recordId);
+    const filter = Filters.EQ(this.primaryKeyColumn.name, recordId);
     try {
       if (!await resource.asUser(adminUser, { meta, extra }).get(filter)) {
-        return { error: 'Record not found' };
+        return { error: 'Record not found', ctx };
       }
     } catch (e) {
-      return { error: (e as Error).message };
+      return { error: (e as Error).message, ctx };
     }
     return { record: await resource.get(filter), ctx };
   }
@@ -966,10 +981,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
    * way the core show route drops them.
    */
   private async scopeRecordForFrontend(record: any, ctx: AccessCheckContext): Promise<Record<string, any>> {
-    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
     const managedFields = this.pluginManagedFields();
     const scoped: Record<string, any> = {
-      [primaryKeyColumn.name]: record[primaryKeyColumn.name],
+      [this.primaryKeyColumn.name]: record[this.primaryKeyColumn.name],
       _label: this.resourceConfig.recordLabel(record),
     };
     for (const column of this.resourceConfig.columns.filter((col) => managedFields.has(col.name))) {
@@ -1076,7 +1090,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const data = body as z.infer<typeof updateFieldsBodySchema>;
         const selectedIds = data.selectedIds || [];
         const fieldsToUpdate = data.fields || {};
-        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
 
         const decimalFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'decimal').map(c => c.name);
         const integerFieldsArray = this.resourceConfig.columns.filter(c => c.type === 'integer').map(c => c.name);
@@ -1088,9 +1101,9 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
         const oldRecords: any[] = [];
         const sanitizedFields: Record<string, any>[] = [];
         for (const [idx, ID] of selectedIds.entries()) {
-          const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(primaryKeyColumn.name, ID)] );
+          const oldRecord = await this.adminforth.resource(this.resourceConfig.resourceId).get( [Filters.EQ(this.primaryKeyColumn.name, ID)] );
           if (!oldRecord) {
-            return { ok: false, error: `Record with ${primaryKeyColumn.name} ${ID} not found` };
+            return { ok: false, error: `Record with ${this.primaryKeyColumn.name} ${ID} not found` };
           }
           const fields = fieldsToUpdate[idx];
           if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
@@ -1352,7 +1365,6 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
       agent: { hiddenFromAgents: true },
       request_schema: getFilteredIdsBodySchema,
       handler: async ({ body, adminUser, headers, query, cookies, requestUrl, response }) => {
-        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
         let records;
         try {
           // only the primary key is read, so response hooks have nothing heavy to post-process
@@ -1361,11 +1373,11 @@ export default class  BulkAiFlowPlugin extends AdminForthPlugin {
               meta: { requestBody: body },
               extra: { body, query, headers, cookies, requestUrl, response },
             })
-            .list(body.filters ?? [], null, null, [], [primaryKeyColumn.name]);
+            .list(body.filters ?? [], undefined, undefined, [], [this.primaryKeyColumn.name]);
         } catch (e) {
           return { ok: false, error: (e as Error).message };
         }
-        return { ok: true, recordIds: records.map((record) => record[primaryKeyColumn.name]) };
+        return { ok: true, recordIds: records.map((record) => record[this.primaryKeyColumn.name]) };
       }
     });
   }
